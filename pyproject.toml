@@ -1,0 +1,25 @@
+[build-system]
+requires = ["maturin>=1.8.0"]
+build-backend = "maturin"
+
+[project]
+name = "pyevoea"
+version = "0.0.1"
+license = {file = "LICENSE"}
+description = "Efficient and high-performance community detection in large-scale graphs, built with Rust for speed and scalability."
+authors = [
+    { name = "Guilherme Santos", email = "0l1ve1r4@proton.me" }
+]
+readme = { file = "README.md", content-type = "text/markdown" }
+keywords = ["rust", "python", "community detection", "multi-objective optimization", "graph analysis"]
+classifiers = [
+    "Programming Language :: Rust",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries",
+    "Programming Language :: Python :: 3.12",
+]
+
+[project.urls]
+Repository = "https://github.com/ol1veir4s/pyevoea"
+Issues = "https://github.com/ol1veir4s/pyevoea/issues"

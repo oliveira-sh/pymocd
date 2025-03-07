@@ -1,0 +1,29 @@
+[package]
+name = "pyevoea" 
+version = "0.1.1" 
+edition = "2024"
+authors = ["Guilherme Santos"]
+license = "GPL-3.0-or-later"
+
+[lib]
+name = "pyevoea"
+crate-type = ["cdylib"]
+
+[profile.release]
+debug = true 
+
+[features]
+cli = []
+python = []
+default = ["cli"]
+
+[dependencies]
+rand = "0.8"            # random number generation.
+rayon = "1.7"           # data parallelism and multi-threading support.
+rustc-hash = { version = "2.1", default-features = true } # a fast hash map implementation.
+pyo3 = { version = "0.23.3", features = ["extension-module"] }
+dashmap = "6.1.0"  # For concurrent HashMap
+rand_chacha = "0.3.1"
+
+[package.metadata.maturin]
+name = "pyevoea"
