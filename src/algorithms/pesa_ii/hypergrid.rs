@@ -261,7 +261,7 @@ pub fn select<'a>(hyperboxes: &'a [HyperBox], rng: &mut impl rand::Rng) -> &'a S
         .map(|hb| 1.0 / (hb.solutions.len() as f64))
         .sum();
 
-    let mut random_value = rng.gen::<f64>() * total_weight;
+    let mut random_value = rng.random::<f64>() * total_weight;
 
     // Selection remains sequential to handle the cumulative weights
     for hyperbox in hyperboxes {
@@ -272,12 +272,12 @@ pub fn select<'a>(hyperboxes: &'a [HyperBox], rng: &mut impl rand::Rng) -> &'a S
         };
         if random_value <= weight {
             // Randomly select a solution from the chosen hyperbox
-            return &hyperbox.solutions[rng.gen_range(0..hyperbox.solutions.len())];
+            return &hyperbox.solutions[rng.random_range(0..hyperbox.solutions.len())];
         }
         random_value -= weight;
     }
 
     // Fallback to last hyperbox
     let last_box = hyperboxes.last().unwrap();
-    &last_box.solutions[rng.gen_range(0..last_box.solutions.len())]
+    &last_box.solutions[rng.random_range(0..last_box.solutions.len())]
 }

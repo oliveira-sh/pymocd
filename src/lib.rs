@@ -106,7 +106,7 @@ fn nsga_ii(py: Python<'_>, graph: &Bound<'_, PyAny>, debug: i8) -> PyResult<BTre
 ///
 /// # Returns
 /// - float: Modularity score based on (Shi, 2012) multi-objective modularity equation
-#[pyfunction(name = "modularity")]
+#[pyfunction(name = "fitness")]
 fn fitness(graph: &Bound<'_, PyAny>, partition: &Bound<'_, PyDict>) -> PyResult<f64> {
     let edges = get_edges(graph)?;
     let graph = build_graph(edges);
@@ -159,7 +159,8 @@ fn build_graph(edges: Vec<(NodeId, NodeId)>) -> Graph {
 // ================================================================================================
 
 #[pymodule]
-fn re_mocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
+#[pyo3(name = "pyevoea")]
+fn pyevoea(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(pesa_ii_maxq, m)?)?;
     m.add_function(wrap_pyfunction!(pesa_ii_minimax, m)?)?;
 
@@ -167,25 +168,3 @@ fn re_mocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(fitness, m)?)?;
     Ok(())
 }
-
-/* ================================================================================================
-// Deprecated
-// ================================================================================================
-
-/// Performs community detection on a graph from an edge list file
-#[pyfunction(name = "from_file")]
-#[pyo3(signature = (file_path))]
-fn from_file(file_path: String) -> PyResult<BTreeMap<i32, i32>> {
-    let config = AlgorithmConfig::parse(&vec!["--library-".to_string(), file_path]);
-    if config.debug {
-        println!("[Detection]: Config: {:?}", config);
-    }
-
-    let graph = Graph::from_edgelist(Path::new(&config.file_path))?;
-    let (communities, _, _) = algorithms::pesa_ii(&graph, config);
-
-    Ok(communities)
-}
-
-
-*/

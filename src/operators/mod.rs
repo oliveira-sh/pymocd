@@ -14,7 +14,6 @@ mod crossover;
 mod mutation;
 mod objective;
 mod population;
-mod selection;
 
 /// Represents the convergence criteria and state for the genetic algorithm
 #[derive(Debug)]

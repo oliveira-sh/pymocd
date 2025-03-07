@@ -2,7 +2,7 @@ use crate::graph::{Partition, Graph};
 
 use crate::operators;
 
-use rand::prelude::*;
+use rand::{prelude::*, rng};
 use rayon::prelude::*;
 use rustc_hash::FxHashSet as HashSet;
 use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
@@ -55,12 +55,12 @@ impl Individual {
 // Tournament selection with early return
 #[inline]
 pub fn tournament_selection<'a>(population: &'a [Individual], tournament_size: usize) -> &'a Individual {
-    let mut rng: ThreadRng = thread_rng(); 
-    let best_idx: usize = rng.gen_range(0..population.len());
+    let mut rng: ThreadRng = rng(); 
+    let best_idx: usize = rng.random_range(0..population.len());
     let mut best: &Individual = &population[best_idx];
     
     for _ in 1..tournament_size {
-        let candidate_idx: usize = rng.gen_range(0..population.len());
+        let candidate_idx: usize = rng.random_range(0..population.len());
         let candidate: &Individual = &population[candidate_idx];
         
         if candidate.rank < best.rank || 
@@ -91,7 +91,7 @@ pub fn create_offspring(
     let thread_offsprings: Vec<Vec<Individual>> = (0..num_threads)
         .into_par_iter()
         .map(|_| {
-            let mut local_rng = thread_rng();
+            let mut local_rng = rng();
             let mut local_offspring = Vec::with_capacity(chunk_size);
             
             while offspring_counter.fetch_add(1, AtomicOrdering::Relaxed) < pop_size {
@@ -118,7 +118,7 @@ pub fn create_offspring(
                     .collect();
                 
                 let parent_slice: &[Partition] = &parent_partitions;   
-                let should_crossover = local_rng.gen::<f64>() < crossover_rate;
+                let should_crossover = local_rng.random::<f64>() < crossover_rate;
                      
                 let mut child = if should_crossover {
                     operators::ensemble_crossover(parent_slice, 1.0)
