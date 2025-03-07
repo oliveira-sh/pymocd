@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 
 #[allow(dead_code)]
 pub fn generate_optimized_population(graph: &Graph, population_size: usize) -> Vec<Partition> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let nodes: Vec<NodeId> = graph.nodes.iter().copied().collect();
     let num_nodes = nodes.len();
     let mut population = Vec::with_capacity(population_size);
@@ -21,7 +21,7 @@ pub fn generate_optimized_population(graph: &Graph, population_size: usize) -> V
     for _ in 0..population_size / 3 {
         let mut partition = BTreeMap::new();
         for &node in &nodes {
-            partition.insert(node, rng.gen_range(0..=(num_nodes / 2)) as CommunityId);
+            partition.insert(node, rng.random_range(0..=(num_nodes / 2)) as CommunityId);
         }
         population.push(partition);
     }
@@ -42,7 +42,7 @@ pub fn generate_optimized_population(graph: &Graph, population_size: usize) -> V
 
                     // Add some neighbors with 70% probability
                     for &neighbor in graph.neighbors(&node) {
-                        if unassigned.contains(&neighbor) && rng.gen_bool(0.7) {
+                        if unassigned.contains(&neighbor) && rng.random_bool(0.7) {
                             to_process.push(neighbor);
                         }
                     }
@@ -76,7 +76,7 @@ pub fn generate_optimized_population(graph: &Graph, population_size: usize) -> V
 
 #[allow(dead_code)]
 pub fn generate_initial_population(graph: &Graph, population_size: usize) -> Vec<Partition> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let nodes: Vec<NodeId> = graph.nodes.iter().copied().collect();
     let num_nodes = nodes.len();
 
@@ -84,7 +84,7 @@ pub fn generate_initial_population(graph: &Graph, population_size: usize) -> Vec
         .map(|_| {
             nodes
                 .iter()
-                .map(|&node| (node, rng.gen_range(0..num_nodes) as CommunityId))
+                .map(|&node| (node, rng.random_range(0..num_nodes) as CommunityId))
                 .collect()
         })
         .collect()

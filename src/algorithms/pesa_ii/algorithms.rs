@@ -9,7 +9,7 @@ use super::model_selection::{max_q_selection, min_max_selection};
 
 use rustc_hash::FxBuildHasher;
 use std::collections::HashMap;
-use rand::thread_rng;
+use rand::rng;
 use rand::seq::SliceRandom as _;
 
 /// Generates multiple random networks and combines their solutions
@@ -24,7 +24,7 @@ fn generate_random_networks(original: &Graph, num_networks: usize) -> Vec<Graph>
             let node_vec: Vec<_> = random_graph.nodes.iter().cloned().collect();
             let num_nodes = node_vec.len();
             let num_edges = original.edges.len();
-            let mut rng = thread_rng();
+            let mut rng = rng();
             let mut possible_pairs = Vec::with_capacity(num_nodes * (num_nodes - 1) / 2);
 
             for i in 0..num_nodes {

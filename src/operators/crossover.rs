@@ -6,8 +6,7 @@
 
 use crate::graph::{NodeId, Partition};
 use std::collections::HashMap;
-use rand::prelude::SliceRandom;
-use rand::Rng;
+use rand::{seq::IndexedRandom, Rng};
 use std::collections::BTreeMap;
 
 pub fn optimized_crossover(
@@ -15,11 +14,11 @@ pub fn optimized_crossover(
     parent2: &Partition,
     crossover_rate: f64,
 ) -> Partition {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
-    if rng.gen::<f64>() > crossover_rate {
+    if rng.random::<f64>() > crossover_rate {
         // If no crossover, randomly return either parent1 or parent2
-        return if rng.gen_bool(0.5) {
+        return if rng.random_bool(0.5) {
             parent1.clone()
         } else {
             parent2.clone()
@@ -32,8 +31,8 @@ pub fn optimized_crossover(
 
     // Optimize crossover point selection
     let crossover_points: (usize, usize) = {
-        let point1: usize = rng.gen_range(0..len);
-        let point2: usize = (point1 + rng.gen_range(1..len / 2)).min(len - 1);
+        let point1: usize = rng.random_range(0..len);
+        let point2: usize = (point1 + rng.random_range(1..len / 2)).min(len - 1);
         (point1, point2)
     };
 
@@ -73,10 +72,10 @@ pub fn simulated_binary_crossover(
     crossover_rate: f64,
     eta: f64,
 ) -> Partition {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
-    if rng.gen::<f64>() > crossover_rate {
-        return if rng.gen_bool(0.5) {
+    if rng.random::<f64>() > crossover_rate {
+        return if rng.random_bool(0.5) {
             parent1.clone()
         } else {
             parent2.clone()
@@ -92,14 +91,14 @@ pub fn simulated_binary_crossover(
         if comm1 == comm2 {
             child.insert(*node, comm1);
         } else {
-            let u = rng.gen::<f64>();
+            let u = rng.random::<f64>();
             let beta = if u <= 0.5 {
                 (2.0 * u).powf(1.0 / (eta + 1.0))
             } else {
                 (1.0 / (2.0 * (1.0 - u))).powf(1.0 / (eta + 1.0))
             };
             let p_parent1 = 1.0 / (1.0 + beta);
-            if rng.gen_bool(p_parent1) {
+            if rng.random_bool(p_parent1) {
                 child.insert(*node, comm1);
             } else {
                 child.insert(*node, comm2);
@@ -115,12 +114,12 @@ pub fn ensemble_crossover(
     parents: &[Partition],
     crossover_rate: f64,
 ) -> Partition {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     // Check if crossover should be skipped
-    if rng.gen::<f64>() > crossover_rate {
+    if rng.random::<f64>() > crossover_rate {
         // Return a random parent if no crossover
-        return parents[rng.gen_range(0..parents.len())].clone();
+        return parents[rng.random_range(0..parents.len())].clone();
     }
 
     // Collect node IDs from the first parent (assuming all parents have same nodes)
@@ -138,11 +137,13 @@ pub fn ensemble_crossover(
 
         // Find maximum count and collect candidates
         let max_count = community_counts.values().max().copied().unwrap_or(0);
+
         let candidates: Vec<_> = community_counts
             .iter()
-            .filter(|(_, &count)| count == max_count)
-            .map(|(&comm, _)| comm)
+            .filter(|(_, count)| **count == max_count)
+            .map(|(comm, _)| *comm)
             .collect();
+        
 
         // Select community with tie-breaking
         let selected = candidates.choose(&mut rng)
