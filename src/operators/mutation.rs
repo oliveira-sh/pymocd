@@ -11,7 +11,7 @@ use rustc_hash::FxBuildHasher;
 use rustc_hash::FxHashMap as HashMap;
 
 pub fn optimized_mutate(partition: &mut Partition, graph: &Graph, mutation_rate: f64) {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     // Convert BTreeMap to a faster hash map for the duration of the mutation
     let partition_size = partition.len();
@@ -23,7 +23,7 @@ pub fn optimized_mutate(partition: &mut Partition, graph: &Graph, mutation_rate:
     let nodes: Vec<NodeId> = fast_partition
         .keys()
         .copied()
-        .filter(|_| rng.gen_bool(mutation_rate))
+        .filter(|_| rng.random_bool(mutation_rate))
         .collect();
 
     // Pre-allocate community cache with expected size
@@ -65,13 +65,13 @@ pub fn polynomial_mutation(
     mutation_rate: f64,
     eta_m: f64,
 ) {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let nodes: Vec<NodeId> = graph.nodes.iter().cloned().collect();
 
     let mut fast_partition: HashMap<NodeId, CommunityId> = partition.iter().map(|(&k, &v)| (k, v)).collect();
 
     for &node in &nodes {
-        if rng.gen::<f64>() > mutation_rate {
+        if rng.random::<f64>() > mutation_rate {
             continue;
         }
 
@@ -102,7 +102,7 @@ pub fn polynomial_mutation(
             continue;
         }
 
-        let mut r = rng.gen::<f64>() * total;
+        let mut r = rng.random::<f64>() * total;
         let mut selected_comm = None;
         for &(comm, val) in &adjusted {
             if r <= val {
