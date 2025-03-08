@@ -54,10 +54,10 @@ impl Individual {
 
 // Tournament selection with early return
 #[inline]
-pub fn tournament_selection<'a>(
-    population: &'a [Individual],
+pub fn tournament_selection(
+    population: &[Individual],
     tournament_size: usize,
-) -> &'a Individual {
+) -> &Individual {
     let mut rng: ThreadRng = rng();
     let best_idx: usize = rng.random_range(0..population.len());
     let mut best: &Individual = &population[best_idx];
@@ -87,7 +87,7 @@ pub fn create_offspring(
     let pop_size = population.len();
     let mut offspring = Vec::with_capacity(pop_size);
     let num_threads = rayon::current_num_threads();
-    let chunk_size = (pop_size + num_threads - 1) / num_threads;
+    let chunk_size = pop_size.div_ceil(num_threads);
 
     // Use atomic counter for better load balancing
     let offspring_counter = AtomicUsize::new(0);

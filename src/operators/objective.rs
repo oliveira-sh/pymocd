@@ -18,7 +18,7 @@ pub fn calculate_objectives(
     // Build communities with HashSet for fast lookups
     let mut communities: HashMap<i32, Vec<NodeId>> = HashMap::default();
     for (&node, &comm) in partition.iter() {
-        communities.entry(comm).or_insert_with(Vec::new).push(node);
+        communities.entry(comm).or_default().push(node);
     }
 
     // Pre-compute node to community mapping for O(1) lookups

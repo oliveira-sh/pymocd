@@ -75,7 +75,7 @@ impl MocdNsgaII {
                 .into_par_iter()
                 .map(Individual::new)
                 .collect();
-        self.evaluate_population(&mut individuals, &self.graph, &degrees);
+        self.evaluate_population(&mut individuals, &self.graph, degrees);
 
         let mut max_local = operators::ConvergenceCriteria::default();
         for generation in 0..self.num_gens {
@@ -90,7 +90,7 @@ impl MocdNsgaII {
                 self.mut_rate,
                 TOURNAMENT_SIZE,
             );
-            self.evaluate_population(&mut offspring, &self.graph, &degrees);
+            self.evaluate_population(&mut offspring, &self.graph, degrees);
 
             // Combine and prepare for environmental selection.
             individuals.extend(offspring);
