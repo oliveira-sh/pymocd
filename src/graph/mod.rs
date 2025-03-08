@@ -8,9 +8,6 @@ use rustc_hash::FxHashMap as HashMap;
 use rustc_hash::FxHashSet as HashSet;
 
 use std::collections::BTreeMap;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::path::Path;
 
 pub type NodeId = i32;
 pub type CommunityId = i32;
@@ -41,8 +38,8 @@ impl Graph {
     pub fn print(&self) {
         println!(
             "[graph/mod.rs]: graph n/e: {}/{}",
-            self.nodes.len(),
-            self.edges.len(),
+            self.num_nodes(),
+            self.num_edges(),
         );
     }
 
@@ -54,23 +51,6 @@ impl Graph {
         // Update adjacency list
         self.adjacency_list.entry(from).or_default().push(to);
         self.adjacency_list.entry(to).or_default().push(from);
-    }
-
-    pub fn from_edgelist(path: &Path) -> Result<Self, std::io::Error> {
-        let mut graph = Graph::new();
-        let file = File::open(path)?;
-        let reader = BufReader::new(file);
-
-        for line in reader.lines() {
-            let line = line?;
-            let parts: Vec<&str> = line.split(',').collect();
-            if parts.len() >= 2 {
-                let from: NodeId = parts[0].parse().unwrap();
-                let to: NodeId = parts[1].parse().unwrap();
-                graph.add_edge(from, to);
-            }
-        }
-        Ok(graph)
     }
 
     pub fn neighbors(&self, node: &NodeId) -> &[NodeId] {
@@ -85,7 +65,7 @@ impl Graph {
         self.edges.len()
     }
 
-    pub fn precompute_degress(&self) -> HashMap<i32, usize> {
+    pub fn precompute_degrees(&self) -> HashMap<i32, usize> {
         let degrees: HashMap<NodeId, usize> = self
             .nodes
             .iter()
@@ -117,12 +97,11 @@ mod test {
         graph.add_edge(0, 2);
         graph.add_edge(0, 4);
 
-        assert_eq!(graph.neighbors(&0), [1,2,4]);      
+        assert_eq!(graph.neighbors(&0), [1, 2, 4]);
     }
 
-
     #[test]
-    fn test_precompute_degress() {
+    fn test_precompute_degrees() {
         let mut graph: Graph = Graph::new();
         graph.add_edge(0, 1);
         graph.add_edge(0, 2);
@@ -134,8 +113,7 @@ mod test {
         expected.insert(4, 1);
         expected.insert(1, 1);
 
-        assert_eq!(graph.precompute_degress(), expected);
-
+        assert_eq!(graph.precompute_degrees(), expected);
     }
 
     #[test]
