@@ -110,7 +110,8 @@ impl MocdPesaII {
                 .iter()
                 .map(|random_graph| {
                     let random_degrees = random_graph.precompute_degrees();
-                    let random_archive = evolutionary::evolutionary_phase(
+                    
+                    evolutionary::evolutionary_phase(
                         random_graph,
                         self.debug_level,
                         self.num_gens,
@@ -118,8 +119,7 @@ impl MocdPesaII {
                         self.cross_rate,
                         self.mut_rate,
                         &random_degrees,
-                    );
-                    random_archive
+                    )
                 })
                 .collect();
             model_selection::min_max_selection(&archive, &random_archives)
