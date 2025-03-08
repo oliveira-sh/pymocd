@@ -1,0 +1,114 @@
+name: Build and Publish to PyPI
+
+on:
+  push:
+    tags:
+      - '*'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  PYTHON_VERSION: "3.9"
+
+jobs:
+  # Build wheels for each OS in parallel
+  build:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install maturin wheel
+
+      # This step is necessary for macOS arm64 builds
+      - name: Set up Rust target for macOS arm64
+        if: runner.os == 'macOS'
+        run: rustup target add aarch64-apple-darwin
+
+      - name: Build wheels
+        run: |
+          maturin build --release --sdist --strip
+        env:
+          # Build universal2 wheels on macOS
+          MACOSX_DEPLOYMENT_TARGET: "10.12"
+          DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+          SDKROOT: /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+
+      - name: List wheels
+        run: |
+          ls -l target/wheels/
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.python-version }}
+          path: target/wheels/*.whl
+
+      - name: Upload sdist
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.9'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: target/wheels/*.tar.gz
+
+  # Publish once all builds are complete
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    # Only publish on tag push or manual trigger
+    if: ${{ github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' }}
+
+    steps:
+      - name: Create dist directory
+        run: mkdir -p dist
+
+      - name: Download all wheels
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded
+
+      - name: Move wheels to dist
+        run: |
+          find downloaded -type f \( -name "*.whl" -o -name "*.tar.gz" \) -exec mv {} dist/ \;
+
+      - name: List distribution files
+        run: ls -l dist/
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install twine
+        run: |
+          python -m pip install --upgrade pip
+          pip install twine
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          twine upload --skip-existing dist/*
