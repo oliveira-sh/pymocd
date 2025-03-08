@@ -4,7 +4,7 @@
 //! Copyright 2024 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use crate::algorithms::pesa_ii::{hypergrid, HyperBox, Solution};
+use crate::mocd_pesa_ii::{HyperBox, Solution, hypergrid};
 use crate::operators::*;
 
 use rayon::prelude::*;
@@ -17,7 +17,6 @@ use rand_chacha::ChaCha8Rng;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::graph::{Graph, Partition};
-use crate::utils::args::AGArgs;
 
 pub const MAX_ARCHIVE_SIZE: usize = 100;
 
@@ -42,17 +41,19 @@ impl SafeRng {
 /// Parallel population generation using PESA-II selection and reproduction
 fn generate_new_population(
     hyperboxes: &[HyperBox],
-    args: &AGArgs,
+    pop_size: usize,
+    cross_rate: f64,
+    mut_rate: f64,
     graph: &Graph,
 ) -> Vec<Partition> {
     // Create thread-safe RNG
     let safe_rng = Arc::new(SafeRng::new());
 
     // Calculate chunk size based on available threads
-    let chunk_size = (args.pop_size / rayon::current_num_threads()).max(1);
+    let chunk_size = (pop_size / rayon::current_num_threads()).max(1);
 
     // Create chunks for parallel processing
-    let chunks: Vec<_> = (0..args.pop_size)
+    let chunks: Vec<_> = (0..pop_size)
         .collect::<Vec<_>>()
         .chunks(chunk_size)
         .map(|c| c.len())
@@ -75,8 +76,8 @@ fn generate_new_population(
                 let parent2 = hypergrid::select(hyperboxes, &mut local_rng);
 
                 // Perform crossover and mutation
-                let mut child = crossover(&parent1.partition, &parent2.partition, args.cross_rate);
-                mutation(&mut child, graph, args.mut_rate);
+                let mut child = crossover(&parent1.partition, &parent2.partition, cross_rate);
+                mutation(&mut child, graph, mut_rate);
                 local_children.push(child);
             }
 
@@ -89,17 +90,21 @@ fn generate_new_population(
 
 pub fn evolutionary_phase(
     graph: &Graph,
-    args: &AGArgs,
+    debug_level: i8,
+    num_gens: usize,
+    pop_size: usize,
+    cross_rate: f64,
+    mut_rate: f64,
     degrees: &HashMap<i32, usize, FxBuildHasher>,
-) -> (Vec<Solution>, Vec<f64>) {
+) -> Vec<Solution> {
     // Validate graph
     if graph.nodes.is_empty() || graph.edges.is_empty() {
         println!("[evolutionary_phase]: Empty graph detected");
-        return (Vec::new(), Vec::new());
+        return Vec::new();
     }
 
     // Debug print graph information
-    if args.debug >= 2 {
+    if debug_level >= 2 {
         println!(
             "[evolutionary_phase]: Starting with graph - nodes: {}, edges: {}",
             graph.nodes.len(),
@@ -107,30 +112,18 @@ pub fn evolutionary_phase(
         );
     }
 
-    let mut archive: Vec<Solution> = Vec::with_capacity(args.pop_size);
-    
+    let mut archive: Vec<Solution> = Vec::with_capacity(pop_size);
+
     // Generate and validate initial population
-    let mut population = generate_population(graph, args.pop_size);
-    if population.is_empty() {
-        println!("[evolutionary_phase]: Failed to generate initial population");
-        return (Vec::new(), Vec::new());
-    }
-
-    if args.debug >= 2 {
-        println!(
-            "[evolutionary_phase]: Initial population size: {}",
-            population.len()
-        );
-    }
-
-    let mut best_fitness_history: Vec<f64> = Vec::with_capacity(args.num_gens);
+    let mut population = generate_population(graph, pop_size);
+    let mut best_fitness_history: Vec<f64> = Vec::with_capacity(num_gens);
     let mut max_local: ConvergenceCriteria = ConvergenceCriteria::default();
 
-    for generation in 0..args.num_gens {
+    for generation in 0..num_gens {
         // Validate population size before parallel processing
         let num_threads = rayon::current_num_threads();
         let chunk_size = population.len().max(1) / num_threads;
-        
+
         if chunk_size == 0 {
             println!("[evolutionary_phase]: Population too small for parallelization");
             break;
@@ -183,7 +176,7 @@ pub fn evolutionary_phase(
 
         // Create hyperboxes from archive
         let hyperboxes: Vec<HyperBox> = hypergrid::create(&archive, hypergrid::GRID_DIVISIONS);
-        
+
         if hyperboxes.is_empty() {
             println!("[evolutionary_phase]: No valid hyperboxes created");
             break;
@@ -199,7 +192,8 @@ pub fn evolutionary_phase(
         best_fitness_history.push(best_fitness);
 
         // Generate new population with validation
-        let new_population = generate_new_population(&hyperboxes, args, graph);
+        let new_population =
+            generate_new_population(&hyperboxes, pop_size, cross_rate, mut_rate, &graph);
         if new_population.is_empty() {
             println!("[evolutionary_phase]: Failed to generate new population");
             break;
@@ -208,13 +202,13 @@ pub fn evolutionary_phase(
 
         // Early stopping
         if max_local.has_converged(best_fitness) {
-            if args.debug >= 1{
+            if debug_level >= 1 {
                 println!("[evolutionary_phase]: Converged!");
             }
             break;
         }
 
-        if args.debug >= 1{
+        if debug_level >= 1 {
             println!(
                 "\x1b[1A\x1b[2K[evolutionary_phase]: gen: {} | bf: {:.4} | pop/arch: {}/{} | bA: {:.4} |",
                 generation,
@@ -226,10 +220,5 @@ pub fn evolutionary_phase(
         }
     }
 
-    // Return empty results if archive is empty
-    if archive.is_empty() {
-        return (Vec::new(), best_fitness_history);
-    }
-
-    (archive, best_fitness_history)
+    archive
 }
