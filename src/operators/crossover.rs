@@ -5,9 +5,9 @@
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use crate::graph::{NodeId, Partition};
-use std::collections::HashMap;
-use rand::{seq::IndexedRandom, Rng};
+use rand::{Rng, seq::IndexedRandom};
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 pub fn optimized_crossover(
     parent1: &Partition,
@@ -66,54 +66,8 @@ pub fn optimized_crossover(
     child
 }
 
-pub fn simulated_binary_crossover(
-    parent1: &Partition,
-    parent2: &Partition,
-    crossover_rate: f64,
-    eta: f64,
-) -> Partition {
-    let mut rng = rand::rng();
-
-    if rng.random::<f64>() > crossover_rate {
-        return if rng.random_bool(0.5) {
-            parent1.clone()
-        } else {
-            parent2.clone()
-        };
-    }
-
-    let mut child = Partition::new();
-
-    for node in parent1.keys() {
-        let comm1 = parent1[node];
-        let comm2 = parent2.get(node).cloned().unwrap_or(comm1);
-
-        if comm1 == comm2 {
-            child.insert(*node, comm1);
-        } else {
-            let u = rng.random::<f64>();
-            let beta = if u <= 0.5 {
-                (2.0 * u).powf(1.0 / (eta + 1.0))
-            } else {
-                (1.0 / (2.0 * (1.0 - u))).powf(1.0 / (eta + 1.0))
-            };
-            let p_parent1 = 1.0 / (1.0 + beta);
-            if rng.random_bool(p_parent1) {
-                child.insert(*node, comm1);
-            } else {
-                child.insert(*node, comm2);
-            }
-        }
-    }
-
-    child
-}
-
 // Ensemble Learning-Based Multi-Individual Crossover
-pub fn ensemble_crossover(
-    parents: &[Partition],
-    crossover_rate: f64,
-) -> Partition {
+pub fn ensemble_crossover(parents: &[Partition], crossover_rate: f64) -> Partition {
     let mut rng = rand::rng();
 
     // Check if crossover should be skipped
@@ -143,10 +97,10 @@ pub fn ensemble_crossover(
             .filter(|(_, count)| **count == max_count)
             .map(|(comm, _)| *comm)
             .collect();
-        
 
         // Select community with tie-breaking
-        let selected = candidates.choose(&mut rng)
+        let selected = candidates
+            .choose(&mut rng)
             .copied()
             .unwrap_or_else(|| parents[0][&node]);
 
