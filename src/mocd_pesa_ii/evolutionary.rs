@@ -193,7 +193,7 @@ pub fn evolutionary_phase(
 
         // Generate new population with validation
         let new_population =
-            generate_new_population(&hyperboxes, pop_size, cross_rate, mut_rate, &graph);
+            generate_new_population(&hyperboxes, pop_size, cross_rate, mut_rate, graph);
         if new_population.is_empty() {
             println!("[evolutionary_phase]: Failed to generate new population");
             break;
