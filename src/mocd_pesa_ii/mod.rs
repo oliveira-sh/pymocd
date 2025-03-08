@@ -99,7 +99,7 @@ impl MocdPesaII {
         Ok(normalize_community_ids(best_solution.partition.clone()))
     }
 
-    pub fn mini_max(&self) -> PyResult<Partition> {
+    pub fn min_max(&self) -> PyResult<Partition> {
         let archive = self.envolve();
 
         let best_solution = {
