@@ -4,154 +4,43 @@
 //! Copyright 2024 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict};
-use std::collections::BTreeMap;
+mod mocd_nsga_ii;
+mod mocd_pesa_ii;
+mod pmoea;
 
-mod algorithms;
 mod graph;
-pub mod operators;
+mod operators;
 mod utils;
 
-use graph::{CommunityId, Graph, NodeId, Partition};
-use utils::args::AGArgs as AlgorithmConfig;
+pub use mocd_nsga_ii::MocdNsgaII;
+pub use mocd_pesa_ii::MocdPesaII;
+pub use pmoea::PMoEAE;
+
+use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
 // ================================================================================================
-// Py functions
+// Functions
 // ================================================================================================
 
-/// Takes a NetworkX Graph as input and performs community detection
-///
-/// # Parameters
-/// - `graph` (networkx.Graph): The graph on which to perform community detection
-/// - `debug` (i8, optional): Enable debug output. Large the num, large the debug. [d=0,1,2,3]
-///
-/// # Returns
-/// - dict[int, int]: Mapping of node IDs to their detected community IDs
-#[pyfunction(name = "pesa_ii_minimax")]
-#[pyo3(signature = (graph, debug = 0))]
-fn pesa_ii_minimax(py: Python<'_>, graph: &Bound<'_, PyAny>, debug: i8) -> PyResult<BTreeMap<i32, i32>> {
-    let edges = get_edges(graph)?;
-    let config = AlgorithmConfig::lib_args(debug);
-
-    if config.debug >= 2 {
-        println!("{:?}", config);
-    }
-
-    py.allow_threads(|| {
-        let graph = build_graph(edges);
-        let (communities, _, _) = algorithms::pesa_ii(&graph, config, false);
-
-        Ok(communities)
-    })
-}
-
-/// Takes a NetworkX Graph as input and performs community detection
-///
-/// # Parameters
-/// - `graph` (networkx.Graph): The graph on which to perform community detection
-/// - `debug` (i8, optional): Enable debug output. Large the num, large the debug. [d=0,1,2,3]
-///
-/// # Returns
-/// - dict[int, int]: Mapping of node IDs to their detected community IDs
-#[pyfunction(name = "pesa_ii_maxq")]
-#[pyo3(signature = (graph, debug = 0))]
-fn pesa_ii_maxq(py: Python<'_>, graph: &Bound<'_, PyAny>, debug: i8) -> PyResult<BTreeMap<i32, i32>> {
-    let edges = get_edges(graph)?;
-    let config = AlgorithmConfig::lib_args(debug);
-
-    if config.debug >= 2 {
-        println!("{:?}", config);
-    }
-
-    py.allow_threads(|| {
-        let graph = build_graph(edges);
-        let (communities, _, _) = algorithms::pesa_ii(&graph, config, true);
-
-        Ok(communities)
-    })
-}
-
-/// Takes a NetworkX Graph as input and performs community detection
-///
-/// # Parameters
-/// - `graph` (networkx.Graph): The graph on which to perform community detection
-/// - `debug` (i8, optional): Enable debug output. Large the num, large the debug. [d=0,1,2,3]
-///
-/// # Returns
-/// - dict[int, int]: Mapping of node IDs to their detected community IDs
-#[pyfunction(name = "nsga_ii")]
-#[pyo3(signature = (graph, debug = 0))]
-fn nsga_ii(py: Python<'_>, graph: &Bound<'_, PyAny>, debug: i8) -> PyResult<BTreeMap<i32, i32>> {
-    let edges = get_edges(graph)?;
-    let config = AlgorithmConfig::lib_args(debug);
-
-    if config.debug >= 2 {
-        println!("{:?}", config);
-    }
-
-    py.allow_threads(|| {
-        let graph = build_graph(edges);
-        let (communities, _, _) = algorithms::nsga_ii(&graph, config);
-
-        Ok(communities)
-    })
-}
-
-/// Calculates the modularity score for a given graph and community partition
+/// Calculates the Q score for a given graph and community partition
+/// based on (Shi, 2012) multi-objective modularity equation. Q = 1 - intra - inter
 ///
 /// # Parameters
 /// - `graph` (networkx.Graph): The graph to analyze
 /// - `partition` (dict[int, int]): Dictionary mapping nodes to community IDs
 ///
 /// # Returns
-/// - float: Modularity score based on (Shi, 2012) multi-objective modularity equation
+/// - float
 #[pyfunction(name = "fitness")]
 fn fitness(graph: &Bound<'_, PyAny>, partition: &Bound<'_, PyDict>) -> PyResult<f64> {
-    let edges = get_edges(graph)?;
-    let graph = build_graph(edges);
+    let edges = utils::get_edges(graph)?;
+    let graph = utils::build_graph(edges);
 
     Ok(operators::get_modularity_from_partition(
-        &to_partition(partition)?,
+        &utils::to_partition(partition)?,
         &graph,
     ))
-}
-
-// ================================================================================================
-// Helper functions
-// ================================================================================================
-
-/// Convert Python dict to Rust partition
-fn to_partition(py_dict: &Bound<'_, PyDict>) -> PyResult<Partition> {
-    let mut part = BTreeMap::new();
-    for (node, comm) in py_dict.iter() {
-        part.insert(node.extract::<NodeId>()?, comm.extract::<CommunityId>()?);
-    }
-    Ok(part)
-}
-
-/// Get edges from NetworkX graph
-fn get_edges(graph: &Bound<'_, PyAny>) -> PyResult<Vec<(NodeId, NodeId)>> {
-    let mut edges = Vec::new();
-    let edges_iter = graph.call_method0("edges")?.call_method0("__iter__")?;
-
-    for edge in edges_iter.try_iter()? {
-        let edge = edge?;
-        let from = edge.get_item(0)?.extract()?;
-        let to = edge.get_item(1)?.extract()?;
-        edges.push((from, to));
-    }
-
-    Ok(edges)
-}
-
-/// Build Graph from edges
-fn build_graph(edges: Vec<(NodeId, NodeId)>) -> Graph {
-    let mut graph = Graph::new();
-    for (from, to) in edges {
-        graph.add_edge(from, to);
-    }
-    graph
 }
 
 // ================================================================================================
@@ -161,10 +50,9 @@ fn build_graph(edges: Vec<(NodeId, NodeId)>) -> Graph {
 #[pymodule]
 #[pyo3(name = "pyevoea")]
 fn pyevoea(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(pesa_ii_maxq, m)?)?;
-    m.add_function(wrap_pyfunction!(pesa_ii_minimax, m)?)?;
-
-    m.add_function(wrap_pyfunction!(nsga_ii, m)?)?;
     m.add_function(wrap_pyfunction!(fitness, m)?)?;
+    m.add_class::<MocdNsgaII>()?;
+    m.add_class::<MocdPesaII>()?;
+    m.add_class::<PMoEAE>()?;
     Ok(())
 }
