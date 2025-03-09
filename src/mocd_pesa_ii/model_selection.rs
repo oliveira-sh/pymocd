@@ -4,7 +4,7 @@
 //! Copyright 2024 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use crate::algorithms::pesa_ii::Solution;
+use crate::mocd_pesa_ii::Solution;
 
 fn euclidean_distance(a: &[f64], b: &[f64]) -> f64 {
     a.iter()
@@ -64,4 +64,53 @@ pub fn min_max_selection<'a>(
     }
 
     best_solution.expect("Real Pareto front is empty.")
+}
+
+use crate::graph::Graph;
+use rand::rng;
+use rand::seq::SliceRandom as _;
+
+/// Generates multiple random networks and combines their solutions
+pub fn generate_random_networks(original: &Graph, num_networks: usize) -> Vec<Graph> {
+    (0..num_networks)
+        .map(|_| {
+            let mut random_graph = Graph {
+                nodes: original.nodes.clone(),
+                ..Default::default()
+            };
+
+            let node_vec: Vec<_> = random_graph.nodes.iter().cloned().collect();
+            let num_nodes = node_vec.len();
+            let num_edges = original.edges.len();
+            let mut rng = rng();
+            let mut possible_pairs = Vec::with_capacity(num_nodes * (num_nodes - 1) / 2);
+
+            for i in 0..num_nodes {
+                for j in (i + 1)..num_nodes {
+                    possible_pairs.push((node_vec[i], node_vec[j]));
+                }
+            }
+
+            possible_pairs.shuffle(&mut rng);
+            let selected_edges = possible_pairs
+                .into_iter()
+                .take(num_edges)
+                .collect::<Vec<_>>();
+
+            for (src, dst) in &selected_edges {
+                random_graph.edges.push((*src, *dst));
+            }
+
+            for node in &random_graph.nodes {
+                random_graph.adjacency_list.insert(*node, Vec::new());
+            }
+
+            for (src, dst) in &random_graph.edges {
+                random_graph.adjacency_list.get_mut(src).unwrap().push(*dst);
+                random_graph.adjacency_list.get_mut(dst).unwrap().push(*src);
+            }
+
+            random_graph
+        })
+        .collect()
 }

@@ -70,16 +70,8 @@ pub fn mutation(partition: &mut Partition, graph: &Graph, mutation_rate: f64) {
     mutation::optimized_mutate(partition, graph, mutation_rate);
 }
 
-pub fn sbx_crossover(parent1: &Partition, parent2: &Partition, crossover_rate: f64) -> Partition {
-    crossover::simulated_binary_crossover(parent1, parent2, crossover_rate, 15.0)
-}
-
 pub fn ensemble_crossover(parents: &[Partition], crossover_rate: f64) -> Partition {
     crossover::ensemble_crossover(parents, crossover_rate)
-}
-
-pub fn pm_mutation(partition: &mut Partition, graph: &Graph, mutation_rate: f64) {
-    mutation::polynomial_mutation(partition, graph, mutation_rate, 20.0);
 }
 
 pub fn get_fitness(
@@ -99,7 +91,7 @@ pub fn generate_population(graph: &Graph, population_size: usize) -> Vec<Partiti
 #[allow(dead_code)]
 pub fn get_modularity_from_partition(partition: &Partition, graph: &Graph) -> f64 {
     let metrics: Metrics =
-        objective::calculate_objectives(graph, partition, &graph.precompute_degress(), false);
+        objective::calculate_objectives(graph, partition, &graph.precompute_degrees(), false);
 
     metrics.get_modularity()
 }
