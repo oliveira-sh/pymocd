@@ -9,7 +9,6 @@ mod utils;
 use crate::graph::{Graph, Partition};
 use crate::operators;
 use crate::utils::{build_graph, get_edges, normalize_community_ids};
-
 use individual::{Individual, create_offspring};
 use utils::{calculate_crowding_distance, fast_non_dominated_sort, max_q_selection};
 
@@ -23,7 +22,7 @@ use std::collections::HashMap;
 const TOURNAMENT_SIZE: usize = 2;
 
 #[pyclass]
-pub struct MocdNsgaII {
+pub struct HpMocd {
     graph: Graph,
     debug_level: i8,
     pop_size: usize,
@@ -33,7 +32,7 @@ pub struct MocdNsgaII {
 }
 
 /* Private (Not exposed to py user) */
-impl MocdNsgaII {
+impl HpMocd {
     fn evaluate_population(
         &self,
         individuals: &mut [Individual],
@@ -68,7 +67,7 @@ impl MocdNsgaII {
         if self.debug_level >= 1 {
             self.graph.print();
         }
-
+    
         let degrees = &self.graph.precompute_degrees();
         let mut individuals: Vec<Individual> =
             operators::generate_population(&self.graph, self.pop_size)
@@ -76,12 +75,12 @@ impl MocdNsgaII {
                 .map(Individual::new)
                 .collect();
         self.evaluate_population(&mut individuals, &self.graph, degrees);
-
+    
         let mut max_local = operators::ConvergenceCriteria::default();
         for generation in 0..self.num_gens {
             let len = individuals.len();
             self.update_population_sort_and_truncate(&mut individuals, len);
-
+    
             // Create offspring and evaluate them.
             let mut offspring = create_offspring(
                 &individuals,
@@ -91,25 +90,25 @@ impl MocdNsgaII {
                 TOURNAMENT_SIZE,
             );
             self.evaluate_population(&mut offspring, &self.graph, degrees);
-
+    
             // Combine and prepare for environmental selection.
             individuals.extend(offspring);
             self.update_population_sort_and_truncate(&mut individuals, self.pop_size);
-
+    
             // Record best fitness.
             let best_fitness = individuals
                 .par_iter()
                 .map(|ind| ind.fitness)
                 .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
                 .unwrap_or(f64::NEG_INFINITY);
-
+    
             if max_local.has_converged(best_fitness) {
                 if self.debug_level >= 1 {
                     println!("[evolutionary_phase]: Converged!");
                 }
                 break;
             }
-
+    
             if self.debug_level >= 1 && (generation % 10 == 0 || generation == self.num_gens - 1) {
                 let first_front_size = individuals.iter().filter(|ind| ind.rank == 1).count();
                 println!(
@@ -121,20 +120,19 @@ impl MocdNsgaII {
                 );
             }
         }
-
+    
         // Extract the Pareto front (first front).
-        let first_front: Vec<Individual> = individuals
+        individuals
             .iter()
             .filter(|ind| ind.rank == 1)
             .cloned()
-            .collect();
+            .collect()
 
-        first_front
     }
 }
 
 #[pymethods]
-impl MocdNsgaII {
+impl HpMocd {
     #[new]
     #[pyo3(signature = (graph,
         debug_level = 0,
@@ -154,7 +152,7 @@ impl MocdNsgaII {
         let edges = get_edges(graph)?;
         let graph = build_graph(edges);
 
-        Ok(MocdNsgaII {
+        Ok(HpMocd {
             graph,
             debug_level,
             pop_size,
@@ -175,7 +173,7 @@ impl MocdNsgaII {
     }
 
     #[pyo3(signature = ())]
-    pub fn max_q(&self) -> PyResult<Partition> {
+    pub fn run(&self) -> PyResult<Partition> {
         let first_front = self.envolve();
         let best_solution = max_q_selection(&first_front);
 

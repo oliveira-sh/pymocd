@@ -4,17 +4,15 @@
 //! Copyright 2024 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-mod mocd_nsga_ii;
+mod hpc_mocd;
 mod mocd_pesa_ii;
-mod pmoea;
 
 mod graph;
 mod operators;
 mod utils;
 
-pub use mocd_nsga_ii::MocdNsgaII;
+pub use hpc_mocd::HpMocd;
 pub use mocd_pesa_ii::MocdPesaII;
-pub use pmoea::PMoEAE;
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -51,8 +49,7 @@ fn fitness(graph: &Bound<'_, PyAny>, partition: &Bound<'_, PyDict>) -> PyResult<
 #[pyo3(name = "pyevoea")]
 fn pyevoea(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(fitness, m)?)?;
-    m.add_class::<MocdNsgaII>()?;
+    m.add_class::<HpMocd>()?;
     m.add_class::<MocdPesaII>()?;
-    m.add_class::<PMoEAE>()?;
     Ok(())
 }
