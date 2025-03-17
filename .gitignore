@@ -4,7 +4,7 @@
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
 # User-specific files
-*.rsuser
+.venv
 *.suo
 *.user
 *.userosscache
@@ -16,7 +16,8 @@ Cargo.lock
 *.userprefs
 
 # Experiments
-*.py 
+*.csv
+*.png
 *.temp
 
 # Mono auto generated files
