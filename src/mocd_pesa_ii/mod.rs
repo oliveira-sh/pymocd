@@ -52,9 +52,9 @@ impl MocdPesaII {
     #[new]
     #[pyo3(signature = (graph,
         debug_level = 0,
-        rand_networks = 3,
+        rand_networks = 30,
         pop_size = 100,
-        num_gens = 500,
+        num_gens = 100,
         cross_rate = 0.8,
         mut_rate = 0.2
     ))]
@@ -114,8 +114,8 @@ impl MocdPesaII {
                     evolutionary::evolutionary_phase(
                         random_graph,
                         self.debug_level,
-                        self.num_gens,
-                        self.pop_size,
+                        self.num_gens / 2,
+                        self.pop_size / 3,
                         self.cross_rate,
                         self.mut_rate,
                         &random_degrees,

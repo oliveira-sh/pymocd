@@ -1,4 +1,4 @@
-use crate::mocd_nsga_ii::individual::Individual;
+use crate::hpc_mocd::individual::Individual;
 
 use rustc_hash::FxHashMap as HashMap;
 use std::cmp::Ordering;
