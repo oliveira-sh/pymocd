@@ -19,7 +19,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyAny;
 
 #[pyclass]
-pub struct MocdPesaII {
+pub struct MOCD {
     graph: Graph,
     debug_level: i8,
     rand_networks: usize,
@@ -29,7 +29,7 @@ pub struct MocdPesaII {
     mut_rate: f64,
 }
 
-impl MocdPesaII {
+impl MOCD {
     pub fn envolve(&self) -> Vec<Solution> {
         if self.debug_level >= 1 {
             self.graph.print();
@@ -48,7 +48,7 @@ impl MocdPesaII {
 }
 
 #[pymethods]
-impl MocdPesaII {
+impl MOCD {
     #[new]
     #[pyo3(signature = (graph,
         debug_level = 0,
@@ -70,7 +70,7 @@ impl MocdPesaII {
         let edges = get_edges(graph)?;
         let graph = build_graph(edges);
 
-        Ok(MocdPesaII {
+        Ok(MOCD {
             graph,
             debug_level,
             rand_networks,
