@@ -4,7 +4,7 @@
 //! Copyright 2024 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use crate::mocd_pesa_ii::Solution;
+use crate::mocd::Solution;
 
 fn euclidean_distance(a: &[f64], b: &[f64]) -> f64 {
     a.iter()
