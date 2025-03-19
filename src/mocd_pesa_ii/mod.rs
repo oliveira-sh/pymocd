@@ -110,7 +110,7 @@ impl MocdPesaII {
                 .iter()
                 .map(|random_graph| {
                     let random_degrees = random_graph.precompute_degrees();
-                    
+
                     evolutionary::evolutionary_phase(
                         random_graph,
                         self.debug_level,
