@@ -143,7 +143,7 @@ def run_experiment(algorithms=None, mus=np.arange(0.1, 0.5, 0.1), n_runs=5, n_no
     return results
 
 # https://grok.com/share/bGVnYWN5_8acc0ffd-6bd7-4570-b7e7-a7d5df652aaa // why mu = 0.3
-def run_nodes_experiment(algorithms=None, n_list=np.arange(32000, 201000, 1000), n_runs=20, mu=0.3):
+def run_nodes_experiment(algorithms=None, n_list=np.arange(80000, 105000, 10000), n_runs=20, mu=0.3):
     if algorithms is None:
         algorithms = list(ALGORITHM_REGISTRY.keys())
     
@@ -183,7 +183,6 @@ def run_nodes_experiment(algorithms=None, n_list=np.arange(32000, 201000, 1000),
                 nmi_values.append(eval_results['nmi'])
                 ami_values.append(eval_results['ami'])
                 time_values.append(end_time - start_time)
-                print(f"{alg_name} {n}: Q = {eval_results['modularity']}, NMI/AMI: {eval_results['nmi']}/{eval_results['ami']}")
                 
             results['algorithm'].append(alg_name)
             results['nodes'].append(n)
@@ -195,7 +194,9 @@ def run_nodes_experiment(algorithms=None, n_list=np.arange(32000, 201000, 1000),
             results['nmi_std'].append(np.std(nmi_values, ddof=1))
             results['ami_std'].append(np.std(ami_values, ddof=1))
             results['time_std'].append(np.std(time_values, ddof=1))
-        
+
+            print(", ".join(str(results[key][-1]) for key in results))
+
         # Save results incrementally
         df = pd.DataFrame(results)
         df.to_csv('community_detection_results.csv', index=False)
@@ -242,6 +243,8 @@ def plot_results(results):
                 plt.plot(x_values, y_values, 'o-', label=alg)
         plt.xlabel(x_label)
         plt.ylabel(metric['ylabel'])
+        if metric == metrics[3]:
+            plt.yscale("log")
         plt.title(metric['title'])
         plt.legend()
         plt.grid(True)
