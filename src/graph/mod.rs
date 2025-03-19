@@ -42,7 +42,7 @@ impl Graph {
             self.num_edges(),
         );
     }
-    
+
     pub fn add_edge(&mut self, from: NodeId, to: NodeId) {
         self.edges.push((from, to));
         self.nodes.insert(from);
@@ -73,7 +73,6 @@ impl Graph {
         }
         degrees
     }
-
 }
 
 #[cfg(test)]

@@ -83,7 +83,7 @@ def evaluate_communities(G, detected_communities, ground_truth_communities, conv
 # Experiment
 # ======================================================================
 
-def run_experiment(algorithms=None, mus=np.arange(0.1, 0.8, 0.1), n_runs=5, n_nodes=5000):
+def run_experiment(algorithms=None, mus=np.arange(0.1, 0.5, 0.1), n_runs=5, n_nodes=500):
     if algorithms is None:
         algorithms = list(ALGORITHM_REGISTRY.keys())
     
@@ -281,6 +281,12 @@ def pyevoea_hpmocd_wrapper(G, seed=None):
         np.random.seed(seed)
     return pyevoea.HpMocd(G).run()
 
+def pyevoea_cocomi_wrapper(G, seed=None):
+    import pyevoea
+    if seed is not None:
+        np.random.seed(seed)
+    return pyevoea.CoCoMi(G).run()
+
 def leiden_wrapper(G, seed=None):
     import igraph as ig
     import leidenalg
@@ -294,6 +300,7 @@ def leiden_wrapper(G, seed=None):
 # ======================================================================
 
 #register_algorithm('MOCD', pymocd, needs_conversion=False)
+register_algorithm('CoCoMi', pyevoea_cocomi_wrapper, needs_conversion=True)
 register_algorithm('Louvain', louvain_wrapper, needs_conversion=True)
 register_algorithm('HpMocd', pyevoea_hpmocd_wrapper, needs_conversion=False)
 register_algorithm('Leiden', leiden_wrapper, needs_conversion=True)
@@ -341,15 +348,15 @@ def read_results_from_csv(filename='community_detection_results.csv'):
         return None
 
 if __name__ == "__main__":
-    mus = np.arange(0.1, 0.7, 0.1)  # 0.1, ..., 0.7
+    mus = np.arange(0.1, 0.6, 0.1)  # 0.1, ..., 0.7
     
     print(f"Running community detection algorithms on LFR benchmark graphs with 1000 nodes")
     print(f"Available algorithms: {list(ALGORITHM_REGISTRY.keys())}")
 
     # Run experiments
-    #results = read_results_from_csv('results.csv')
+    results = read_results_from_csv('results.csv')
     #results = run_experiment(mus=mus, n_runs=10)
-    results = run_nodes_experiment(n_runs=20)
+    #results = run_nodes_experiment(n_runs=20)
 
     print("\nResults:")
     plot_results(results)    

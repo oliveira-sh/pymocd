@@ -54,10 +54,7 @@ impl Individual {
 
 // Tournament selection with early return
 #[inline]
-pub fn tournament_selection(
-    population: &[Individual],
-    tournament_size: usize,
-) -> &Individual {
+pub fn tournament_selection(population: &[Individual], tournament_size: usize) -> &Individual {
     let mut rng: ThreadRng = rng();
     let best_idx: usize = rng.random_range(0..population.len());
     let mut best: &Individual = &population[best_idx];

@@ -67,7 +67,7 @@ impl HpMocd {
         if self.debug_level >= 1 {
             self.graph.print();
         }
-    
+
         let degrees = &self.graph.precompute_degrees();
         let mut individuals: Vec<Individual> =
             operators::generate_population(&self.graph, self.pop_size)
@@ -75,12 +75,12 @@ impl HpMocd {
                 .map(Individual::new)
                 .collect();
         self.evaluate_population(&mut individuals, &self.graph, degrees);
-    
+
         let mut max_local = operators::ConvergenceCriteria::default();
         for generation in 0..self.num_gens {
             let len = individuals.len();
             self.update_population_sort_and_truncate(&mut individuals, len);
-    
+
             // Create offspring and evaluate them.
             let mut offspring = create_offspring(
                 &individuals,
@@ -90,25 +90,25 @@ impl HpMocd {
                 TOURNAMENT_SIZE,
             );
             self.evaluate_population(&mut offspring, &self.graph, degrees);
-    
+
             // Combine and prepare for environmental selection.
             individuals.extend(offspring);
             self.update_population_sort_and_truncate(&mut individuals, self.pop_size);
-    
+
             // Record best fitness.
             let best_fitness = individuals
                 .par_iter()
                 .map(|ind| ind.fitness)
                 .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
                 .unwrap_or(f64::NEG_INFINITY);
-    
+
             if max_local.has_converged(best_fitness) {
                 if self.debug_level >= 1 {
                     println!("[evolutionary_phase]: Converged!");
                 }
                 break;
             }
-    
+
             if self.debug_level >= 1 && (generation % 10 == 0 || generation == self.num_gens - 1) {
                 let first_front_size = individuals.iter().filter(|ind| ind.rank == 1).count();
                 println!(
@@ -120,14 +120,13 @@ impl HpMocd {
                 );
             }
         }
-    
+
         // Extract the Pareto front (first front).
         individuals
             .iter()
             .filter(|ind| ind.rank == 1)
             .cloned()
             .collect()
-
     }
 }
 
