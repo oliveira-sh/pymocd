@@ -1,9 +1,13 @@
 <div align="center">
-  <img src="res/logo.png" alt="pymocd logo" width="40%">  
+  <img src="res/logo.png" alt="pymocd logo" width="50%">  
   
-  **Python Multi-Objective Evolutionary Algorithms for Community Detection**  
+  **Python Multi-Objective High-performance Evolutionary Algorithms for Community Detection**  
   
-  Efficient and high-performance community detection in large-scale graphs, built with Rust for speed and scalability.
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/oliveira-sh/pymocd/rust.yml)
+![PyPI - Version](https://img.shields.io/pypi/v/pymocd)
+![PyPI - License](https://img.shields.io/pypi/l/pymocd)
+
+
 </div>
 
 ## Overview  
