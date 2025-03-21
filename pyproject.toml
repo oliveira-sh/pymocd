@@ -3,7 +3,7 @@ requires = ["maturin>=1.8.0"]
 build-backend = "maturin"
 
 [project]
-name = "pyevoea"
+name = "pymocd"
 version = "0.0.1"
 license = {file = "LICENSE"}
 description = "Efficient and high-performance community detection in large-scale graphs, built with Rust for speed and scalability."
@@ -21,5 +21,5 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://github.com/ol1veir4s/pyevoea"
-Issues = "https://github.com/ol1veir4s/pyevoea/issues"
+Repository = "https://github.com/ol1veir4s/pymocd"
+Issues = "https://github.com/ol1veir4s/pymocd/issues"

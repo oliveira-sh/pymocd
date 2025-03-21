@@ -1,12 +1,12 @@
 [package]
-name = "pyevoea" 
+name = "pymocd" 
 version = "0.1.1" 
 edition = "2024"
 authors = ["Guilherme Santos"]
 license = "GPL-3.0-or-later"
 
 [lib]
-name = "pyevoea"
+name = "pymocd"
 crate-type = ["cdylib"]
 
 [profile.release]
@@ -26,4 +26,4 @@ dashmap = "6.1.0"                                               # For concurrent
 rand_chacha = "0.9.0"                                           # ChaCha random number generator 
 
 [package.metadata.maturin]
-name = "pyevoea"
+name = "pymocd"
