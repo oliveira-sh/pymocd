@@ -1,7 +1,7 @@
 <div align="center">
   <img src="res/logo.png" alt="pymocd logo" width="40%">  
   
-  **Python Multi-Objective Evolutionary Algorithms**  
+  **Python Multi-Objective Evolutionary Algorithms for Community Detection**  
   
   Efficient and high-performance community detection in large-scale graphs, built with Rust for speed and scalability.
 </div>
