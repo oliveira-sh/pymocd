@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="res/logo.png" alt="pyevoea logo" width="40%">  
+  <img src="res/logo.png" alt="pymocd logo" width="40%">  
   
   **Python Multi-Objective Evolutionary Algorithms**  
   
@@ -7,7 +7,7 @@
 </div>
 
 ## Overview  
-**pyevoea** is a Rust-powered Python library designed for efficient multi-objective evolutionary algorithms in community detection. It enhances performance over traditional methods, making it ideal for large-scale graph analysis. This project continues from [re-mocd](https://github.com/0l1ve1r4/re-mocd).  
+**pymocd** is a Rust-powered Python library designed for efficient multi-objective evolutionary algorithms in community detection. It enhances performance over traditional methods, making it ideal for large-scale graph analysis. This project continues from [re-mocd](https://github.com/0l1ve1r4/re-mocd).  
 
 ## Features  
 - High-performance Rust backend for computational efficiency  

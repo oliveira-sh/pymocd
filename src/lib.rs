@@ -47,9 +47,9 @@ fn fitness(graph: &Bound<'_, PyAny>, partition: &Bound<'_, PyDict>) -> PyResult<
 // Module
 // ================================================================================================
 
-#[pymodule]
-#[pyo3(name = "pyevoea")]
-fn pyevoea(m: &Bound<'_, PyModule>) -> PyResult<()> {
+#[pymocd]
+#[pyo3(name = "pymocd")]
+fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(fitness, m)?)?;
     m.add_class::<HpMocd>()?;
     m.add_class::<CoCoMi>()?;

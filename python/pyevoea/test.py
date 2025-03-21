@@ -278,17 +278,11 @@ def pymocd(G, seed=None):
 def louvain_wrapper(G, seed=None):
     return louvain_communities(G, seed=seed)
 
-def pyevoea_hpmocd_wrapper(G, seed=None):
-    import pyevoea
+def pymocd_hpmocd_wrapper(G, seed=None):
+    import pymocd
     if seed is not None:
         np.random.seed(seed)
-    return pyevoea.HpMocd(G).run()
-
-def pyevoea_cocomi_wrapper(G, seed=None):
-    import pyevoea
-    if seed is not None:
-        np.random.seed(seed)
-    return pyevoea.CoCoMi(G).run()
+    return pymocd.HpMocd(G).run()
 
 def leiden_wrapper(G, seed=None):
     import igraph as ig
@@ -303,9 +297,8 @@ def leiden_wrapper(G, seed=None):
 # ======================================================================
 
 #register_algorithm('MOCD', pymocd, needs_conversion=False)
-register_algorithm('CoCoMi', pyevoea_cocomi_wrapper, needs_conversion=True)
 register_algorithm('Louvain', louvain_wrapper, needs_conversion=True)
-register_algorithm('HpMocd', pyevoea_hpmocd_wrapper, needs_conversion=False)
+register_algorithm('HpMocd', pymocd_hpmocd_wrapper, needs_conversion=False)
 register_algorithm('Leiden', leiden_wrapper, needs_conversion=True)
 
 # ======================================================================
