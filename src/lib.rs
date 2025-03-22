@@ -4,7 +4,7 @@
 //! Copyright 2024 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-mod cocomi;
+mod mmcomo;
 mod hpc_mocd;
 mod mocd;
 
@@ -12,7 +12,7 @@ mod graph;
 mod operators;
 mod utils;
 
-pub use cocomi::CoCoMi;
+pub use mmcomo::MMCoMO;
 pub use hpc_mocd::HpMocd;
 pub use mocd::MOCD;
 
@@ -52,7 +52,7 @@ fn fitness(graph: &Bound<'_, PyAny>, partition: &Bound<'_, PyDict>) -> PyResult<
 fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(fitness, m)?)?;
     m.add_class::<HpMocd>()?;
-    m.add_class::<CoCoMi>()?;
+    m.add_class::<MMCoMO>()?;
     m.add_class::<MOCD>()?;
     Ok(())
 }
