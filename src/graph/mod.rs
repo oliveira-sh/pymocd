@@ -6,6 +6,8 @@
 
 use rustc_hash::FxHashMap as HashMap;
 use rustc_hash::FxHashSet as HashSet;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 
 use std::collections::BTreeMap;
 
@@ -48,9 +50,34 @@ impl Graph {
         self.nodes.insert(from);
         self.nodes.insert(to);
 
-        // Update adjacency list
         self.adjacency_list.entry(from).or_default().push(to);
         self.adjacency_list.entry(to).or_default().push(from);
+    }
+
+    pub fn from_adj_list(file_path: &str) -> Self {
+        let mut graph = Graph::new();
+
+        let file = File::open(file_path).expect("Unable to open file");
+        let reader = BufReader::new(file);
+
+        for line in reader.lines() {
+            let line = line.expect("Could not read line");
+            let parts: Vec<&str> = line.split_whitespace().collect();
+
+            if line.trim().starts_with('#') || parts.is_empty() {
+                continue;
+            }
+
+            let node: NodeId = parts[0].parse().expect("First item should be node ID");
+            for neighbor_str in &parts[1..] {
+                let neighbor: NodeId = neighbor_str
+                    .parse()
+                    .expect("Neighbor should be a valid node ID");
+                graph.add_edge(node, neighbor);
+            }
+        }
+
+        graph
     }
 
     pub fn neighbors(&self, node: &NodeId) -> &[NodeId] {

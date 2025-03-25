@@ -10,7 +10,7 @@
 *.userosscache
 *.sln.docstates
 Cargo.lock
-
+*.adjlist
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
