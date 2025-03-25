@@ -6,7 +6,7 @@
 mod individual;
 mod utils;
 
-use crate::graph::{Graph, Partition};
+use crate::graph::{self, Graph, Partition};
 use crate::operators;
 use crate::utils::{build_graph, get_edges, normalize_community_ids};
 use individual::{Individual, create_offspring};
@@ -130,13 +130,34 @@ impl HpMocd {
     }
 }
 
+/// To be used when running directly
+impl HpMocd {
+    pub fn _new(graph: Graph) -> Self {
+        HpMocd {
+            graph,
+            debug_level: 10,
+            pop_size: 100,
+            num_gens: 100,
+            cross_rate: 0.8,
+            mut_rate: 0.2,
+        }
+    }
+
+    pub fn _run(&self) -> Partition {
+        let first_front = self.envolve();
+        let best_solution = max_q_selection(&first_front);
+
+        normalize_community_ids(best_solution.partition.clone())
+    }
+}
+
 #[pymethods]
 impl HpMocd {
     #[new]
     #[pyo3(signature = (graph,
         debug_level = 0,
         pop_size = 100,
-        num_gens = 500,
+        num_gens = 100,
         cross_rate = 0.8,
         mut_rate = 0.2
     ))]

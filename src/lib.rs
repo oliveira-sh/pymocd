@@ -4,16 +4,16 @@
 //! Copyright 2024 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-mod mmcomo;
 mod hpc_mocd;
+mod mmcomo;
 mod mocd;
 
 mod graph;
 mod operators;
 mod utils;
 
-pub use mmcomo::MMCoMO;
 pub use hpc_mocd::HpMocd;
+pub use mmcomo::MMCoMO;
 pub use mocd::MOCD;
 
 use pyo3::prelude::*;
