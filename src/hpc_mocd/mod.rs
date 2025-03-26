@@ -6,7 +6,7 @@
 mod individual;
 mod utils;
 
-use crate::graph::{self, Graph, Partition};
+use crate::graph::{Graph, Partition};
 use crate::operators;
 use crate::utils::{build_graph, get_edges, normalize_community_ids};
 use individual::{Individual, create_offspring};
