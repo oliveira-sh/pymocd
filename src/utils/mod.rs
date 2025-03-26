@@ -28,6 +28,7 @@ pub fn normalize_community_ids(partition: Partition) -> Partition {
 }
 
 /// Convert Python dict to Rust partition
+#[allow(dead_code)]
 pub fn to_partition(py_dict: &Bound<'_, PyDict>) -> PyResult<Partition> {
     let mut part = BTreeMap::new();
     for (node, comm) in py_dict.iter() {
