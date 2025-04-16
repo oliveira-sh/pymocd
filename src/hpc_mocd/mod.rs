@@ -10,7 +10,7 @@ use crate::graph::{Graph, Partition};
 use crate::operators;
 use crate::utils::{build_graph, get_edges, normalize_community_ids};
 use individual::{Individual, create_offspring};
-use utils::{calculate_crowding_distance, fast_non_dominated_sort, max_q_selection};
+use utils::{calculate_crowding_distance, fast_non_dominated_sort, fast_non_dominated_sort_2d, max_q_selection};
 
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
@@ -51,15 +51,8 @@ impl HpMocd {
         individuals: &mut Vec<Individual>,
         pop_size: usize,
     ) {
-        fast_non_dominated_sort(individuals);
+        fast_non_dominated_sort_2d(individuals);
         calculate_crowding_distance(individuals);
-        individuals.sort_unstable_by(|a, b| {
-            a.rank.cmp(&b.rank).then_with(|| {
-                b.crowding_distance
-                    .partial_cmp(&a.crowding_distance)
-                    .unwrap_or(Ordering::Equal)
-            })
-        });
         individuals.truncate(pop_size);
     }
 
@@ -78,8 +71,8 @@ impl HpMocd {
 
         let mut max_local = operators::ConvergenceCriteria::default();
         for generation in 0..self.num_gens {
-            let len = individuals.len();
-            self.update_population_sort_and_truncate(&mut individuals, len);
+            //let len = individuals.len();
+            //self.update_population_sort_and_truncate(&mut individuals, len);
 
             // Create offspring and evaluate them.
             let mut offspring = create_offspring(

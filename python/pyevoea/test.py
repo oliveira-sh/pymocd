@@ -143,7 +143,7 @@ def run_experiment(algorithms=None, mus=np.arange(0.1, 0.5, 0.1), n_runs=5, n_no
     return results
 
 # https://grok.com/share/bGVnYWN5_8acc0ffd-6bd7-4570-b7e7-a7d5df652aaa // why mu = 0.3
-def run_nodes_experiment(algorithms=None, n_list=np.arange(80000, 105000, 10000), n_runs=20, mu=0.3):
+def run_nodes_experiment(algorithms=None, n_list=np.arange(10000, 110000, 10000), n_runs=20, mu=0.3):
     if algorithms is None:
         algorithms = list(ALGORITHM_REGISTRY.keys())
     
@@ -208,8 +208,14 @@ def run_nodes_experiment(algorithms=None, n_list=np.arange(80000, 105000, 10000)
 # ======================================================================
 
 def plot_results(results):
+    import matplotlib.pyplot as plt
+    import pandas as pd
+
+    # Converte os resultados para um DataFrame
     df = pd.DataFrame(results)
     algorithms = df['algorithm'].unique()
+
+    # Define a variável do eixo x: usa 'mu' se existir ou 'nodes'
     if 'mu' in df.columns:
         x_var = 'mu'
         x_label = 'Mixing Parameter (μ)'
@@ -218,40 +224,50 @@ def plot_results(results):
         x_label = 'Number of nodes (n)'
     else:
         raise ValueError("Neither 'mu' nor 'nodes' found in results")
-    has_std_data = all(col in df.columns for col in ['nmi_std', 'ami_std', 'modularity_std', 'time_std'])
+    
+    # Verifica se os dados de desvio padrão estão disponíveis para as métricas
+    has_std_data = all(col in df.columns for col in ['nmi_std', 'ami_std', 'time_std'])
+
+    # Define as métricas a serem plotadas (excluindo modularity)
     metrics = [
-        {'key': 'nmi', 'title': 'Normalized Mutual Information', 'ylabel': 'NMI'},
-        {'key': 'ami', 'title': 'Adjusted Mutual Information', 'ylabel': 'AMI'},
-        {'key': 'modularity', 'title': 'Modularity', 'ylabel': 'Modularity'},
-        {'key': 'time', 'title': 'Computation Time', 'ylabel': 'Time (s)'}
+        {'key': 'nmi', 'ylabel': 'NMI'},
+        {'key': 'ami', 'ylabel': 'AMI'},
+        {'key': 'time', 'ylabel': 'Time (s)'}  # Será plotado em escala logarítmica
     ]
-    plt.figure(figsize=(15, 10))
-    for i, metric in enumerate(metrics, start=1):
-        plt.subplot(2, 2, i)
+    
+    # Para cada métrica, gera uma figura separada
+    for metric in metrics:
+        plt.figure(figsize=(8, 6))
         for alg in algorithms:
+            # Filtra os dados do algoritmo e ordena pelo eixo x
             alg_data = df[df['algorithm'] == alg].sort_values(by=x_var)
             x_values = alg_data[x_var].values
             y_values = alg_data[metric['key']].values
+
+            # Plota a linha central (valor médio)
+            plt.plot(x_values, y_values, 'o-', label=alg)
+            # Se os dados de desvio padrão estiverem disponíveis, plota a área de intervalo de confiança
             if has_std_data:
                 std_key = metric['key'] + '_std'
                 if std_key in alg_data.columns:
                     y_std = alg_data[std_key].values
-                    plt.errorbar(x_values, y_values, yerr=y_std, fmt='o-', label=alg, capsize=5)
-                else:
-                    plt.plot(x_values, y_values, 'o-', label=alg)
-            else:
-                plt.plot(x_values, y_values, 'o-', label=alg)
+                    lower_bound = y_values - y_std
+                    upper_bound = y_values + y_std
+                    plt.fill_between(x_values, lower_bound, upper_bound, alpha=0.3)
+        
         plt.xlabel(x_label)
         plt.ylabel(metric['ylabel'])
-        if metric == metrics[3]:
+        # Se a métrica é 'time', usa escala logarítmica no eixo y
+        if metric['key'] == 'time':
             plt.yscale("log")
-        plt.title(metric['title'])
         plt.legend()
         plt.grid(True)
-    plt.suptitle("Community Detection Algorithms Comparison", fontsize=16)
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
-    plt.savefig('community_detection_results.png', dpi=300)
-    plt.show()
+        plt.tight_layout()
+        
+        # Salva a figura em um arquivo separado
+        plt.savefig(f"{metric['key']}_plot.png", dpi=300)
+        plt.close()
+
 
 def save_results_to_csv(results, filename='community_detection_results.csv'):
     df = pd.DataFrame(results)
@@ -297,9 +313,9 @@ def leiden_wrapper(G, seed=None):
 # ======================================================================
 
 #register_algorithm('MOCD', pymocd, needs_conversion=False)
-register_algorithm('Louvain', louvain_wrapper, needs_conversion=True)
-register_algorithm('HpMocd', pymocd_hpmocd_wrapper, needs_conversion=False)
-register_algorithm('Leiden', leiden_wrapper, needs_conversion=True)
+register_algorithm('HpMocd-v0.1.1', pymocd_hpmocd_wrapper, needs_conversion=False)
+#register_algorithm('Louvain', louvain_wrapper, needs_conversion=True)
+#register_algorithm('Leiden', leiden_wrapper, needs_conversion=True)
 
 # ======================================================================
 # Plotting and saving results
@@ -350,9 +366,9 @@ if __name__ == "__main__":
     print(f"Available algorithms: {list(ALGORITHM_REGISTRY.keys())}")
 
     # Run experiments
-    results = read_results_from_csv('results.csv')
-    #results = run_experiment(mus=mus, n_runs=10)
-    #results = run_nodes_experiment(n_runs=20)
+    results = read_results_from_csv('nodess.csv')
+    #results = run_experiment(mus=mus, n_runs=2)
+    #results = run_nodes_experiment(n_runs=1)
 
     print("\nResults:")
     plot_results(results)    
