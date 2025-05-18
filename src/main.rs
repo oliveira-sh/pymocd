@@ -14,6 +14,6 @@ fn main() {
     println!("Started");
     let graph = graph::Graph::from_adj_list("python/graph.adjlist");
 
-    let alg = hpc_mocd::HpMocd::_new(graph);
+    let alg = hpc_mocd::HPMOCD::_new(graph);
     alg._run();
 }

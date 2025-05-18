@@ -93,39 +93,6 @@ pub fn fast_non_dominated_sort(population: &mut [Individual]) {
     }
 }
 
-pub fn fast_non_dominated_sort_2d(population: &mut [Individual]) {
-    let pop_size = population.len();
-
-    // Parallel lexicographic sort:
-    // Sort first by the first objective (ascending) and then by the second (ascending).
-    population.par_sort_by(|a, b| {
-        let cmp0 = a.objectives[0]
-            .partial_cmp(&b.objectives[0])
-            .unwrap_or(Ordering::Equal);
-        if cmp0 != Ordering::Equal {
-            cmp0
-        } else {
-            a.objectives[1]
-                .partial_cmp(&b.objectives[1])
-                .unwrap_or(Ordering::Equal)
-        }
-    });
-
-    population[0].rank = 1;
-    let mut best_second = population[0].objectives[1];
-
-    // Linear sweep: for each subsequent individual, if its second objective is lower
-    // than the best seen so far, it is not dominated by any previous individual.
-    for i in 1..pop_size {
-        if population[i].objectives[1] < best_second {
-            best_second = population[i].objectives[1];
-            population[i].rank = 1; // non-dominated
-        } else {
-            population[i].rank = 2; // for example, 2 means dominated
-        }
-    }
-}
-
 // Calculate crowding distance with optimized memory usage
 pub fn calculate_crowding_distance(population: &mut [Individual]) {
     if population.is_empty() {

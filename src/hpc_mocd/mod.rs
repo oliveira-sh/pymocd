@@ -10,19 +10,18 @@ use crate::graph::{Graph, Partition};
 use crate::operators;
 use crate::utils::{build_graph, get_edges, normalize_community_ids};
 use individual::{Individual, create_offspring};
-use utils::{calculate_crowding_distance, fast_non_dominated_sort, fast_non_dominated_sort_2d, max_q_selection};
+use utils::{calculate_crowding_distance, fast_non_dominated_sort, max_q_selection};
 
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
 use rayon::prelude::*;
 use rustc_hash::FxBuildHasher;
-use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 const TOURNAMENT_SIZE: usize = 2;
 
 #[pyclass]
-pub struct HpMocd {
+pub struct HPMOCD {
     graph: Graph,
     debug_level: i8,
     pop_size: usize,
@@ -32,7 +31,7 @@ pub struct HpMocd {
 }
 
 /* Private (Not exposed to py user) */
-impl HpMocd {
+impl HPMOCD {
     fn evaluate_population(
         &self,
         individuals: &mut [Individual],
@@ -51,7 +50,7 @@ impl HpMocd {
         individuals: &mut Vec<Individual>,
         pop_size: usize,
     ) {
-        fast_non_dominated_sort_2d(individuals);
+        fast_non_dominated_sort(individuals);
         calculate_crowding_distance(individuals);
         individuals.truncate(pop_size);
     }
@@ -114,19 +113,19 @@ impl HpMocd {
             }
         }
 
-        // Extract the Pareto front (first front).
-        individuals
-            .iter()
-            .filter(|ind| ind.rank == 1)
-            .cloned()
-            .collect()
+                // Extract the Pareto front (first front).
+                individuals
+                .iter()
+                .filter(|ind| ind.rank <= 3)
+                .cloned()
+                .collect()
     }
 }
 
 /// To be used when running directly
-impl HpMocd {
+impl HPMOCD {
     pub fn _new(graph: Graph) -> Self {
-        HpMocd {
+        HPMOCD {
             graph,
             debug_level: 10,
             pop_size: 100,
@@ -145,7 +144,7 @@ impl HpMocd {
 }
 
 #[pymethods]
-impl HpMocd {
+impl HPMOCD {
     #[new]
     #[pyo3(signature = (graph,
         debug_level = 0,
@@ -165,7 +164,7 @@ impl HpMocd {
         let edges = get_edges(graph)?;
         let graph = build_graph(edges);
 
-        Ok(HpMocd {
+        Ok(HPMOCD {
             graph,
             debug_level,
             pop_size,
@@ -176,14 +175,17 @@ impl HpMocd {
     }
 
     #[pyo3(signature = ())]
-    pub fn generate_pareto_front(&self) -> PyResult<Vec<(Partition, Vec<f64>)>> {
-        let first_front = self.envolve();
-
-        Ok(first_front
+    pub fn generate_pareto_front(&self) -> PyResult<Vec<(Vec<BTreeMap<i32, i32>>, Vec<f64>)>> {
+        let first_front: Vec<Individual> = self.envolve();
+        
+        let result: Vec<(Vec<BTreeMap<i32, i32>>, Vec<f64>)> = first_front
             .into_iter()
-            .map(|ind| (normalize_community_ids(ind.partition), ind.objectives))
-            .collect())
+            .map(|ind| (vec![ind.partition], ind.objectives)) 
+            .collect();
+    
+        Ok(result)
     }
+    
 
     #[pyo3(signature = ())]
     pub fn run(&self) -> PyResult<Partition> {

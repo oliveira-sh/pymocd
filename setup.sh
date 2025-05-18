@@ -24,6 +24,9 @@ pip install \
     numpy \
     python-louvain \
     igraph \
-    leidenalg
+    leidenalg \
+    pymoo \
+
+maturin develop --release
 
 echo "[OK] Setup complete"

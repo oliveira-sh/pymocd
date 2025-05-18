@@ -5,6 +5,7 @@
 
 # User-specific files
 .venv
+.ignore
 *.suo
 *.user
 *.userosscache

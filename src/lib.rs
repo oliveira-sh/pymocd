@@ -12,7 +12,7 @@ mod graph;
 mod operators;
 mod utils;
 
-pub use hpc_mocd::HpMocd;
+pub use hpc_mocd::HPMOCD;
 pub use mmcomo::MMCoMO;
 pub use mocd::MOCD;
 
@@ -51,7 +51,7 @@ fn fitness(graph: &Bound<'_, PyAny>, partition: &Bound<'_, PyDict>) -> PyResult<
 #[pyo3(name = "pymocd")]
 fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(fitness, m)?)?;
-    m.add_class::<HpMocd>()?;
+    m.add_class::<HPMOCD>()?;
     m.add_class::<MMCoMO>()?;
     m.add_class::<MOCD>()?;
     Ok(())

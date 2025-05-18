@@ -210,7 +210,26 @@ def run_nodes_experiment(algorithms=None, n_list=np.arange(10000, 110000, 10000)
 def plot_results(results):
     import matplotlib.pyplot as plt
     import pandas as pd
-
+    from matplotlib import rcParams
+    
+    # Set up Elsevier style parameters
+    plt.style.use('default')
+    rcParams['font.family'] = 'serif'
+    rcParams['font.serif'] = ['Times New Roman']
+    rcParams['font.size'] = 9
+    rcParams['axes.labelsize'] = 9
+    rcParams['axes.titlesize'] = 9
+    rcParams['xtick.labelsize'] = 8
+    rcParams['ytick.labelsize'] = 8
+    rcParams['legend.fontsize'] = 8
+    rcParams['figure.figsize'] = (3.5, 2.625)  # Elsevier standard single column width (3.5 inches)
+    rcParams['figure.dpi'] = 300
+    rcParams['savefig.dpi'] = 600
+    rcParams['axes.linewidth'] = 0.5
+    rcParams['lines.linewidth'] = 1.0
+    rcParams['grid.linewidth'] = 0.5
+    rcParams['lines.markersize'] = 4
+    
     # Converte os resultados para um DataFrame
     df = pd.DataFrame(results)
     algorithms = df['algorithm'].unique()
@@ -218,10 +237,10 @@ def plot_results(results):
     # Define a variável do eixo x: usa 'mu' se existir ou 'nodes'
     if 'mu' in df.columns:
         x_var = 'mu'
-        x_label = 'Mixing Parameter (μ)'
+        x_label = '$μ$'  # LaTeX format for mu
     elif 'nodes' in df.columns:
         x_var = 'nodes'
-        x_label = 'Number of nodes (n)'
+        x_label = '$n$'  # LaTeX format for n
     else:
         raise ValueError("Neither 'mu' nor 'nodes' found in results")
     
@@ -232,20 +251,33 @@ def plot_results(results):
     metrics = [
         {'key': 'nmi', 'ylabel': 'NMI'},
         {'key': 'ami', 'ylabel': 'AMI'},
-        {'key': 'time', 'ylabel': 'Time (s)'}  # Será plotado em escala logarítmica
+        {'key': 'time', 'ylabel': 'Time (s)'}
     ]
+    
+    # Arrays de markers e linestyles para diferenciar os algoritmos
+    markers = ['o', 's', '^', 'D', 'v', '<', '>']
+    linestyles = ['-', '--', '-.', ':']
     
     # Para cada métrica, gera uma figura separada
     for metric in metrics:
-        plt.figure(figsize=(8, 6))
-        for alg in algorithms:
+        fig, ax = plt.subplots()
+        
+        for i, alg in enumerate(algorithms):
             # Filtra os dados do algoritmo e ordena pelo eixo x
             alg_data = df[df['algorithm'] == alg].sort_values(by=x_var)
             x_values = alg_data[x_var].values
             y_values = alg_data[metric['key']].values
+            
+            # Seleciona marker e linestyle de forma cíclica
+            marker = markers[i % len(markers)]
+            linestyle = linestyles[i % len(linestyles)]
 
             # Plota a linha central (valor médio)
-            plt.plot(x_values, y_values, 'o-', label=alg)
+            ax.plot(x_values, y_values, 
+                   marker=marker, 
+                   linestyle=linestyle,
+                   label=alg)
+            
             # Se os dados de desvio padrão estiverem disponíveis, plota a área de intervalo de confiança
             if has_std_data:
                 std_key = metric['key'] + '_std'
@@ -253,19 +285,31 @@ def plot_results(results):
                     y_std = alg_data[std_key].values
                     lower_bound = y_values - y_std
                     upper_bound = y_values + y_std
-                    plt.fill_between(x_values, lower_bound, upper_bound, alpha=0.3)
+                    ax.fill_between(x_values, lower_bound, upper_bound, alpha=0.2)
         
-        plt.xlabel(x_label)
-        plt.ylabel(metric['ylabel'])
+        # Configura os rótulos dos eixos
+        ax.set_xlabel(x_label)
+        ax.set_ylabel(metric['ylabel'])
+        
         # Se a métrica é 'time', usa escala logarítmica no eixo y
         if metric['key'] == 'time':
-            plt.yscale("log")
-        plt.legend()
-        plt.grid(True)
-        plt.tight_layout()
+            ax.set_yscale("log")
         
-        # Salva a figura em um arquivo separado
-        plt.savefig(f"{metric['key']}_plot.png", dpi=300)
+        # Adiciona legenda compacta na melhor posição sem sobrepor os dados
+        ax.legend(loc='best', frameon=False, handlelength=1.5, handletextpad=0.5)
+        
+        # Adiciona grade sutil
+        ax.grid(True, linestyle='--', alpha=0.3, linewidth=0.5)
+        
+        # Remove bordas superior e à direita
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        
+        # Ajusta o layout e as margens
+        plt.tight_layout(pad=0.3)
+        
+        plt.savefig(f"{metric['key']}_plot.pdf", format='pdf', bbox_inches='tight')
+        plt.savefig(f"{metric['key']}_plot.png", dpi=600, bbox_inches='tight')
         plt.close()
 
 
@@ -294,11 +338,11 @@ def pymocd(G, seed=None):
 def louvain_wrapper(G, seed=None):
     return louvain_communities(G, seed=seed)
 
-def pymocd_hpmocd_wrapper(G, seed=None):
+def pymocd_HPMOCD_wrapper(G, seed=None):
     import pymocd
     if seed is not None:
         np.random.seed(seed)
-    return pymocd.HpMocd(G).run()
+    return pymocd.MOCD(G, pop_size=100, num_gens=200).min_max()
 
 def leiden_wrapper(G, seed=None):
     import igraph as ig
@@ -308,14 +352,19 @@ def leiden_wrapper(G, seed=None):
     communities = [set(cluster) for cluster in partition]
     return communities
 
+def girvan_newman_wrapper(G, seed=None):
+    return nx.community.girvan_newman(G)
+
 # ======================================================================
 # Register
 # ======================================================================
 
 #register_algorithm('MOCD', pymocd, needs_conversion=False)
-register_algorithm('HpMocd-v0.1.1', pymocd_hpmocd_wrapper, needs_conversion=False)
+register_algorithm('HPMOCD', pymocd_HPMOCD_wrapper, needs_conversion=False)
 #register_algorithm('Louvain', louvain_wrapper, needs_conversion=True)
 #register_algorithm('Leiden', leiden_wrapper, needs_conversion=True)
+#register_algorithm("Girvan Newman", girvan_newman_wrapper, needs_conversion=True)
+
 
 # ======================================================================
 # Plotting and saving results
@@ -360,15 +409,15 @@ def read_results_from_csv(filename='community_detection_results.csv'):
         return None
 
 if __name__ == "__main__":
-    mus = np.arange(0.1, 0.6, 0.1)  # 0.1, ..., 0.7
-    
-    print(f"Running community detection algorithms on LFR benchmark graphs with 1000 nodes")
     print(f"Available algorithms: {list(ALGORITHM_REGISTRY.keys())}")
+    min_mu = 0.1
+    max_mu = 0.5
+
 
     # Run experiments
-    results = read_results_from_csv('nodess.csv')
-    #results = run_experiment(mus=mus, n_runs=2)
-    #results = run_nodes_experiment(n_runs=1)
+    #results = read_results_from_csv('nodes.csv')
+    results = run_experiment(mus=np.arange(min_mu, max_mu + 0.1, 0.1), n_runs=2)
+    #results = run_nodes_experiment(n_runs=20)
 
     print("\nResults:")
     plot_results(results)    
