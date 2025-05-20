@@ -172,7 +172,7 @@ def hpmocd_wrapper(G, seed=None):
     import pymocd
     if seed is not None:
         np.random.seed(seed)
-    return pymocd.HpMocd(G, debug_level=1).run()
+    return pymocd.HpMocd(G, debug_level=1,pop_size=400, num_gens=500).run()
 
 def leiden_wrapper(G, seed=None):
     import igraph as ig
