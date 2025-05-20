@@ -21,7 +21,7 @@ default = ["cli"]
 rand = "0.9"                                                    # random number generation.
 rayon = "1.10.0"                                                # data parallelism and multi-threading support.
 rustc-hash = { version = "2.1.1", default-features = true }     # a fast hash map implementation.
-pyo3 = { version = "0.24.0", features = ["extension-module"] }  # Python compatibility
+pyo3 = { version = "0.25.0", features = ["extension-module"] }  # Python compatibility
 dashmap = "6.1.0"                                               # For concurrent HashMap
 rand_chacha = "0.9.0"                                           # ChaCha random number generator 
 
