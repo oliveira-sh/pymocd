@@ -1,12 +1,11 @@
-import networkx as nx
-import numpy as np
-import matplotlib.pyplot as plt
 from networkx.algorithms.community import louvain_communities
-
 import community as community_louvain
-import time
+import matplotlib.pyplot as plt
+import networkx as nx
 from tqdm import tqdm
 import pandas as pd
+import numpy as np
+import time
 
 from utils import (
     generate_lfr_benchmark,
@@ -15,14 +14,13 @@ from utils import (
     SAVE_PATH
 )
 
-CSV_FILE_PATH = 'community_detection_results.csv'
+CSV_FILE_PATH = 'lfr_experiment.csv'
 MIN_MU = 0.1
 MAX_MU = 0.8
 STEP_MU = 0.1
 NUM_RUNS = 10
 JUST_PLOT_AVAILABLE_RESULTS = False
-
-MU_EXPERIMENT = True
+MU_EXPERIMENT = True                    # false to run scalling experiment
 
 # ======================================================================
 # Helpers
@@ -41,7 +39,7 @@ def register_algorithm(name, func, needs_conversion=True):
 # Experiment
 # ======================================================================
 
-def run_experiment(algorithms=None, mus=np.arange(MIN_MU, MAX_MU, STEP_MU), n_runs=NUM_RUNS, n_nodes=500):
+def run_experiment(algorithms=None, mus=np.arange(MIN_MU, MAX_MU, STEP_MU), n_runs=NUM_RUNS, n_nodes=100000):
     if algorithms is None:
         algorithms = list(ALGORITHM_REGISTRY.keys())
     
