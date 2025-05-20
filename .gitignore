@@ -4,6 +4,10 @@
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
 # User-specific files
+.ignore
+*.pdf
+*.png
+*.out
 .venv
 *.suo
 *.user
