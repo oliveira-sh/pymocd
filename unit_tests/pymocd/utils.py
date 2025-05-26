@@ -1,5 +1,5 @@
 import networkx as nx
-import pandas
+import pandas as pd
 import numpy as np
 from networkx.algorithms.community import modularity
 from sklearn.metrics.cluster import normalized_mutual_info_score, adjusted_mutual_info_score
