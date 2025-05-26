@@ -13,7 +13,8 @@ Options:
 EOF
 }
 
-setup() {
+setup() {# Register with parallel flags as desired
+
   echo "[..] Creating virtual environment at .venv…"
   python3 -m venv .venv
 
@@ -34,7 +35,8 @@ setup() {
     numpy \
     python-louvain \
     igraph \
-    leidenalg
+    leidenalg \
+    pymoo
 
   echo "[..] Building the Rust extension via maturin…"
   maturin develop --release
