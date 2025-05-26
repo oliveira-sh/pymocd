@@ -13,7 +13,7 @@ Options:
 EOF
 }
 
-setup() {# Register with parallel flags as desired
+setup() {
 
   echo "[..] Creating virtual environment at .venv…"
   python3 -m venv .venv
