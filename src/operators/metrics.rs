@@ -4,7 +4,6 @@
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 #[derive(Debug, PartialEq)]
-#[allow(dead_code)]
 pub struct Metrics {
     pub modularity: f64,
     pub intra: f64,
@@ -22,7 +21,6 @@ impl Default for Metrics {
 }
 
 impl Metrics {
-    #[allow(dead_code)]
     pub fn get_modularity(&self) -> f64 {
         self.modularity
     }

@@ -85,10 +85,8 @@ pub fn get_fitness(
 
 pub fn generate_population(graph: &Graph, population_size: usize) -> Vec<Partition> {
     population::generate_initial_population(graph, population_size)
-    // population::generate_optimized_population(graph, population_size)
 }
 
-#[allow(dead_code)]
 pub fn get_modularity_from_partition(partition: &Partition, graph: &Graph) -> f64 {
     let metrics: Metrics =
         objective::calculate_objectives(graph, partition, &graph.precompute_degrees(), false);
