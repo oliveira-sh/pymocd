@@ -1,23 +1,26 @@
 //! lib.rs
 //! Implements the algorithm to be run as a PyPI python library
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
-//! Copyright 2024 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
-
-mod hpc_mocd;
-mod mmcomo;
-mod mocd;
-
-mod graph;
-mod operators;
-mod utils;
-
-pub use hpc_mocd::HpMocd;
-pub use mmcomo::MMCoMO;
-pub use mocd::MOCD;
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+
+// ================================================================================================
+// Algorithms Classes
+// ================================================================================================
+mod hpmocd;
+mod mocd;
+
+mod graph;                      // graph custom implementation;
+mod operators;                  // genetic algorithm operators;
+mod utils;                      // networkx to graph conversion, some useful funcs.
+
+// ================================================================================================
+
+pub use hpmocd::HpMocd;         // proposed hpmocd (2025)
+pub use mocd::MOCD;             // shi 2010, (with a lot of changes, cant be called the same alg)
 
 // ================================================================================================
 // Functions
@@ -52,7 +55,6 @@ fn fitness(graph: &Bound<'_, PyAny>, partition: &Bound<'_, PyDict>) -> PyResult<
 fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(fitness, m)?)?;
     m.add_class::<HpMocd>()?;
-    m.add_class::<MMCoMO>()?;
     m.add_class::<MOCD>()?;
     Ok(())
 }
