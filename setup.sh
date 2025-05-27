@@ -8,6 +8,7 @@ Usage: $0 [OPTION]
 Options:
   --dependencies      Create venv, install Python deps & build Rust extension
   --experiment        Run LFR experiment (after setting up dependencies)
+  --ga-params         Run an experiment to check how many gens/pop for the GA
   --pareto-frontier   Run Pareto-front experiment (after setting up dependencies)
   -h, --help          Show this help message
 EOF
@@ -53,6 +54,12 @@ case "${1:-}" in
     echo "[..] Running LFR experiment and writing to experiment.out…"
     python3 unit_tests/pymocd/lfr_experiment.py > experiment.out
     echo "[OK] Experiment finished. See experiment.out."
+    ;;
+  --ga-params)
+    setup
+    echo "[..] Running Genetic Algorithm params experiment"
+    python3 unit_tests/pymocd/params.py > experiment.out
+    echo "[OK] Experiment finished. See experiment.out."   
     ;;
   --pareto-frontier)
     setup
