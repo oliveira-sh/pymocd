@@ -219,11 +219,14 @@ def moganet_wrapper(G, seed=None):
                                   r=1.5,
                                   elite_ratio=0.1)
 
-#register_algorithm('HPMOCD', hpmocd_wrapper, needs_conversion=False, parallel=True)
-#register_algorithm('Louvain', louvain_wrapper, needs_conversion=True, parallel=True)
-#register_algorithm('Leiden', leiden_wrapper, needs_conversion=True, parallel=True)
-register_algorithm('MOCD', mocd_wrapper, needs_conversion=False, parallel=True)
-register_algorithm('MogaNet', moganet_wrapper, needs_conversion=False, parallel=True)
+register_algorithm('HPMOCD', hpmocd_wrapper, needs_conversion=False, parallel=False)
+# use parallel always as false, has built-in features. 
+register_algorithm('Louvain', louvain_wrapper, needs_conversion=True, parallel=True)
+register_algorithm('Leiden', leiden_wrapper, needs_conversion=True, parallel=True)
+# We removed the MOCD and MogaNet due to the fast execution time being unfeasible,
+# reaching over 20 hours for a single run.
+#register_algorithm('MOCD', mocd_wrapper, needs_conversion=False, parallel=True)
+#register_algorithm('MogaNet', moganet_wrapper, needs_conversion=False, parallel=True)
 
 # ======================================================================
 # Main
