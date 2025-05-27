@@ -17,14 +17,12 @@ pub struct Solution {
 }
 
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
 pub struct HyperBox {
     pub solutions: Vec<Solution>,
-    pub coordinates: Vec<usize>,
+    pub _coordinates: Vec<usize>,
 }
 
 impl HyperBox {
-    #[allow(dead_code)]
     pub fn density(&self) -> f64 {
         self.solutions.len() as f64
     }
@@ -246,9 +244,9 @@ pub fn create(solutions: &[Solution], divisions: usize) -> Vec<HyperBox> {
     // Convert DashMap to Vec<HyperBox>
     hyperbox_map
         .into_iter()
-        .map(|(coordinates, solutions)| HyperBox {
+        .map(|(_coordinates, solutions)| HyperBox {
             solutions,
-            coordinates,
+            _coordinates,
         })
         .collect()
 }
