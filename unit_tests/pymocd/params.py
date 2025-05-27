@@ -15,7 +15,7 @@ records = []
 for pop_size in population_sizes:
     for num_gens in generation_counts:
         for run_id in range(1, n_runs + 1):
-            G, ground_truth = generate_lfr_benchmark(seed=run_id + num_gens - pop_size)
+            G, ground_truth = generate_lfr_benchmark(n = 50000, seed=run_id + num_gens - pop_size)
             
             start = time.time()
             solver = pymocd.HpMocd(G, debug_level=3, pop_size=pop_size, num_gens=num_gens)
