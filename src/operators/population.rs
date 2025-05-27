@@ -74,7 +74,6 @@ pub fn generate_optimized_population(graph: &Graph, population_size: usize) -> V
     population
 }
 
-#[allow(dead_code)]
 pub fn generate_initial_population(graph: &Graph, population_size: usize) -> Vec<Partition> {
     let mut rng = rand::rng();
     let nodes: Vec<NodeId> = graph.nodes.iter().copied().collect();
