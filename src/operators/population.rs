@@ -16,16 +16,13 @@ fn random_partition(node_ids: &[NodeId], num_communities: usize, rng: &mut impl 
         })
         .collect()
 }
-pub fn generate_initial_population(
-    graph: &Graph,
-    population_size: usize,
-) -> Vec<Partition> {
+pub fn generate_initial_population(graph: &Graph, population_size: usize) -> Vec<Partition> {
     let mut rng = rng();
 
     // Extract node IDs only once
     let node_ids: Vec<NodeId> = graph.nodes.iter().copied().collect();
     let num_communities = node_ids.len();
-    (0..population_size)     // Build each individual 
+    (0..population_size) // Build each individual
         .map(|_| random_partition(&node_ids, num_communities, &mut rng))
         .collect()
 }

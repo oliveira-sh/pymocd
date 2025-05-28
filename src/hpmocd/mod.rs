@@ -7,8 +7,8 @@ mod individual;
 mod utils;
 
 use crate::graph::{Graph, Partition};
-use crate::operators;
 use crate::utils::{build_graph, get_edges, normalize_community_ids};
+use crate::{debug, operators};
 use individual::{Individual, create_offspring};
 use utils::{calculate_crowding_distance, fast_non_dominated_sort, max_q_selection};
 
@@ -76,12 +76,9 @@ impl HpMocd {
                 .collect();
         self.evaluate_population(&mut individuals, &self.graph, degrees);
 
-        let mut max_local = operators::ConvergenceCriteria::default();
         for generation in 0..self.num_gens {
-            let len = individuals.len();
-            self.update_population_sort_and_truncate(&mut individuals, len);
+            self.update_population_sort_and_truncate(&mut individuals, self.pop_size);
 
-            // Create offspring and evaluate them.
             let mut offspring = create_offspring(
                 &individuals,
                 &self.graph,
@@ -91,37 +88,20 @@ impl HpMocd {
             );
             self.evaluate_population(&mut offspring, &self.graph, degrees);
 
-            // Combine and prepare for environmental selection.
             individuals.extend(offspring);
-            self.update_population_sort_and_truncate(&mut individuals, self.pop_size);
-
-            // Record best fitness.
-            let best_fitness = individuals
-                .par_iter()
-                .map(|ind| ind.fitness)
-                .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                .unwrap_or(f64::NEG_INFINITY);
-
-            if max_local.has_converged(best_fitness) {
-                if self.debug_level >= 1 {
-                    println!("[evolutionary_phase]: Converged!");
-                }
-                break;
-            }
 
             if self.debug_level >= 1 && (generation % 10 == 0 || generation == self.num_gens - 1) {
                 let first_front_size = individuals.iter().filter(|ind| ind.rank == 1).count();
-                println!(
-                    "NSGA-II: Gen {} | Best fitness: {:.4} | First front size: {} | Pop size: {}",
+                debug!(
+                    debug,
+                    "NSGA-II: Gen {} | 1st Front/Pop: {}/{}",
                     generation,
-                    best_fitness,
                     first_front_size,
                     individuals.len()
                 );
             }
         }
 
-        // Extract the Pareto front (first front).
         individuals
             .iter()
             .filter(|ind| ind.rank == 1)
