@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import networkx as nx
 from utils import generate_lfr_benchmark, SAVE_PATH
 
+pymocd.set_thread_count(2)
+
 G, _ = generate_lfr_benchmark(n=250, mu=0.1)
 GENERATIONS = [10, 30, 50, 80, 100, 110]
 os.makedirs(SAVE_PATH, exist_ok=True)

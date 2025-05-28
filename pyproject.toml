@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "pymocd"
-version = "0.2.0"
+version = "1.0.0"
 license = {file = "LICENSE"}
 description = "Efficient and high-performance community detection in large-scale graphs, built with Rust for speed and scalability."
 authors = [

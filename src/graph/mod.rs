@@ -11,6 +11,8 @@ use std::io::{BufRead, BufReader};
 
 use std::collections::BTreeMap;
 
+use crate::debug;
+
 pub type NodeId = i32;
 pub type CommunityId = i32;
 pub type Partition = BTreeMap<NodeId, CommunityId>;
@@ -38,8 +40,9 @@ impl Graph {
     }
 
     pub fn print(&self) {
-        println!(
-            "[graph/mod.rs]: graph n/e: {}/{}",
+        debug!(
+            debug,
+            "G = ({},{})", // G = (V, E)
             self.num_nodes(),
             self.num_edges(),
         );
