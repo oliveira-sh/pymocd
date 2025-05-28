@@ -20,15 +20,15 @@ CSV_FILE_PATH = 'lfr_experiment.csv'
 MIN_MU = 0.1
 MAX_MU = 0.8
 STEP_MU = 0.1
-NUM_RUNS = 1
+NUM_RUNS = 5
 
 # Set this to true if you already has the csv (with the name above)
 # and just want to plot the comparasions
-JUST_PLOT_AVAILABLE_RESULTS = False
+JUST_PLOT_AVAILABLE_RESULTS = True
 
 # true: growing mu parameter experiment
 # false; network growing size experiment (nodes only)
-MU_EXPERIMENT = False  
+MU_EXPERIMENT = True  
 
 # ======================================================================
 # Registry and Helpers
@@ -104,7 +104,7 @@ def _process_n(args):
 def run_experiment(algorithms=None,
                    mus=np.arange(MIN_MU, MAX_MU + STEP_MU, STEP_MU),
                    n_runs=NUM_RUNS,
-                   n_nodes=20000):
+                   n_nodes=100000):
     if algorithms is None:
         algorithms = list(ALGORITHM_REGISTRY.keys())
     all_results = []
@@ -139,7 +139,7 @@ def run_experiment(algorithms=None,
 
 
 def run_nodes_experiment(algorithms=None,
-                         n_list=np.arange(5000, 55000, 5000),
+                         n_list=np.arange(10000, 110000, 10000),
                          n_runs=NUM_RUNS,
                          mu=0.3):
     if algorithms is None:
@@ -184,7 +184,6 @@ def mocd_wrapper(G, seed=None):
     from mocd import mocd
     return mocd(G)
 
-
 def louvain_wrapper(G, seed=None):
     return louvain_communities(G, seed=seed)
 
@@ -195,17 +194,11 @@ def hpmocd_wrapper(G, seed=None):
         np.random.seed(seed)
     return pymocd.HpMocd(G, debug_level=3).run()
 
-
 def leiden_wrapper(G, seed=None):
     import igraph as ig, leidenalg
     G_ig = ig.Graph(edges=list(G.edges()), directed=False)
     partition = leidenalg.find_partition(G_ig, leidenalg.ModularityVertexPartition, seed=seed)
     return [set(c) for c in partition]
-
-
-def girvan_newman_wrapper(G, seed=None):
-    return list(nx.community.girvan_newman(G))
-
 
 def moganet_wrapper(G, seed=None):
     import sys, os
@@ -234,7 +227,7 @@ register_algorithm('Leiden', leiden_wrapper, needs_conversion=True, parallel=Tru
 if __name__ == "__main__":
     print(f"Available algorithms: {list(ALGORITHM_REGISTRY.keys())}")
     if JUST_PLOT_AVAILABLE_RESULTS:
-        results = read_results_from_csv(CSV_FILE_PATH)
+        results = read_results_from_csv(SAVE_PATH + CSV_FILE_PATH)
     else:
         if MU_EXPERIMENT:
             results = run_experiment(mus=np.arange(MIN_MU, MAX_MU + STEP_MU, STEP_MU), n_runs=NUM_RUNS)
