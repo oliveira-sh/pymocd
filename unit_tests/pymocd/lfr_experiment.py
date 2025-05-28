@@ -20,7 +20,7 @@ CSV_FILE_PATH = 'lfr_experiment.csv'
 MIN_MU = 0.1
 MAX_MU = 0.8
 STEP_MU = 0.1
-NUM_RUNS = 20
+NUM_RUNS = 1
 
 # Set this to true if you already has the csv (with the name above)
 # and just want to plot the comparasions
@@ -28,7 +28,7 @@ JUST_PLOT_AVAILABLE_RESULTS = False
 
 # true: growing mu parameter experiment
 # false; network growing size experiment (nodes only)
-MU_EXPERIMENT = True  
+MU_EXPERIMENT = False  
 
 # ======================================================================
 # Registry and Helpers
@@ -104,7 +104,7 @@ def _process_n(args):
 def run_experiment(algorithms=None,
                    mus=np.arange(MIN_MU, MAX_MU + STEP_MU, STEP_MU),
                    n_runs=NUM_RUNS,
-                   n_nodes=100000):
+                   n_nodes=20000):
     if algorithms is None:
         algorithms = list(ALGORITHM_REGISTRY.keys())
     all_results = []
@@ -139,7 +139,7 @@ def run_experiment(algorithms=None,
 
 
 def run_nodes_experiment(algorithms=None,
-                         n_list=np.arange(10000, 110000, 10000),
+                         n_list=np.arange(5000, 55000, 5000),
                          n_runs=NUM_RUNS,
                          mu=0.3):
     if algorithms is None:
@@ -193,7 +193,7 @@ def hpmocd_wrapper(G, seed=None):
     import pymocd
     if seed is not None:
         np.random.seed(seed)
-    return pymocd.HpMocd(G, debug_level=1, pop_size=400, num_gens=500).run()
+    return pymocd.HpMocd(G, debug_level=3).run()
 
 
 def leiden_wrapper(G, seed=None):
@@ -239,5 +239,5 @@ if __name__ == "__main__":
         if MU_EXPERIMENT:
             results = run_experiment(mus=np.arange(MIN_MU, MAX_MU + STEP_MU, STEP_MU), n_runs=NUM_RUNS)
         else:
-            results = run_nodes_experiment(n_runs=20)
+            results = run_nodes_experiment(n_runs=NUM_RUNS)
     plot_results(results)
