@@ -18,7 +18,7 @@ hero:
   titleLogo:
      path: "images/logos"
      filename: "title_logo.png"
-     alt: "Lotus Docs Logo"
+     alt: "pymocd logo"
      height: 80px
 
   title: ""

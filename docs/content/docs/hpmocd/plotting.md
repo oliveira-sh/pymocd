@@ -70,14 +70,6 @@ labels, _ = frontier[23]
 plot_communities(G, labels)
 ```
 
-{{% alert context="info" text="**Expected output:**" /%}}
-
-|      |                |
-|---------------|--------------------|
-| ![](images/hpmocd/karate.png)     | ![](images/hpmocd/individual.png)   |
-
-
-
 ---
 
 ### Plotting the Pareto Front
@@ -103,7 +95,3 @@ def plot_pareto_front(frontier):
 ```python
 plot_pareto_front(frontier)
 ```
-
-{{% alert context="info" text="**Expected output:**" /%}}
-
-![](images/hpmocd/pareto_front.png)

@@ -39,14 +39,17 @@ Install the library by pip interface:
 pip install pymocd
 ```
 
-And refer to the official **[Documentation](https://oliveira-sh.github.io/pymocd/)** for detailed instructions and usage examples.
+For an easy usage:
 
-#### Key Features
+```python
+import networkx
+import pymocd
 
-  * **High-Performance Backend:** Leverages Rust for computationally intensive tasks, ensuring speed and efficiency.
-  * **Multi-Objective Optimization:** Employs multi-objective evolutionary algorithms to find nuanced community structures.
-  * **Scalability:** Designed to handle large graphs effectively.
-  * **User-Friendly Python API:** Offers an easy-to-use interface for Python developers.
+G = network.Graph() # Your graph
+alg = pymocd.HpMocd(G)
+communities = alg.run()
+```
+Refer to the official **[Documentation](https://oliveira-sh.github.io/pymocd/)** for detailed instructions and more usage examples.
 
 ### Contributing
 
