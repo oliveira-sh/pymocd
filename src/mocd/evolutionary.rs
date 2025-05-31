@@ -99,7 +99,7 @@ pub fn evolutionary_phase(
 ) -> Vec<Solution> {
     // Validate graph
     if graph.nodes.is_empty() || graph.edges.is_empty() {
-        debug!(debug, "[evolutionary_phase]: Empty graph detected");
+        debug!(debug, "Empty graph detected");
         return Vec::new();
     }
 
@@ -107,7 +107,7 @@ pub fn evolutionary_phase(
     if debug_level >= 2 {
         debug!(
             debug,
-            "[evolutionary_phase]: Starting with graph - nodes: {}, edges: {}",
+            "Starting with graph - nodes: {}, edges: {}",
             graph.nodes.len(),
             graph.edges.len()
         );
@@ -126,10 +126,7 @@ pub fn evolutionary_phase(
         let chunk_size = population.len().max(1) / num_threads;
 
         if chunk_size == 0 {
-            debug!(
-                debug,
-                "[evolutionary_phase]: Population too small for parallelization"
-            );
+            debug!(debug, "Population too small for parallelization");
             break;
         }
 
@@ -151,7 +148,7 @@ pub fn evolutionary_phase(
             .collect();
 
         if solutions.is_empty() {
-            debug!(debug, "[evolutionary_phase]: No valid solutions generated");
+            debug!(debug, "No valid solutions generated");
             break;
         }
 
@@ -164,7 +161,7 @@ pub fn evolutionary_phase(
         }
 
         if archive.is_empty() {
-            debug!(debug, "[evolutionary_phase]: Empty archive after update");
+            debug!(debug, "Empty archive after update");
             break;
         }
 
@@ -174,10 +171,7 @@ pub fn evolutionary_phase(
 
         // Validate archive before creating hyperboxes
         if archive.is_empty() {
-            debug!(
-                debug,
-                "[evolutionary_phase]: Empty archive after truncation"
-            );
+            debug!(debug, "Empty archive after truncation");
             break;
         }
 
@@ -185,7 +179,7 @@ pub fn evolutionary_phase(
         let hyperboxes: Vec<HyperBox> = hypergrid::create(&archive, hypergrid::GRID_DIVISIONS);
 
         if hyperboxes.is_empty() {
-            debug!(debug, "[evolutionary_phase]: No valid hyperboxes created");
+            debug!(debug, "No valid hyperboxes created");
             break;
         }
 
@@ -202,10 +196,7 @@ pub fn evolutionary_phase(
         let new_population =
             generate_new_population(&hyperboxes, pop_size, cross_rate, mut_rate, graph);
         if new_population.is_empty() {
-            debug!(
-                err,
-                "[evolutionary_phase]: Failed to generate new population"
-            );
+            debug!(err, "Failed to generate new population");
             break;
         }
         population = new_population;
@@ -213,7 +204,7 @@ pub fn evolutionary_phase(
         // Early stopping
         if max_local.has_converged(best_fitness) {
             if debug_level >= 1 {
-                debug!(debug, "[evolutionary_phase]: Converged!");
+                debug!(debug, "Converged!");
             }
             break;
         }
@@ -221,7 +212,7 @@ pub fn evolutionary_phase(
         if debug_level >= 1 {
             debug!(
                 debug,
-                "\x1b[1A\x1b[2K[evolutionary_phase]: gen: {} | bf: {:.4} | pop/arch: {}/{} | bA: {:.4} |",
+                "gen: {} | bf: {:.4} | pop/arch: {}/{} | bA: {:.4} |",
                 generation,
                 best_fitness,
                 population.len(),

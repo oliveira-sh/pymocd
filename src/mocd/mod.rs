@@ -4,6 +4,11 @@
 //! Copyright 2024 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
+//! This isn't the corrected implementation of Shi 2012, MOCD. This is just the early
+//! stages of the HP-MOCD Algorithm, which is deprecated now. If you want MOCD Implementation
+//! You ask for authors permission, and start fixing this class. :)
+#![allow(deprecated)] // just to ignore warnings from this file.
+
 mod evolutionary;
 mod hypergrid;
 mod model_selection;
@@ -18,6 +23,7 @@ use crate::utils::{build_graph, get_edges, normalize_community_ids};
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
 
+#[deprecated]
 #[pyclass]
 pub struct MOCD {
     graph: Graph,
@@ -91,15 +97,7 @@ impl MOCD {
             .collect())
     }
 
-    #[pyo3(signature = ())]
-    pub fn max_q(&self) -> PyResult<Partition> {
-        let archive = self.envolve();
-        let best_solution = model_selection::max_q_selection(&archive);
-
-        Ok(normalize_community_ids(best_solution.partition.clone()))
-    }
-
-    pub fn min_max(&self) -> PyResult<Partition> {
+    pub fn run(&self) -> PyResult<Partition> {
         let archive = self.envolve();
 
         let best_solution = {
