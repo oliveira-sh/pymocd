@@ -1,5 +1,3 @@
-# plot the algorithm evolution based on some parameters
-
 import os
 import pymocd
 import matplotlib.pyplot as plt

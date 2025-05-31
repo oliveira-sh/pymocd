@@ -1,7 +1,7 @@
 <div align="center">
   <img src="res/logo.png" alt="pymocd logo" width="50%">  
   
-  **Python Multi-Objective High-performance Evolutionary Algorithms for Community Detection**  
+  <strong>Python Multi-Objective Community Detection Algorithms</strong>  
 
 [![PyPI Publish](https://github.com/oliveira-sh/pymocd/actions/workflows/release.yml/badge.svg)](https://github.com/oliveira-sh/pymocd/actions/workflows/release.yml)
 ![Rust Compilation](https://img.shields.io/github/actions/workflow/status/oliveira-sh/pymocd/rust.yml)

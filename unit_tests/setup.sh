@@ -52,19 +52,19 @@ case "${1:-}" in
   --experiment)
     setup
     echo "[..] Running LFR experiment and writing to experiment.out…"
-    python3 unit_tests/pymocd/lfr_experiment.py > experiment.out
+    python3 benchmarks/lfr_experiment.py > experiment.out
     echo "[OK] Experiment finished. See experiment.out."
     ;;
   --ga-params)
     setup
     echo "[..] Running Genetic Algorithm params experiment"
-    python3 unit_tests/pymocd/params.py > experiment.out
+    python3 benchmarks/params.py > experiment.out
     echo "[OK] Experiment finished. See experiment.out."   
     ;;
   --pareto-frontier)
     setup
     echo "[..] Running Pareto-front experiment and writing to experiment.out…"
-    python3 unit_tests/pymocd/pareto_front.py > experiment.out
+    python3 benchmarks/pareto_front.py > experiment.out
     echo "[OK] Experiment finished. See experiment.out."
     ;;
   -h|--help)
