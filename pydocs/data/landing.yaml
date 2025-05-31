@@ -1,0 +1,86 @@
+hero:
+  enable: true
+  weight: 10
+  template: hero
+
+  backgroundImage:
+    path: "images/templates/hero"
+    filename:
+      desktop: "gradient-desktop.webp"
+      mobile: "gradient-mobile.webp"
+
+  badge:
+    text: v1.0.1
+    color: primary # primary, secondary, success, danger, warning, info, light, dark
+    pill: true # boolean
+    soft: true # boolean
+
+  titleLogo:
+     path: "images/logos"
+     filename: "title_logo.png"
+     alt: "Lotus Docs Logo"
+     height: 80px
+
+  title: ""
+  subtitle: A **lightweight**, **parallalized** and fast library with multi-objective community detection evolutionary algorithms. Written in **Rust** exposed to python through PyO3 
+
+  image:
+    path: "images" # path to image under configured assets directory. default 'images'
+    filename: "lotus_docs_screenshot.png" # filename of your hero image (including file extension)
+    alt: "pymocd Docs" # Optional but recommended
+    boxShadow: false # default 'false' (excludes .svg images)
+    rounded: false # round the image corners? default 'false' (excludes .svg images)
+
+  ctaButton:
+    icon: rocket_launch
+    btnText: "Get Started"
+    url: "docs/quickstart/#install-pymocd"
+  cta2Button:
+    icon: construction
+    btnText: "In Development"
+    url: "https://github.com/oliveira-sh/pymocd"
+
+  info: "**Open Source** GPLv3 Licensed."
+
+# Feature Grid
+featureGrid:
+  enable: true
+  weight: 20
+  template: feature grid
+
+  title: Why Choose Our Library?
+  subtitle: Not everyone has the time or desire to build state-of-the-art models from scratch. Researchers and practitioners alike need a robust tool that delivers optimized results without reinventing the wheel—whether it’s for performance, efficiency, or ease of use.
+
+  items:
+    - title: Fast
+      icon: speed
+      description: Tired of waiting days for your algorithms to run? Our multiobjective community detection algorithms are fully parallelized, ensuring rapid execution with just a standard CPU.
+      ctaLink:
+        text: Learn More
+        url: docs/
+
+    - title: User-Friendly
+      icon: terminal
+      description: Built for Python enthusiasts, our library integrates seamlessly with your workflow. Get started quickly without a steep learning curve.
+      ctaLink:
+        text: Learn More
+        url: docs/
+
+    - title: Highly Configurable
+      icon: settings
+      description: Tailor your analysis with a variety of optional parameters. Fine-tune algorithm features to meet your specific research or project needs.
+      ctaLink:
+        text: Learn More
+        url: docs/
+
+imageCompare:
+  enable: true
+  weight: 30
+  template: image compare
+
+  title: Acknowledgments
+
+  items:
+    - title: Discovery Data Lab
+    - title: CDlib
+    - title: NetworkX
