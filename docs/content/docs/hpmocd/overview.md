@@ -12,12 +12,13 @@ images: []
 
 The High-Performance Multi-Objective Community Detection (HP-MOCD) algorithm is a scalable evolutionary method designed to efficiently identify high-quality community partitions in large complex networks. HP-MOCD combines the NSGA-II optimization framework with a parallel architecture and topology-aware genetic operators tailored to the structure of real-world graphs. In addition to detailing its core components, we describe the algorithm’s design choices, solution representation, and multi-objective selection strategy. The implementation is written in [Rust](https://www.rust-lang.org/) for performance and exposed to Python via [PyO3](https://pyo3.rs/v0.24.0/). The full source code is publicly available on [GitHub](https://oliveira-sh.github.io/pymocd/).
 
-{{% alert context="info" text="**Note**: The library has only **networkx** support. Compatibility for another libraries should be a great contribution!" /%}}
-
+{{% alert context="success" text="You can read the full pre-print clicking [here](/extras/hpmocd_pre_print.pdf)!" /%}}
 
 ### Overview and Design Rationale
 
-Let us consider a graph \( G = (V, E) \), where \( V \) is the set of nodes and \( E \) the set of edges. The objective of the **HP-MOCD** (Hybrid Parallel Multi-Objective Community Detection) algorithm is to uncover meaningful community structures by **simultaneously optimizing multiple, often conflicting, structural criteria**.
+Let us consider a graph `G = (V, E)`, where `V` is the set of nodes and `E` the set of edges. The objective of the **HP-MOCD** (Hybrid Parallel Multi-Objective Community Detection) algorithm is to uncover meaningful community structures by **simultaneously optimizing multiple, often conflicting, structural criteria**.
+
+{{% alert context="info" text="**Note**: The library has only **networkx** support. Compatibility for another libraries should be a great contribution!" /%}}
 
 To achieve this, HP-MOCD is built upon the **NSGA-II** (Non-dominated Sorting Genetic Algorithm II) framework, a well-established method in multi-objective optimization. NSGA-II was chosen due to its strong ability to produce diverse, high-quality Pareto fronts, especially when compared to older algorithms like **PESA-II** \[Diosan2007], which often struggle with diversity maintenance or selection pressure.
 
@@ -74,7 +75,7 @@ Together, these form a **multi-objective problem**, where each solution represen
 
 ### Internal Graph Representation
 
-Internally, the graph $G$ is stored using a **hash map** (via Rust’s high-performance `rustc-hash`) mapping each node to its neighbor list. This ensures:
+Internally, the graph `G` is stored using a **hash map** (via Rust’s high-performance `rustc-hash`) mapping each node to its neighbor list. This ensures:
 
 * Fast access/modification during evolution
 * Efficient computation of objective functions
