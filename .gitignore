@@ -4,9 +4,10 @@
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
 # User-specific files
+*.png
+*.csv
 .ignore
 *.pdf
-*.png
 *.out
 .venv
 *.suo
@@ -16,13 +17,11 @@
 Cargo.lock
 *.adjlist
 
+# Allowed-specific files
+!res/**/*.png
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
-
-# Experiments
-*.csv
-*.png
-*.temp
 
 # Mono auto generated files
 mono_crash.*
