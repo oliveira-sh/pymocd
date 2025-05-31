@@ -20,11 +20,11 @@ CSV_FILE_PATH = 'lfr_experiment.csv'
 MIN_MU = 0.1
 MAX_MU = 0.8
 STEP_MU = 0.1
-NUM_RUNS = 5
+NUM_RUNS = 20
 
-# Set this to true if you already has the csv (with the name above)
+# Set this to true if you already has the csv (with the name = CSV_FILE_PATH)
 # and just want to plot the comparasions
-JUST_PLOT_AVAILABLE_RESULTS = True
+JUST_PLOT_AVAILABLE_RESULTS = False
 
 # true: growing mu parameter experiment
 # false; network growing size experiment (nodes only)
@@ -216,8 +216,13 @@ register_algorithm('HPMOCD', hpmocd_wrapper, needs_conversion=False, parallel=Fa
 # use parallel always as false, has built-in features. 
 register_algorithm('Louvain', louvain_wrapper, needs_conversion=True, parallel=True)
 register_algorithm('Leiden', leiden_wrapper, needs_conversion=True, parallel=True)
+
 # We removed the MOCD and MogaNet due to the fast execution time being unfeasible,
-# reaching over 20 hours for a single run.
+# reaching over 25 hours for a single run. 
+# These two algorithms will not be available in any form in the pymocd source code. 
+# This is because, since the algorithms are from other authors, it is unethical to make them
+# available without proper permission. 
+# The wrappers are still here, in case you want to reimplement them from scratch.
 #register_algorithm('MOCD', mocd_wrapper, needs_conversion=False, parallel=True)
 #register_algorithm('MogaNet', moganet_wrapper, needs_conversion=False, parallel=True)
 

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# for automated analisys, this should be called by a shellscript
+# due to the pymocd.set_thread_count(num_threads). Check more on:
+# https://oliveira-sh.github.io/pymocd/docs/optional-options/limiting-usage/
 import sys
 import os
 import csv
