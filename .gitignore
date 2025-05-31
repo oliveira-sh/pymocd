@@ -18,6 +18,8 @@
 
 # Allowed-specific files
 !res/**/*.png
+!docs/**/*.png
+!docs/**/*.pdf
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
