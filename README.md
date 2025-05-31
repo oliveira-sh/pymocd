@@ -14,6 +14,13 @@
 
 **Navigate the [Documentation](https://www.google.com/search?q=https://oliveira-sh.github.io/pymocd/) for detailed guidance and usage instructions.**
 
+## Table of Contents
+- [Understanding Community Detection with HP-MOCD](#understanding-community-detection-with-hp-mocd)
+- [Getting Started](#getting-started)
+  - [Key Features](#key-features)
+- [Contributing](#contributing)
+- [Citation](#citation)
+
 ---
 
 ### Understanding Community Detection with HP-MOCD
