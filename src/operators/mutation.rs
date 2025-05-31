@@ -54,7 +54,6 @@ pub fn optimized_mutate(partition: &mut Partition, graph: &Graph, mutation_rate:
             }
         }
     }
-    // Update
     partition.clear();
     partition.extend(fast_partition);
 }

@@ -23,7 +23,7 @@ mod utils; // networkx to graph conversion, some useful funcs.
 
 static INIT_RAYON: Once = Once::new();
 pub use hpmocd::HpMocd; // proposed hpmocd (2025)
-pub use mocd::MOCD; // shi 2010, (with a lot of changes, cant be called the same alg)
+// pub use mocd::MOCD; // shi 2010, (with a lot of changes, cant be called the same alg)
 
 // ================================================================================================
 // Functions
@@ -95,7 +95,6 @@ fn set_thread_count(num_threads: usize) -> PyResult<()> {
 fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(set_thread_count, m)?)?;
     m.add_function(wrap_pyfunction!(fitness, m)?)?;
-    m.add_class::<HpMocd>()?;
-    m.add_class::<MOCD>()?;
+    //m.add_class::<MOCD>()?;
     Ok(())
 }

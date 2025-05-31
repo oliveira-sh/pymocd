@@ -63,7 +63,7 @@ impl ConvergenceCriteria {
 }
 
 pub fn crossover(parent1: &Partition, parent2: &Partition, crossover_rate: f64) -> Partition {
-    crossover::optimized_crossover(parent1, parent2, crossover_rate)
+    crossover::two_point_crossover(parent1, parent2, crossover_rate)
 }
 
 pub fn mutation(partition: &mut Partition, graph: &Graph, mutation_rate: f64) {

@@ -6,63 +6,44 @@
 
 use crate::graph::{NodeId, Partition};
 use rand::{Rng, seq::IndexedRandom};
-use std::collections::BTreeMap;
 use std::collections::HashMap;
 
-pub fn optimized_crossover(
+pub fn two_point_crossover(
     parent1: &Partition,
     parent2: &Partition,
     crossover_rate: f64,
 ) -> Partition {
     let mut rng = rand::rng();
-
     if rng.random::<f64>() > crossover_rate {
-        // If no crossover, randomly return either parent1 or parent2
         return if rng.random_bool(0.5) {
             parent1.clone()
         } else {
             parent2.clone()
         };
     }
-
-    // Use Vec for faster sequential access
     let keys: Vec<NodeId> = parent1.keys().copied().collect();
     let len = keys.len();
-
-    // Optimize crossover point selection
-    let crossover_points: (usize, usize) = {
-        let point1: usize = rng.random_range(0..len);
-        let point2: usize = (point1 + rng.random_range(1..len / 2)).min(len - 1);
-        (point1, point2)
-    };
-
-    // Pre-allocate with capacity
-    let mut child: BTreeMap<i32, i32> = Partition::new();
-
-    // Copy elements before crossover point from parent1
-    keys.iter().take(crossover_points.0).for_each(|&key| {
+    let mut point1 = rng.random_range(0..len);
+    let mut point2 = rng.random_range(0..len);
+    if point1 > point2 {
+        std::mem::swap(&mut point1, &mut point2);
+    }
+    let mut child: Partition = Partition::new();
+    for &key in keys.iter().take(point1) {
         if let Some(&community) = parent1.get(&key) {
             child.insert(key, community);
         }
-    });
-
-    // Copy elements in crossover region from parent2
-    keys.iter()
-        .skip(crossover_points.0)
-        .take(crossover_points.1 - crossover_points.0)
-        .for_each(|&key| {
-            if let Some(&community) = parent2.get(&key) {
-                child.insert(key, community);
-            }
-        });
-
-    // Copy remaining elements from parent1
-    keys.iter().skip(crossover_points.1).for_each(|&key| {
+    }
+    for &key in keys.iter().skip(point1).take(point2 - point1) {
+        if let Some(&community) = parent2.get(&key) {
+            child.insert(key, community);
+        }
+    }
+    for &key in keys.iter().skip(point2) {
         if let Some(&community) = parent1.get(&key) {
             child.insert(key, community);
         }
-    });
-
+    }
     child
 }
 
@@ -72,11 +53,10 @@ pub fn ensemble_crossover(parents: &[Partition], crossover_rate: f64) -> Partiti
 
     // Check if crossover should be skipped
     if rng.random::<f64>() > crossover_rate {
-        // Return a random parent if no crossover
         return parents[rng.random_range(0..parents.len())].clone();
     }
 
-    // Collect node IDs from the first parent (assuming all parents have same nodes)
+    // Collect node IDs from the first parent
     let keys: Vec<NodeId> = parents[0].keys().copied().collect();
     let mut child = Partition::new();
 
