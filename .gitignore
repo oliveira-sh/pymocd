@@ -14,7 +14,6 @@
 *.user
 *.userosscache
 *.sln.docstates
-Cargo.lock
 *.adjlist
 
 # Allowed-specific files
