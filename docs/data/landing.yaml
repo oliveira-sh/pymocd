@@ -26,7 +26,7 @@ hero:
 
   image:
     path: "images" # path to image under configured assets directory. default 'images'
-    filename: "lotus_docs_screenshot.png" # filename of your hero image (including file extension)
+    filename: "banner.png" # filename of your hero image (including file extension)
     alt: "pymocd Docs" # Optional but recommended
     boxShadow: false # default 'false' (excludes .svg images)
     rounded: false # round the image corners? default 'false' (excludes .svg images)
