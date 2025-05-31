@@ -10,12 +10,7 @@ name = "pymocd"
 crate-type = ["cdylib"]
 
 [profile.release]
-debug = true 
-
-[features]
-cli = []
-python = []
-default = ["cli"]
+debug = false 
 
 [dependencies]
 rand = "0.9"                                                    # random number generation.

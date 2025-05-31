@@ -14,17 +14,6 @@ fn euclidean_distance(a: &[f64], b: &[f64]) -> f64 {
         .sqrt()
 }
 
-pub fn max_q_selection(archive: &[Solution]) -> &Solution {
-    archive
-        .iter()
-        .max_by(|a, b| {
-            let q_a = 1.0 - a.objectives[0] - a.objectives[1]; // 1 - intra - inter
-            let q_b = 1.0 - b.objectives[0] - b.objectives[1];
-            q_a.partial_cmp(&q_b).unwrap()
-        })
-        .unwrap()
-}
-
 /// Selects a solution from the real Pareto front based on the "max-min" distance criterion.
 ///
 /// - `real_front`: A vector of non-dominated (Pareto) solutions from the real network.
