@@ -9,7 +9,7 @@ from utils import generate_lfr_benchmark, evaluate_communities
 network_sizes    = [10000, 20000, 30000]
 population_sizes = [50, 100, 150, 200]
 generation_counts= [50 * i for i in range(1, 7)]
-n_runs           = 10
+n_runs           = 20
 
 output_file = 'ga_params_experiment_results.csv'
 if os.path.exists(output_file):
