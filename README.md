@@ -33,7 +33,7 @@ The `HP-MOCD` algorithm, central to `pymocd`, identifies community structures wi
 
 ### Getting Started
 
-Install the library by pip interface:
+Installing the library using pip interface:
 
 ```bash
 pip install pymocd
@@ -45,10 +45,13 @@ For an easy usage:
 import networkx
 import pymocd
 
-G = network.Graph() # Your graph
+G = networkx.Graph() # Your graph
 alg = pymocd.HpMocd(G)
 communities = alg.run()
 ```
+> [!IMPORTANT]
+> Graphs must be provided in **NetworkX compatible format**.
+
 Refer to the official **[Documentation](https://oliveira-sh.github.io/pymocd/)** for detailed instructions and more usage examples.
 
 ### Contributing
