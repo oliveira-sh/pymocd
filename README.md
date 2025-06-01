@@ -49,6 +49,9 @@ G = networkx.Graph() # Your graph
 alg = pymocd.HpMocd(G)
 communities = alg.run()
 ```
+> [!IMPORTANT]
+> Graphs must be provided in **NetworkX compatible format**.
+
 Refer to the official **[Documentation](https://oliveira-sh.github.io/pymocd/)** for detailed instructions and more usage examples.
 
 ### Contributing
