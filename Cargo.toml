@@ -1,6 +1,6 @@
 [package]
 name = "pymocd" 
-version = "1.0.1" 
+version = "1.0.3" 
 edition = "2024"
 authors = ["Guilherme Santos"]
 license = "GPL-3.0-or-later"
