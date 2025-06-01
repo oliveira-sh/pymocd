@@ -95,6 +95,7 @@ fn set_thread_count(num_threads: usize) -> PyResult<()> {
 fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(set_thread_count, m)?)?;
     m.add_function(wrap_pyfunction!(fitness, m)?)?;
+    m.add_class::<HpMocd>()?;
     //m.add_class::<MOCD>()?;
     Ok(())
 }
