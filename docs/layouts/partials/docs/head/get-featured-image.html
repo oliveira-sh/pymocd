@@ -66,8 +66,9 @@
         {{ $siteTitleFilter := (images.Text $textSiteTitle $textSiteTitleOptions)}}
         {{ $filters = $filters | append $siteTitleFilter }}
     {{ end }}
-
-    {{ $featured = $featured | images.Filter $filters }}
+    {{ if $featured }}
+        {{ $featured = $featured | images.Filter $filters }}
+    {{ end }}
 {{ end }}
 
 {{ return $featured }}

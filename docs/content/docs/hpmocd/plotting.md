@@ -56,7 +56,7 @@ def plot_communities(G, labels):
 import networkx as nx
 import pymocd
 
-G = nx.karate_club_graph()
+G = nx.LFR_benchmark_graph(200, 3, 1.5, 0.1, average_degree=5, min_community=20, seed=2)
 alg = pymocd.HpMocd(graph=G)
 
 solution = alg.run()
@@ -95,3 +95,8 @@ def plot_pareto_front(frontier):
 ```python
 plot_pareto_front(frontier)
 ```
+
+### Expected Outputs
+
+![](images/hpmocd/comms.png) 
+![](images/hpmocd/pareto.png)
