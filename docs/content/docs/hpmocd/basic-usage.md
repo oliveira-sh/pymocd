@@ -11,17 +11,19 @@ images: []
 toc: true
 ---
 
+{{% alert context="warning" text="**Note**: Here it is assumed that you have read the quickstarting section and have already installed the library on your operating system, whatever it may be." /%}}
+
 # Basic Usage
 
 To detect communities in a graph using the **HpMocd** algorithm from **pymocd**, follow the steps below.
 
-{{% alert context="danger" text="**Note**: The input graph **must** be unweighted and undirected." /%}}
+{{% alert context="danger" text="**Note**: The input graph **must** be unweighted and undirected. It can be an object from `networkx.Graph` or `igraph.Graph`" /%}}
 
 First, prepare your graph:
 
 ```python
-import networkx as nx
-from pymocd import HpMocd
+import networkx as nx       # You can use igraph too
+from pymocd import HpMocd   # Our library
 
 G = nx.karate_club_graph()
 ```

@@ -12,15 +12,15 @@ images: []
 
 The High-Performance Multi-Objective Community Detection (HP-MOCD) algorithm is a scalable evolutionary method designed to efficiently identify high-quality community partitions in large complex networks. HP-MOCD combines the NSGA-II optimization framework with a parallel architecture and topology-aware genetic operators tailored to the structure of real-world graphs. In addition to detailing its core components, we describe the algorithm’s design choices, solution representation, and multi-objective selection strategy. The implementation is written in [Rust](https://www.rust-lang.org/) for performance and exposed to Python via [PyO3](https://pyo3.rs/v0.24.0/). The full source code is publicly available on [GitHub](https://oliveira-sh.github.io/pymocd/).
 
-{{% alert context="success" text="You can read the full pre-print clicking [here](/articles/hpmocd.pdf)!" /%}}
+{{% alert context="success" text="You can read the full pre-print clicking [here](http://arxiv.org/abs/2506.01752)" /%}}
 
 ### Overview and Design Rationale
 
-Let us consider a graph `G = (V, E)`, where `V` is the set of nodes and `E` the set of edges. The objective of the **HP-MOCD** (Hybrid Parallel Multi-Objective Community Detection) algorithm is to uncover meaningful community structures by **simultaneously optimizing multiple, often conflicting, structural criteria**.
+Let us consider a graph `G = (V, E)`, where `V` is the set of nodes and `E` the set of edges. The objective of the **HP-MOCD** is to uncover meaningful community structures by **simultaneously optimizing multiple, often conflicting, structural criteria**.
 
-{{% alert context="info" text="**Note**: The library has only **networkx** support. Compatibility for another libraries should be a great contribution!" /%}}
+{{% alert context="info" text="**Note**: The library has only **networkx** or **igraph** support. Compatibility for another libraries should be a great contribution!" /%}}
 
-To achieve this, HP-MOCD is built upon the **NSGA-II** (Non-dominated Sorting Genetic Algorithm II) framework, a well-established method in multi-objective optimization. NSGA-II was chosen due to its strong ability to produce diverse, high-quality Pareto fronts, especially when compared to older algorithms like **PESA-II** \[Diosan2007], which often struggle with diversity maintenance or selection pressure.
+To achieve this, HP-MOCD is built upon the **NSGA-II** (Non-dominated Sorting Genetic Algorithm II) framework, a well-established method in multi-objective optimization. NSGA-II was chosen due to its strong ability to produce diverse, high-quality Pareto fronts, especially when compared to older algorithms like **PESA-II**, which often struggle with diversity maintenance or selection pressure.
 
 ---
 
@@ -42,18 +42,27 @@ This high-level flow is summarized below.
 
 ```mermaid
 flowchart TD
-    A["Start HP-MOCD:\n- Graph G\n- Population Size N\n- Generations T\n- Crossover C_P\n- Mutation M_P"] --> B["Initialize P ← Random Partitions of G"]
-    B --> C["Evaluate P (Intra/Inter Scores)"]
-    C --> D{gen ≤ T?}
+    %% Start
+    A["Start HP-MOCD"]--> B["Initialize Population"]
+
+    %% First evaluation
+    B --> C["Evaluate P (Intra/Inter)"]
+
+    %% Main loop condition
+    C --> D{"gen finished?"}
+
+    %% Loop path
     D -- Yes --> E["Assign Crowding Distances"]
-    E --> F["Select M ← Tournament Selection from P"]
-    F --> G["Create Offspring Q ← Genetic Operators on M"]
+    E --> F["Select Parents M\n(Tournament Selection)"]
+    F --> G["Generate Offspring Q\n(Apply Crossover & Mutation)"]
     G --> H["Evaluate Q"]
     H --> I["Merge P and Q → R"]
-    I --> J["Select Next Generation P ← Best N from R"]
+    I --> J["Select Next Generation P\n(Best N from R)"]
     J --> K["Increment gen"]
     K --> D
-    D -- No --> L["Extract Pareto Front F1 (rank = 1)"]
+
+    %% End path
+    D -- No --> L["Extract Pareto Front F1\n(rank = 1)"]
     L --> M["Return F1"]
 ```
 
@@ -88,14 +97,6 @@ Each individual (solution) is encoded as a mapping from node IDs to community ID
 ```
 
 This compact representation supports fast mutations and evaluations during the evolutionary cycle.
-
----
-
-### Outcome: The Pareto Front
-
-After evolution, the algorithm outputs a **Pareto front**: a set of non-dominated solutions, where no solution is strictly better than another in both objectives. Each solution in the front offers a different perspective on community structure—some favoring tighter internal connectivity, others prioritizing clearer community boundaries.
-
-This gives the user full control to select a result based on downstream needs or metrics like **modularity**, **conductance**, or **custom heuristics**.
 
 ---
 
