@@ -10,7 +10,7 @@ hero:
       mobile: "gradient-mobile.webp"
 
   badge:
-    text: v1.0.3
+    text: v1.1.3
     color: primary # primary, secondary, success, danger, warning, info, light, dark
     pill: true # boolean
     soft: true # boolean
@@ -22,7 +22,7 @@ hero:
      height: 80px
 
   title: ""
-  subtitle: A **lightweight**, **parallalized** and fast library with multi-objective community detection evolutionary algorithms. Written in **Rust** exposed to python through PyO3 
+  subtitle: A **lightweight**, **parallalized** and fast library with multi-objective community detection algorithms. Written in **Rust** exposed to python through PyO3 
 
   image:
     path: "images" # path to image under configured assets directory. default 'images'
