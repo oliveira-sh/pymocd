@@ -15,14 +15,13 @@ toc: true
 
 Have I helped you with a project, or have any tools I've developed helped you in any way? Consider **buying me a coffee** and supporting monetary decentralization! :)
 
-#### 1. XMR
+#### Monero (XMR)
 
-Monero (XMR) is a privacy-focused cryptocurrency that keeps transactions confidential. Donations are received in XMR, so if you scan the QR code below, you’ll be sending Monero directly.
+XMR is a privacy-focused cryptocurrency that keeps transactions confidential. Donations are received in XMR, so if you use the wallet address below, you’ll be sending Monero directly.
 
-![](images/qrcode.png)
 
-```bash
-echo 45Fm24G4wdzRvfzMBJeEav4A2euBUDRSE2UhGaeRXzSoBktc5bvmQsua8fAuxZqN4Eb1dXRcaJRt95b4Kma77QrELPkhtXV > donate.txt
+```text
+45Fm24G4wdzRvfzMBJeEav4A2euBUDRSE2UhGaeRXzSoBktc5bvmQsua8fAuxZqN4Eb1dXRcaJRt95b4Kma77QrELPkhtXV
 ```
 
 ## Thanks :green_heart:
