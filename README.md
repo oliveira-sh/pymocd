@@ -50,7 +50,7 @@ alg = pymocd.HpMocd(G)
 communities = alg.run()
 ```
 > [!IMPORTANT]
-> Graphs must be provided in **NetworkX compatible format**.
+> Graphs must be provided in **NetworkX** or **Igraph** compatible format**.
 
 Refer to the official **[Documentation](https://oliveira-sh.github.io/pymocd/)** for detailed instructions and more usage examples.
 
