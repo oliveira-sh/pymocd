@@ -123,7 +123,7 @@ impl HpMocd {
         let first_front = self.envolve();
         let best_solution = max_q_selection(&first_front);
 
-        normalize_community_ids(best_solution.partition.clone())
+        normalize_community_ids(&self.graph, best_solution.partition.clone())
     }
 }
 
@@ -170,15 +170,25 @@ impl HpMocd {
 
         Ok(first_front
             .into_iter()
-            .map(|ind| (normalize_community_ids(ind.partition), ind.objectives))
+            .map(|ind| (normalize_community_ids(&self.graph, ind.partition), ind.objectives))
             .collect())
     }
 
+    /// Algorithm main function, run the NSGA-II for community detection and do a pareto front selection
+    /// to find the best partition of the network.
+    /// 
+    /// Returns:
+    /// 
+    /// A dict of node:community, both integers
+    /// 
+    /// Note:
+    /// 
+    /// If a node has degree = 0, it's community will be -1.
     #[pyo3(signature = ())]
     pub fn run(&self) -> PyResult<Partition> {
         let first_front = self.envolve();
         let best_solution = max_q_selection(&first_front);
 
-        Ok(normalize_community_ids(best_solution.partition.clone()))
+        Ok(normalize_community_ids(&self.graph, best_solution.partition.clone()))
     }
 }
