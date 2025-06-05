@@ -7,7 +7,7 @@ mod individual;
 mod utils;
 
 use crate::graph::{Graph, Partition};
-use crate::utils::{build_graph, get_edges, normalize_community_ids};
+use crate::utils::{build_graph, get_edges, get_nodes, normalize_community_ids};
 use crate::{debug, operators};
 use individual::{Individual, create_offspring};
 use utils::{calculate_crowding_distance, fast_non_dominated_sort, max_q_selection};
@@ -64,10 +64,6 @@ impl HpMocd {
     }
 
     fn envolve(&self) -> Vec<Individual> {
-        if self.debug_level >= 1 {
-            self.graph.print();
-        }
-
         let degrees = &self.graph.precompute_degrees();
         let mut individuals: Vec<Individual> =
             operators::generate_population(&self.graph, self.pop_size)
@@ -149,8 +145,14 @@ impl HpMocd {
         cross_rate: f64,
         mut_rate: f64,
     ) -> PyResult<Self> {
-        let edges = get_edges(graph)?;
-        let graph = build_graph(edges);
+        let nodes = get_nodes(graph);
+        let edges = get_edges(graph);
+        let graph = build_graph(nodes.unwrap(), edges.unwrap());
+
+        if debug_level >= 1 {
+            debug!(debug, "Debug: {} | Level: {}", debug_level >= 1, debug_level);
+            graph.print();
+        } 
 
         Ok(HpMocd {
             graph,

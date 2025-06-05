@@ -31,7 +31,36 @@ pub fn to_partition(py_dict: &Bound<'_, PyDict>) -> PyResult<Partition> {
     }
     Ok(part)
 }
-/// Try NetworkX's `edges()` first. If that fails, fall back to igraph's `get_edgelist()`.
+pub fn get_nodes(graph: &Bound<'_, PyAny>) -> PyResult<Vec<NodeId>> {
+    // Try NetworkX: graph.nodes()
+    if let Ok(nx_nodes) = graph.call_method0("nodes") {
+        let iter = nx_nodes.call_method0("__iter__")?;
+        let mut nodes: Vec<NodeId> = Vec::new();
+
+        for node_obj in iter.try_iter()? {
+            let node_id: NodeId = node_obj?.extract()?;
+            nodes.push(node_id);
+        }
+        return Ok(nodes);
+    }
+
+    // if fail, try igraph: graph.vs
+    if let Ok(vs) = graph.getattr("vs") {
+        let iter_vs = vs.call_method0("__iter__")?;
+        let mut nodes: Vec<NodeId> = Vec::new();
+
+        for vertex_obj in iter_vs.try_iter()? {
+            let vertex: Bound<'_, PyAny> = vertex_obj?;
+            let index: NodeId = vertex.getattr("index")?.extract()?;
+            nodes.push(index);
+        }
+        return Ok(nodes);
+    }
+
+    Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+        "Não foi possível obter a lista de nós de NetworkX nem de igraph",
+    ))
+}
 pub fn get_edges(graph: &Bound<'_, PyAny>) -> PyResult<Vec<(NodeId, NodeId)>> {
     let edges_iter = match graph.call_method0("edges") {
         Ok(nx_edges) => {
@@ -64,10 +93,24 @@ pub fn get_edges(graph: &Bound<'_, PyAny>) -> PyResult<Vec<(NodeId, NodeId)>> {
 
     Ok(edges)
 }
-pub fn build_graph(edges: Vec<(NodeId, NodeId)>) -> Graph {
-    let mut graph: Graph = Graph::new();
-    for (from, to) in edges {
-        graph.add_edge(from, to);
+pub fn build_graph(nodes: Vec<NodeId>, edges: Vec<(NodeId, NodeId)>) -> Graph {
+    let mut graph = Graph::new();
+    
+    for node in nodes {
+        graph.nodes.insert(node);
+        graph.adjacency_list.entry(node).or_default();
     }
+    
+    for (from, to) in edges {
+        graph.edges.push((from, to));
+        
+        graph.nodes.insert(from);
+        graph.nodes.insert(to);
+
+        graph.adjacency_list.entry(from).or_default().push(to);
+        graph.adjacency_list.entry(to).or_default().push(from);
+    }
+    
     graph
 }
+
