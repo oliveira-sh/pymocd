@@ -94,7 +94,7 @@ impl MOCD {
 
         Ok(first_front
             .into_iter()
-            .map(|ind| (normalize_community_ids(ind.partition), ind.objectives))
+            .map(|ind| (normalize_community_ids(&self.graph, ind.partition), ind.objectives))
             .collect())
     }
 
@@ -124,6 +124,6 @@ impl MOCD {
             model_selection::min_max_selection(&archive, &random_archives)
         };
 
-        Ok(normalize_community_ids(best_solution.partition.clone()))
+        Ok(normalize_community_ids(&self.graph, best_solution.partition.clone()))
     }
 }
