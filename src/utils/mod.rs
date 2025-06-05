@@ -8,18 +8,39 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 use std::collections::{BTreeMap, HashMap};
 
-pub fn normalize_community_ids(partition: Partition) -> Partition {
-    let mut new_partition: BTreeMap<i32, i32> = Partition::new();
-    let mut id_mapping: HashMap<i32, i32> = HashMap::new();
-    let mut next_id: i32 = 0;
+pub fn normalize_community_ids(
+    graph: &Graph,
+    partition: Partition,
+) -> Partition {
+    let mut new_partition: BTreeMap<NodeId, CommunityId> = BTreeMap::new();
+    let mut id_mapping: HashMap<CommunityId, CommunityId> = HashMap::new();
+    let mut next_id: CommunityId = 0;
 
-    // Create a new mapping for community IDs
-    for (node_id, &community_id) in partition.iter() {
-        if let std::collections::hash_map::Entry::Vacant(e) = id_mapping.entry(community_id) {
-            e.insert(next_id);
-            next_id += 1;
+    for &node in graph.nodes.iter() {
+        let is_isolated = match graph.adjacency_list.get(&node) {
+            Some(neighbors) => neighbors.is_empty(),
+            None => true, // if hasnt adjacency_list, it is isolated
+        };
+
+        if is_isolated {
+            new_partition.insert(node, -1);
+        } else {
+            match partition.get(&node) {
+                Some(&orig_comm) if orig_comm != -1 => {
+                    if let std::collections::hash_map::Entry::Vacant(e) =
+                        id_mapping.entry(orig_comm)
+                    {
+                        e.insert(next_id);
+                        next_id += 1;
+                    }
+                    let mapped = *id_mapping.get(&orig_comm).unwrap();
+                    new_partition.insert(node, mapped);
+                }
+                _ => {
+                    new_partition.insert(node, -1);
+                }
+            }
         }
-        new_partition.insert(*node_id, *id_mapping.get(&community_id).unwrap());
     }
 
     new_partition
