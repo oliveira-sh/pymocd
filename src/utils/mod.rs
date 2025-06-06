@@ -55,11 +55,19 @@ pub fn to_partition(py_dict: &Bound<'_, PyDict>) -> PyResult<Partition> {
 pub fn get_nodes(graph: &Bound<'_, PyAny>) -> PyResult<Vec<NodeId>> {
     // Try NetworkX: graph.nodes()
     if let Ok(nx_nodes) = graph.call_method0("nodes") {
-        let iter = nx_nodes.call_method0("__iter__")?;
         let mut nodes: Vec<NodeId> = Vec::new();
-
-        for node_obj in iter.try_iter()? {
-            let node_id: NodeId = node_obj?.extract()?;
+        for node_obj_result in nx_nodes.try_iter()? {
+            let node_obj = node_obj_result?;
+            let node_id = match node_obj.extract::<i64>() {
+                Ok(int_val) => {
+                    int_val as NodeId
+                }
+                Err(_) => {
+                    return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                        "Failed getting node id's. Verify if all Graph.nodes are positive integers; <str> as node_id isn't supported",
+                    ));
+                }
+            };
             nodes.push(node_id);
         }
         return Ok(nodes);
@@ -79,7 +87,7 @@ pub fn get_nodes(graph: &Bound<'_, PyAny>) -> PyResult<Vec<NodeId>> {
     }
 
     Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
-        "Não foi possível obter a lista de nós de NetworkX nem de igraph",
+        "Unable to get node list from NetworkX or igraph",
     ))
 }
 pub fn get_edges(graph: &Bound<'_, PyAny>) -> PyResult<Vec<(NodeId, NodeId)>> {
