@@ -12,7 +12,7 @@
 
 **pymocd** is a Python library, powered by a Rust backend, for performing efficient multi-objective evolutionary community detection in complex networks. This library is designed to deliver enhanced performance compared to traditional methods, making it particularly well-suited for analyzing large-scale graphs.
 
-**Navigate the [Documentation](https://www.google.com/search?q=https://oliveira-sh.github.io/pymocd/) for detailed guidance and usage instructions.**
+**Navigate the [Documentation](https://oliveira-sh.github.io/pymocd/) for detailed guidance and usage instructions.**
 
 ## Table of Contents
 - [Understanding Community Detection with HP-MOCD](#understanding-community-detection-with-hp-mocd)
@@ -50,7 +50,7 @@ alg = pymocd.HpMocd(G)
 communities = alg.run()
 ```
 > [!IMPORTANT]
-> Graphs must be provided in **NetworkX** or **Igraph** compatible format**.
+> Graphs must be provided in **NetworkX** or **Igraph** compatible format.
 
 Refer to the official **[Documentation](https://oliveira-sh.github.io/pymocd/)** for detailed instructions and more usage examples.
 
