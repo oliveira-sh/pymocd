@@ -31,5 +31,5 @@ readme = { file = "README.md", content-type = "text/markdown" }
 
 [project.urls]
 Documentation = "https://oliveira-sh.github.io/pymocd/"
-Repository = "https://github.com/ol1veir4s/pymocd"
-Issues = "https://github.com/ol1veir4s/pymocd/issues"
+Repository = "https://github.com/oliveira-sh/pymocd"
+Issues = "https://github.com/oliveira-sh/pymocd/issues"
