@@ -143,3 +143,37 @@ pub fn build_graph(nodes: Vec<NodeId>, edges: Vec<(NodeId, NodeId)>) -> Graph {
     graph
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn normalize_ids_handles_isolated_nodes() {
+        let nodes = vec![0, 1, 2, 3];
+        let edges = vec![(0, 1), (1, 3)];
+        let graph = build_graph(nodes.clone(), edges);
+        let mut part = BTreeMap::new();
+        part.insert(0, 10);
+        part.insert(1, 10);
+        part.insert(3, 20);
+        let normalized = normalize_community_ids(&graph, part);
+        let mut expected = BTreeMap::new();
+        expected.insert(0, 0);
+        expected.insert(1, 0);
+        expected.insert(2, -1);
+        expected.insert(3, 1);
+        assert_eq!(normalized, expected);
+    }
+
+    #[test]
+    fn build_graph_basic_properties() {
+        let nodes = vec![0, 1, 2];
+        let edges = vec![(0, 1), (1, 2)];
+        let graph = build_graph(nodes.clone(), edges);
+        assert_eq!(graph.num_nodes(), 3);
+        assert_eq!(graph.num_edges(), 2);
+        assert_eq!(graph.neighbors(&0), [1]);
+        assert_eq!(graph.neighbors(&1), [0, 2]);
+    }
+}
