@@ -8,18 +8,39 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 use std::collections::{BTreeMap, HashMap};
 
-pub fn normalize_community_ids(partition: Partition) -> Partition {
-    let mut new_partition: BTreeMap<i32, i32> = Partition::new();
-    let mut id_mapping: HashMap<i32, i32> = HashMap::new();
-    let mut next_id: i32 = 0;
+pub fn normalize_community_ids(
+    graph: &Graph,
+    partition: Partition,
+) -> Partition {
+    let mut new_partition: BTreeMap<NodeId, CommunityId> = BTreeMap::new();
+    let mut id_mapping: HashMap<CommunityId, CommunityId> = HashMap::new();
+    let mut next_id: CommunityId = 0;
 
-    // Create a new mapping for community IDs
-    for (node_id, &community_id) in partition.iter() {
-        if let std::collections::hash_map::Entry::Vacant(e) = id_mapping.entry(community_id) {
-            e.insert(next_id);
-            next_id += 1;
+    for &node in graph.nodes.iter() {
+        let is_isolated = match graph.adjacency_list.get(&node) {
+            Some(neighbors) => neighbors.is_empty(),
+            None => true, // if hasnt adjacency_list, it is isolated
+        };
+
+        if is_isolated {
+            new_partition.insert(node, -1);
+        } else {
+            match partition.get(&node) {
+                Some(&orig_comm) if orig_comm != -1 => {
+                    if let std::collections::hash_map::Entry::Vacant(e) =
+                        id_mapping.entry(orig_comm)
+                    {
+                        e.insert(next_id);
+                        next_id += 1;
+                    }
+                    let mapped = *id_mapping.get(&orig_comm).unwrap();
+                    new_partition.insert(node, mapped);
+                }
+                _ => {
+                    new_partition.insert(node, -1);
+                }
+            }
         }
-        new_partition.insert(*node_id, *id_mapping.get(&community_id).unwrap());
     }
 
     new_partition
@@ -31,7 +52,44 @@ pub fn to_partition(py_dict: &Bound<'_, PyDict>) -> PyResult<Partition> {
     }
     Ok(part)
 }
-/// Try NetworkX's `edges()` first. If that fails, fall back to igraph's `get_edgelist()`.
+pub fn get_nodes(graph: &Bound<'_, PyAny>) -> PyResult<Vec<NodeId>> {
+    // Try NetworkX: graph.nodes()
+    if let Ok(nx_nodes) = graph.call_method0("nodes") {
+        let mut nodes: Vec<NodeId> = Vec::new();
+        for node_obj_result in nx_nodes.try_iter()? {
+            let node_obj = node_obj_result?;
+            let node_id = match node_obj.extract::<i64>() {
+                Ok(int_val) => {
+                    int_val as NodeId
+                }
+                Err(_) => {
+                    return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                        "Failed getting node id's. Verify if all Graph.nodes are positive integers; <str> as node_id isn't supported",
+                    ));
+                }
+            };
+            nodes.push(node_id);
+        }
+        return Ok(nodes);
+    }
+
+    // if fail, try igraph: graph.vs
+    if let Ok(vs) = graph.getattr("vs") {
+        let iter_vs = vs.call_method0("__iter__")?;
+        let mut nodes: Vec<NodeId> = Vec::new();
+
+        for vertex_obj in iter_vs.try_iter()? {
+            let vertex: Bound<'_, PyAny> = vertex_obj?;
+            let index: NodeId = vertex.getattr("index")?.extract()?;
+            nodes.push(index);
+        }
+        return Ok(nodes);
+    }
+
+    Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+        "Unable to get node list from NetworkX or igraph",
+    ))
+}
 pub fn get_edges(graph: &Bound<'_, PyAny>) -> PyResult<Vec<(NodeId, NodeId)>> {
     let edges_iter = match graph.call_method0("edges") {
         Ok(nx_edges) => {
@@ -64,10 +122,24 @@ pub fn get_edges(graph: &Bound<'_, PyAny>) -> PyResult<Vec<(NodeId, NodeId)>> {
 
     Ok(edges)
 }
-pub fn build_graph(edges: Vec<(NodeId, NodeId)>) -> Graph {
-    let mut graph: Graph = Graph::new();
-    for (from, to) in edges {
-        graph.add_edge(from, to);
+pub fn build_graph(nodes: Vec<NodeId>, edges: Vec<(NodeId, NodeId)>) -> Graph {
+    let mut graph = Graph::new();
+    
+    for node in nodes {
+        graph.nodes.insert(node);
+        graph.adjacency_list.entry(node).or_default();
     }
+    
+    for (from, to) in edges {
+        graph.edges.push((from, to));
+        
+        graph.nodes.insert(from);
+        graph.nodes.insert(to);
+
+        graph.adjacency_list.entry(from).or_default().push(to);
+        graph.adjacency_list.entry(to).or_default().push(from);
+    }
+    
     graph
 }
+
