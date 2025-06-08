@@ -65,13 +65,10 @@ We welcome contributions to `pymocd`\! If you have ideas for new features, bug f
 If you use `pymocd` or the `HP-MOCD` algorithm in your research, please cite the following paper:
 
 ```bibtex
-@article{santos2025hpmocd,
-  author    = {Guilherme O. Santos, Lucas S. Vieira, Giulio Rossetti, Carlos H. G. Ferreira and Gladston J. P. Moreira},
-  title     = {HP-MOCD: A High-Performance Multi-Objective Community Detection Algorithm for Large-Scale Networks},
-  journal   = {The 17th International Conference on Advances in Social Networks Analysis and Mining},
-  year      = {2025},
-  abstract  = {Community detection in social networks has traditionally been approached as a single-objective optimization problem, with various heuristics targeting specific community-defining metrics. However, this approach often proves inadequate for capturing the multifaceted nature of communities. We introduce HP-MOCD, a fully parallelized, evolutionary high-performance multi-objective community detection algorithm designed specifically for large-scale networks. Our implementation overcomes the computational challenges that typically limit multi-objective approaches in this domain. While performance may decrease with networks containing high proportions of inter-community edges, extensive evaluations on synthetic datasets demonstrate that HP-MOCD achieves an exceptional balance between scalability and detection accuracy. Available as open-source software, HP-MOCD offers researchers and practitioners a practical, powerful solution for complex network analysis, particularly for applications requiring both efficiency and detection quality.},
-  keywords  = {community detection, complex networks, evolutionary algorithms, genetic algorithms, multi-objective},
-  note      = {Currently under analysis by the journal}
+@article{santos2025high,
+  title={A High-Performance Evolutionary Multiobjective Community Detection Algorithm},
+  author={Santos, Guilherme O and Vieira, Lucas S and Rossetti, Giulio and Ferreira, Carlos HG and Moreira, Gladston},
+  journal={arXiv preprint arXiv:2506.01752},
+  year={2025}
 }
 ```
