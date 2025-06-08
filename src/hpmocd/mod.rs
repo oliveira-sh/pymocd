@@ -7,7 +7,7 @@ mod individual;
 mod utils;
 
 use crate::graph::{Graph, Partition};
-use crate::utils::{build_graph, get_edges, normalize_community_ids};
+use crate::utils::{build_graph, get_edges, get_nodes, normalize_community_ids};
 use crate::{debug, operators};
 use individual::{Individual, create_offspring};
 use utils::{calculate_crowding_distance, fast_non_dominated_sort, max_q_selection};
@@ -64,10 +64,6 @@ impl HpMocd {
     }
 
     fn envolve(&self) -> Vec<Individual> {
-        if self.debug_level >= 1 {
-            self.graph.print();
-        }
-
         let degrees = &self.graph.precompute_degrees();
         let mut individuals: Vec<Individual> =
             operators::generate_population(&self.graph, self.pop_size)
@@ -127,7 +123,7 @@ impl HpMocd {
         let first_front = self.envolve();
         let best_solution = max_q_selection(&first_front);
 
-        normalize_community_ids(best_solution.partition.clone())
+        normalize_community_ids(&self.graph, best_solution.partition.clone())
     }
 }
 
@@ -149,8 +145,14 @@ impl HpMocd {
         cross_rate: f64,
         mut_rate: f64,
     ) -> PyResult<Self> {
-        let edges = get_edges(graph)?;
-        let graph = build_graph(edges);
+        let nodes = get_nodes(graph);
+        let edges = get_edges(graph);
+        let graph = build_graph(nodes.unwrap(), edges.unwrap());
+
+        if debug_level >= 1 {
+            debug!(debug, "Debug: {} | Level: {}", debug_level >= 1, debug_level);
+            graph.print();
+        } 
 
         Ok(HpMocd {
             graph,
@@ -168,15 +170,25 @@ impl HpMocd {
 
         Ok(first_front
             .into_iter()
-            .map(|ind| (normalize_community_ids(ind.partition), ind.objectives))
+            .map(|ind| (normalize_community_ids(&self.graph, ind.partition), ind.objectives))
             .collect())
     }
 
+    /// Algorithm main function, run the NSGA-II for community detection and do a pareto front selection
+    /// to find the best partition of the network.
+    /// 
+    /// Returns:
+    /// 
+    /// A dict of node:community, both integers
+    /// 
+    /// Note:
+    /// 
+    /// If a node has degree = 0, it's community will be -1.
     #[pyo3(signature = ())]
     pub fn run(&self) -> PyResult<Partition> {
         let first_front = self.envolve();
         let best_solution = max_q_selection(&first_front);
 
-        Ok(normalize_community_ids(best_solution.partition.clone()))
+        Ok(normalize_community_ids(&self.graph, best_solution.partition.clone()))
     }
 }
