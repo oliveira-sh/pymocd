@@ -165,7 +165,7 @@ dependencies = [
 
 [[package]]
 name = "pymocd"
-version = "1.0.3"
+version = "1.2.5"
 dependencies = [
  "dashmap",
  "pyo3",

@@ -25,8 +25,9 @@ static INIT_RAYON: Once = Once::new();
 /// float: f64
 #[pyfunction(name = "fitness")]
 pub fn fitness(graph: &Bound<'_, PyAny>, partition: &Bound<'_, PyDict>) -> PyResult<f64> {
+    let nodes = utils::get_nodes(graph);
     let edges = utils::get_edges(graph)?;
-    let graph = utils::build_graph(edges);
+    let graph = utils::build_graph(nodes.unwrap(), edges);
 
     Ok(operators::get_modularity_from_partition(
         &utils::to_partition(partition)?,
