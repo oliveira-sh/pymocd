@@ -1,5 +1,13 @@
-from networkx.algorithms.community import louvain_communities
+import sys, os
+
+# ======================================================================
+# ALGORITHMS
 import community as community_louvain
+from networkx.algorithms.community import asyn_lpa_communities
+from networkx.algorithms.community import louvain_communities
+from networkx.algorithms.community import girvan_newman
+# ======================================================================
+
 import matplotlib.pyplot as plt
 import networkx as nx
 from tqdm import tqdm
@@ -178,30 +186,27 @@ def run_nodes_experiment(algorithms=None,
 # Algorithm Wrappers and Registration
 # ======================================================================
 
-def mocd_wrapper(G, seed=None):
-    import sys, os
+def mocd_w(G, seed=None):
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
     from mocd import mocd
     return mocd(G)
 
-def louvain_wrapper(G, seed=None):
+def louvain_w(G, seed=None):
     return louvain_communities(G, seed=seed)
 
-
-def hpmocd_wrapper(G, seed=None):
+def hpmocd_w(G, seed=None):
     import pymocd
     if seed is not None:
         np.random.seed(seed)
     return pymocd.HpMocd(G, debug_level=3).run()
 
-def leiden_wrapper(G, seed=None):
+def leiden_w(G, seed=None):
     import igraph as ig, leidenalg
     G_ig = ig.Graph(edges=list(G.edges()), directed=False)
     partition = leidenalg.find_partition(G_ig, leidenalg.ModularityVertexPartition, seed=seed)
     return [set(c) for c in partition]
 
-def moganet_wrapper(G, seed=None):
-    import sys, os
+def moganet_w(G, seed=None):
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
     from mogaNet import detect_communities_ga
     return detect_communities_ga(G,
@@ -212,10 +217,23 @@ def moganet_wrapper(G, seed=None):
                                   r=1.5,
                                   elite_ratio=0.1)
 
-register_algorithm('HPMOCD', hpmocd_wrapper, needs_conversion=False, parallel=False)
+def newman_w(G, seed=None):
+    # girvan_newman yields successive splits; take the first one
+    comp_gen = girvan_newman(G)
+    first_split = next(comp_gen)
+    # wrap each community in a set and return as list
+    return [set(c) for c in first_split]
+
+def asynlpr_w(G, seed=None):
+    lpa_communities = list(asyn_lpa_communities(G))
+    return lpa_communities
+
+#register_algorithm('HPMOCD', hpmocd_wrapper, needs_conversion=False, parallel=False)
 # use parallel always as false, has built-in features. 
-register_algorithm('Louvain', louvain_wrapper, needs_conversion=True, parallel=True)
-register_algorithm('Leiden', leiden_wrapper, needs_conversion=True, parallel=True)
+#register_algorithm('Louvain', louvain_wrapper, needs_conversion=True, parallel=True)
+#register_algorithm('Leiden', leiden_wrapper, needs_conversion=True, parallel=True)
+register_algorithm('ASYN-LPA', asynlpr, needs_conversion=True, parallel=True)
+register_algorithm('Girvan Newman', newman_w, needs_conversion=True, parallel=True)
 
 # We removed the MOCD and MogaNet due to the fast execution time being unfeasible,
 # reaching over 25 hours for a single run. 
@@ -223,8 +241,8 @@ register_algorithm('Leiden', leiden_wrapper, needs_conversion=True, parallel=Tru
 # This is because, since the algorithms are from other authors, it is unethical to make them
 # available without proper permission. 
 # The wrappers are still here, in case you want to reimplement them from scratch.
-#register_algorithm('MOCD', mocd_wrapper, needs_conversion=False, parallel=True)
-#register_algorithm('MogaNet', moganet_wrapper, needs_conversion=False, parallel=True)
+#register_algorithm('MOCD', mocd_w, needs_conversion=False, parallel=True)
+#register_algorithm('MogaNet', moganet_w, needs_conversion=False, parallel=True)
 
 # ======================================================================
 # Main
