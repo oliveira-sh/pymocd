@@ -19,7 +19,6 @@ setup() {
   echo "[..] Creating virtual environment at .venv…"
   python3 -m venv .venv
 
-  # shellcheck source=/dev/null
   source .venv/bin/activate
 
   echo "[..] Upgrading pip, setuptools, and wheel…"
@@ -37,7 +36,10 @@ setup() {
     python-louvain \
     igraph \
     leidenalg \
-    pymoo
+    pymoo \
+    networkx \
+    pybind11 \  
+    walker
 
   echo "[..] Building the Rust extension via maturin…"
   maturin develop --release
