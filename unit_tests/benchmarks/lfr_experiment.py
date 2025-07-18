@@ -6,6 +6,8 @@ import community as community_louvain
 from networkx.algorithms.community import asyn_lpa_communities
 from networkx.algorithms.community import louvain_communities
 from networkx.algorithms.community import girvan_newman
+from nsga_iii import run_krm, run_ccm
+from cdrme.gen import run_cdrme
 # ======================================================================
 
 import matplotlib.pyplot as plt
@@ -26,9 +28,9 @@ from utils import (
 
 CSV_FILE_PATH = 'lfr_experiment.csv'
 MIN_MU = 0.1
-MAX_MU = 0.8
+MAX_MU = 0.3
 STEP_MU = 0.1
-NUM_RUNS = 20
+NUM_RUNS = 4
 
 # Set this to true if you already has the csv (with the name = CSV_FILE_PATH)
 # and just want to plot the comparasions
@@ -112,7 +114,7 @@ def _process_n(args):
 def run_experiment(algorithms=None,
                    mus=np.arange(MIN_MU, MAX_MU + STEP_MU, STEP_MU),
                    n_runs=NUM_RUNS,
-                   n_nodes=100000):
+                   n_nodes=250):
     if algorithms is None:
         algorithms = list(ALGORITHM_REGISTRY.keys())
     all_results = []
@@ -198,7 +200,7 @@ def hpmocd_w(G, seed=None):
     import pymocd
     if seed is not None:
         np.random.seed(seed)
-    return pymocd.HpMocd(G, debug_level=3).run()
+    return pymocd.HpMocd(G, debug_level=0).run()
 
 def leiden_w(G, seed=None):
     import igraph as ig, leidenalg
@@ -228,21 +230,37 @@ def asynlpr_w(G, seed=None):
     lpa_communities = list(asyn_lpa_communities(G))
     return lpa_communities
 
-#register_algorithm('HPMOCD', hpmocd_wrapper, needs_conversion=False, parallel=False)
-# use parallel always as false, has built-in features. 
-#register_algorithm('Louvain', louvain_wrapper, needs_conversion=True, parallel=True)
-#register_algorithm('Leiden', leiden_wrapper, needs_conversion=True, parallel=True)
-register_algorithm('ASYN-LPA', asynlpr, needs_conversion=True, parallel=True)
-register_algorithm('Girvan Newman', newman_w, needs_conversion=True, parallel=True)
+def krm_w(G, seed=None):
+    return run_krm(G)
 
-# We removed the MOCD and MogaNet due to the fast execution time being unfeasible,
+def ccm_w(G, seed=None):
+    return run_ccm(G)
+
+def cdrme_w(G, seed=None):
+    return run_cdrme(G)
+
+# ======================================================================
+# use parallel always as false, has built-in features. 
+register_algorithm('NSGA III KRM', krm_w, needs_conversion=False, parallel=True )
+register_algorithm('NSGA III CCM', ccm_w, needs_conversion=False, parallel=True )
+register_algorithm('CDRME', cdrme_w, needs_conversion=True, parallel=True )
+register_algorithm('HPMOCD', hpmocd_w, needs_conversion=False, parallel=False )
+register_algorithm('Louvain', louvain_w, needs_conversion=True, parallel=True )
+register_algorithm('Leiden', leiden_w, needs_conversion=True, parallel=True )
+register_algorithm('ASYN-LPA', asynlpr_w, needs_conversion=True, parallel=True )
+
+
+# ======================================================================
+# We removed the MOCD, MogaNet and Girvan Newman due to the fast execution time being unfeasible,
 # reaching over 25 hours for a single run. 
 # These two algorithms will not be available in any form in the pymocd source code. 
 # This is because, since the algorithms are from other authors, it is unethical to make them
 # available without proper permission. 
 # The wrappers are still here, in case you want to reimplement them from scratch.
+
 #register_algorithm('MOCD', mocd_w, needs_conversion=False, parallel=True)
 #register_algorithm('MogaNet', moganet_w, needs_conversion=False, parallel=True)
+#register_algorithm('Girvan Newman', newman_w, needs_conversion=True, parallel=True)
 
 # ======================================================================
 # Main
