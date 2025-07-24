@@ -1,16 +1,5 @@
-import sys, os
-
-# ======================================================================
-# ALGORITHMS
-import community as community_louvain
-from networkx.algorithms.community import asyn_lpa_communities
-from networkx.algorithms.community import louvain_communities
-from networkx.algorithms.community import girvan_newman
-from nsga_iii import run_krm, run_ccm
-from cdrme.gen import run_cdrme
-import pymocd
-# ======================================================================
-
+import sys
+import os
 import matplotlib.pyplot as plt
 import networkx as nx
 from tqdm import tqdm
@@ -18,6 +7,16 @@ import pandas as pd
 import numpy as np
 import time
 from multiprocessing import Pool
+from functools import wraps
+from typing import Callable, Dict, Any, List, Set, Union
+
+import community as community_louvain
+from networkx.algorithms.community import asyn_lpa_communities
+from networkx.algorithms.community import louvain_communities
+from networkx.algorithms.community import girvan_newman
+from nsga_iii import run_krm, run_ccm
+from cdrme.gen import run_cdrme
+import pymocd
 
 from utils import (
     generate_lfr_benchmark,
@@ -27,261 +26,258 @@ from utils import (
     SAVE_PATH
 )
 
-CSV_FILE_PATH = 'lfr_experiment.csv'
+CSV_FILE_PATH = 'lfr.csv'
 MIN_MU = 0.1
 MAX_MU = 0.8
 STEP_MU = 0.1
 NUM_RUNS = 10
-
-# Set this to true if you already has the csv (with the name = CSV_FILE_PATH)
-# and just want to plot the comparasions
 JUST_PLOT_AVAILABLE_RESULTS = False
+MU_EXPERIMENT = False
+BACKUP_CSV_FILE_PATH = os.path.join(SAVE_PATH, CSV_FILE_PATH.replace('.csv', '_bk.csv'))
 
-# true: growing mu parameter experiment
-# false; network growing size experiment (nodes only)
-MU_EXPERIMENT = True  
-
-# ======================================================================
-# Registry and Helpers
-# ======================================================================
 ALGORITHM_REGISTRY = {}
 
-def register_algorithm(name, func, needs_conversion=True, parallel=False):
-    ALGORITHM_REGISTRY[name] = {
-        'function': func,
-        'needs_conversion': needs_conversion,
-        'parallel': parallel
-    }
-    print(f"Registered algorithm: {name} (parallel={parallel})")
+def algorithm(name: str, needs_conversion: bool = True, parallel: bool = True):
+    """Decorator to register community detection algorithms"""
+    def decorator(func: Callable):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+        
+        ALGORITHM_REGISTRY[name] = {
+            'function': wrapper,
+            'needs_conversion': needs_conversion,
+            'parallel': parallel
+        }
+        print(f"Registered algorithm: {name} (parallel={parallel})")
+        return wrapper
+    return decorator
 
-# Top-level worker for mu experiments
-def _process_mu(args):
-    alg_name, alg_func, needs_conversion, n_runs, mu, n_nodes = args
-    mod_vals, nmi_vals, ami_vals, time_vals = [], [], [], []
-    for run_id in range(n_runs):
-        G, ground_truth = generate_lfr_benchmark(n=n_nodes, mu=mu, seed=run_id)
+def seed_handler(func: Callable):
+    """Decorator to handle seed parameter for reproducibility"""
+    @wraps(func)
+    def wrapper(G, seed=None, *args, **kwargs):
+        if seed is not None:
+            np.random.seed(seed)
+        return func(G, *args, **kwargs)
+    return wrapper
+
+def timing_decorator(func: Callable):
+    """Decorator to measure execution time"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
         start = time.time()
-        communities = alg_func(G, seed=run_id)
+        result = func(*args, **kwargs)
         duration = time.time() - start
-        eval_r = evaluate_communities(G, communities, ground_truth, convert=needs_conversion)
-        mod_vals.append(eval_r['modularity'])
-        nmi_vals.append(eval_r['nmi'])
-        ami_vals.append(eval_r['ami'])
-        time_vals.append(duration)
-    return {
-        'algorithm': alg_name,
-        'mu': mu,
-        'mod_mean': np.mean(mod_vals),
-        'nmi_mean': np.mean(nmi_vals),
-        'ami_mean': np.mean(ami_vals),
-        'time_mean': np.mean(time_vals),
-        'mod_std': np.std(mod_vals, ddof=1),
-        'nmi_std': np.std(nmi_vals, ddof=1),
-        'ami_std': np.std(ami_vals, ddof=1),
-        'time_std': np.std(time_vals, ddof=1)
-    }
+        return result, duration
+    return wrapper
 
-# Top-level worker for node-size experiments
-def _process_n(args):
-    alg_name, alg_func, needs_conversion, n_runs, nodes, mu = args
-    mod_vals, nmi_vals, ami_vals, time_vals = [], [], [], []
-    for run_id in range(n_runs):
-        G, ground_truth = generate_lfr_benchmark(n=nodes, mu=mu, seed=run_id)
-        start = time.time()
-        communities = alg_func(G, seed=run_id)
-        duration = time.time() - start
-        eval_r = evaluate_communities(G, communities, ground_truth, convert=needs_conversion)
-        mod_vals.append(eval_r['modularity'])
-        nmi_vals.append(eval_r['nmi'])
-        ami_vals.append(eval_r['ami'])
-        time_vals.append(duration)
-    return {
-        'algorithm': alg_name,
-        'nodes': nodes,
-        'mod_mean': np.mean(mod_vals),
-        'nmi_mean': np.mean(nmi_vals),
-        'ami_mean': np.mean(ami_vals),
-        'time_mean': np.mean(time_vals),
-        'mod_std': np.std(mod_vals, ddof=1),
-        'nmi_std': np.std(nmi_vals, ddof=1),
-        'ami_std': np.std(ami_vals, ddof=1),
-        'time_std': np.std(time_vals, ddof=1)
-    }
+def error_handler(func: Callable):
+    """Decorator to handle exceptions in algorithm execution"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            print(f"Error in {func.__name__}: {e}")
+            return []
+    return wrapper
 
-# ======================================================================
-# Experiments
-# ======================================================================
+@algorithm('Louvain', needs_conversion=True, parallel=True)
+@error_handler
+@seed_handler
+def louvain_algorithm(G):
+    return louvain_communities(G)
 
-def run_experiment(algorithms=None,
-                   mus=np.arange(MIN_MU, MAX_MU + STEP_MU, STEP_MU),
-                   n_runs=NUM_RUNS,
-                   n_nodes=1000):
-    if algorithms is None:
-        algorithms = list(ALGORITHM_REGISTRY.keys())
-    all_results = []
+@algorithm('Leiden', needs_conversion=True, parallel=True)
+@error_handler
+@seed_handler
+def leiden_algorithm(G):
+    import igraph as ig
+    import leidenalg
+    G_ig = ig.Graph(edges=list(G.edges()), directed=False)
+    partition = leidenalg.find_partition(G_ig, leidenalg.ModularityVertexPartition)
+    return [set(c) for c in partition]
 
-    for alg_name in algorithms:
-        info = ALGORITHM_REGISTRY[alg_name]
-        func = info['function']
-        needs_conversion = info['needs_conversion']
-        parallel_flag = info['parallel']
+@algorithm('ASYN-LPA', needs_conversion=True, parallel=True)
+@error_handler
+@seed_handler
+def asynlpa_algorithm(G):
+    return list(asyn_lpa_communities(G))
 
-        if parallel_flag:
-            args = [(alg_name, func, needs_conversion, n_runs, mu, n_nodes) for mu in mus]
-            with Pool() as pool:
-                summary = pool.map(_process_mu, args)
-        else:
-            summary = []
-            for mu in tqdm(mus, desc=f"{alg_name} (sequential µ loop)"):
-                summary.append(_process_mu((alg_name, func, needs_conversion, n_runs, mu, n_nodes)))
+@algorithm('HPMOCD', needs_conversion=False, parallel=False)
+@error_handler
+@seed_handler
+def hpmocd_algorithm(G):
+    return pymocd.HpMocd(G, debug_level=0).run()
 
-        for entry in summary:
-            all_results.append(entry)
-            print(f"{entry['algorithm']} µ={entry['mu']}: Q={entry['mod_mean']:.4f}, "
-                  f"NMI={entry['nmi_mean']:.4f}, AMI={entry['ami_mean']:.4f}")
+@algorithm('NSGA III KRM', needs_conversion=False, parallel=True)
+@error_handler
+@seed_handler
+def krm_algorithm(G):
+    return run_krm(G)
 
-    df = pd.DataFrame(all_results)
-    df.rename(columns={
-        'mod_mean': 'modularity', 'nmi_mean': 'nmi', 'ami_mean': 'ami', 'time_mean': 'time',
-        'mod_std': 'modularity_std', 'nmi_std': 'nmi_std', 'ami_std': 'ami_std', 'time_std': 'time_std'
-    }, inplace=True)
-    df.to_csv(f'{SAVE_PATH}{CSV_FILE_PATH}', index=False)
-    return df
+@algorithm('NSGA III CCM', needs_conversion=False, parallel=True)
+@error_handler
+@seed_handler
+def ccm_algorithm(G):
+    return run_ccm(G)
 
+@algorithm('CDRME', needs_conversion=True, parallel=True)
+@error_handler
+@seed_handler
+def cdrme_algorithm(G):
+    return run_cdrme(G)
 
-def run_nodes_experiment(algorithms=None,
-                         n_list=np.arange(10000, 110000, 10000),
-                         n_runs=NUM_RUNS,
-                         mu=0.3):
-    if algorithms is None:
-        algorithms = list(ALGORITHM_REGISTRY.keys())
-    all_results = []
-
-    for alg_name in algorithms:
-        info = ALGORITHM_REGISTRY[alg_name]
-        func = info['function']
-        needs_conversion = info['needs_conversion']
-        parallel_flag = info['parallel']
-
-        if parallel_flag:
-            args = [(alg_name, func, needs_conversion, n_runs, n, mu) for n in n_list]
-            with Pool() as pool:
-                summary = pool.map(_process_n, args)
-        else:
-            summary = []
-            for n in tqdm(n_list, desc=f"{alg_name} (sequential n loop)"):
-                summary.append(_process_n((alg_name, func, needs_conversion, n_runs, n, mu)))
-
-        for entry in summary:
-            all_results.append(entry)
-            print(f"{entry['algorithm']} n={entry['nodes']}: Q={entry['mod_mean']:.4f}, "
-                  f"NMI={entry['nmi_mean']:.4f}, AMI={entry['ami_mean']:.4f}")
-
-    df = pd.DataFrame(all_results)
-    df.rename(columns={
-        'mod_mean': 'modularity', 'nmi_mean': 'nmi', 'ami_mean': 'ami', 'time_mean': 'time',
-        'mod_std': 'modularity_std', 'nmi_std': 'nmi_std', 'ami_std': 'ami_std', 'time_std': 'time_std'
-    }, inplace=True)
-    df.to_csv(f'{SAVE_PATH}{CSV_FILE_PATH}', index=False)
-    return df
-
-# ======================================================================
-# Algorithm Wrappers and Registration
-# ======================================================================
-
-def mocd_w(G, seed=None):
+@algorithm('MOCD', needs_conversion=False, parallel=True)
+@error_handler
+@seed_handler
+def mocd_algorithm(G):
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
     from mocd import mocd
     return mocd(G)
 
-def louvain_w(G, seed=None):
-    return louvain_communities(G, seed=seed)
-
-def hpmocd_w(G, seed=None):
-    import pymocd
-    if seed is not None:
-        np.random.seed(seed)
-    return pymocd.HpMocd(G, debug_level=0).run()
-
-def leiden_w(G, seed=None):
-    import igraph as ig, leidenalg
-    G_ig = ig.Graph(edges=list(G.edges()), directed=False)
-    partition = leidenalg.find_partition(G_ig, leidenalg.ModularityVertexPartition, seed=seed)
-    return [set(c) for c in partition]
-
-def moganet_w(G, seed=None):
+@algorithm('MogaNet', needs_conversion=False, parallel=True)
+@error_handler
+@seed_handler
+def moganet_algorithm(G):
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
     from moganet import detect_communities_ga
     return detect_communities_ga(G,
-                                  pop_size=100,
-                                  generations=100,
-                                  crossover_rate=0.9,
-                                  mutation_rate=0.1,
-                                  r=1.5,
-                                  elite_ratio=0.1)
+                                pop_size=100,
+                                generations=100,
+                                crossover_rate=0.9,
+                                mutation_rate=0.1,
+                                r=1.5,
+                                elite_ratio=0.1)
 
-def bb(G, seed=None):
-    x = pymocd.branch_bound(G)
-    print(x)
+class ExperimentRunner:
+    def __init__(self, n_runs: int = NUM_RUNS):
+        self.n_runs = n_runs
+    
+    def _run_single_experiment(self, args: tuple) -> Dict[str, Any]:
+        alg_name, alg_func, needs_conversion, n_runs, param_name, param_value, fixed_param = args
+        metrics = {'modularity': [], 'nmi': [], 'ami': [], 'time': []}
+        
+        for run_id in range(n_runs):
+            if param_name == 'mu':
+                G, ground_truth = generate_lfr_benchmark(n=fixed_param, mu=param_value, seed=run_id)
+            else:  # nodes experiment
+                G, ground_truth = generate_lfr_benchmark(n=param_value, mu=fixed_param, seed=run_id)
+            
+            start = time.time()
+            communities = alg_func(G, seed=run_id)
+            duration = time.time() - start
+            
+            eval_result = evaluate_communities(G, communities, ground_truth, convert=needs_conversion)
+            
+            metrics['modularity'].append(eval_result['modularity'])
+            metrics['nmi'].append(eval_result['nmi'])
+            metrics['ami'].append(eval_result['ami'])
+            metrics['time'].append(duration)
+        
+        result = {
+            'algorithm': alg_name,
+            param_name: param_value,
+        }
+        
+        for metric in metrics:
+            result[f'{metric}_mean'] = np.mean(metrics[metric])
+            result[f'{metric}_std'] = np.std(metrics[metric], ddof=1)
+        
+        # --- incremental backup: append this single-result row to *_bk.csv ---
+        try:
+            # only write header if file doesn't yet exist
+            write_header = not os.path.exists(BACKUP_CSV_FILE_PATH)
+            row_df = pd.DataFrame([result])
+            # rename mean‐columns to match final output
+            row_df.rename(columns={
+                'modularity_mean': 'modularity',
+                'nmi_mean'      : 'nmi',
+                'ami_mean'      : 'ami',
+                'time_mean'     : 'time'
+            }, inplace=True)
+            row_df.to_csv(BACKUP_CSV_FILE_PATH,
+                          mode='a',
+                          header=write_header,
+                          index=False)
+        except Exception as e:
+            print(f"[Backup ERROR] could not write to {BACKUP_CSV_FILE_PATH}: {e}")
 
-def csicea(G, seed=None):
-    return pymocd.run_csicea(G)
+        return result
+    
+    def _prepare_experiment_args(self, algorithms: List[str], param_name: str, 
+                               param_values: np.ndarray, fixed_param: float) -> List[tuple]:
+        args_list = []
+        for alg_name in algorithms:
+            info = ALGORITHM_REGISTRY[alg_name]
+            for param_value in param_values:
+                args_list.append((
+                    alg_name, info['function'], info['needs_conversion'],
+                    self.n_runs, param_name, param_value, fixed_param
+                ))
+        return args_list
+    
+    def run_mu_experiment(self, algorithms: List[str] = None, 
+                         mus: np.ndarray = None, n_nodes: int = 250) -> pd.DataFrame:
+        if algorithms is None:
+            algorithms = list(ALGORITHM_REGISTRY.keys())
+        if mus is None:
+            mus = np.arange(MIN_MU, MAX_MU + STEP_MU, STEP_MU)
+        
+        args_list = self._prepare_experiment_args(algorithms, 'mu', mus, n_nodes)
+        
+        with Pool() as pool:
+            results = pool.map(self._run_single_experiment, args_list)
+        
+        return self._format_results(results)
+    
+    def run_nodes_experiment(self, algorithms: List[str] = None,
+                           n_list: np.ndarray = None, mu: float = 0.3) -> pd.DataFrame:
+        if algorithms is None:
+            algorithms = list(ALGORITHM_REGISTRY.keys())
+        if n_list is None:
+            n_list = np.arange(500, 5500, 500)
+        
+        args_list = self._prepare_experiment_args(algorithms, 'nodes', n_list, mu)
+        
+        with Pool() as pool:
+            results = pool.map(self._run_single_experiment, args_list)
+        
+        return self._format_results(results)
+    
+    def _format_results(self, results: List[Dict]) -> pd.DataFrame:
+        df = pd.DataFrame(results)
+        df.rename(columns={
+            'modularity_mean': 'modularity',
+            'nmi_mean': 'nmi', 
+            'ami_mean': 'ami',
+            'time_mean': 'time',
+            'modularity_std': 'modularity_std',
+            'nmi_std': 'nmi_std',
+            'ami_std': 'ami_std',
+            'time_std': 'time_std'
+        }, inplace=True)
+        
+        df.to_csv(f'{SAVE_PATH}{CSV_FILE_PATH}', index=False)
+        return df
 
-def newman_w(G, seed=None):
-    # girvan_newman yields successive splits; take the first one
-    comp_gen = girvan_newman(G)
-    first_split = next(comp_gen)
-    # wrap each community in a set and return as list
-    return [set(c) for c in first_split]
-
-def asynlpr_w(G, seed=None):
-    lpa_communities = list(asyn_lpa_communities(G))
-    return lpa_communities
-
-def krm_w(G, seed=None):
-    return run_krm(G)
-
-def ccm_w(G, seed=None):
-    return run_ccm(G)
-
-def cdrme_w(G, seed=None):
-    return run_cdrme(G)
-
-# ======================================================================
-# use parallel always as false, has built-in features. 
-# Future usage
-#register_algorithm('csicea', csicea, needs_conversion=False, parallel=False )
-register_algorithm('Louvain', louvain_w, needs_conversion=True, parallel=True )
-register_algorithm('Leiden', leiden_w, needs_conversion=True, parallel=True )
-register_algorithm('NSGA III KRM', krm_w, needs_conversion=False, parallel=True )
-register_algorithm('NSGA III CCM', ccm_w, needs_conversion=False, parallel=True )
-register_algorithm('CDRME', cdrme_w, needs_conversion=True, parallel=True )
-register_algorithm('HPMOCD', hpmocd_w, needs_conversion=False, parallel=False )
-register_algorithm('ASYN-LPA', asynlpr_w, needs_conversion=True, parallel=True )
-
-
-# ======================================================================
-# We removed the MOCD, MogaNet and Girvan Newman due to the fast execution time being unfeasible,
-# reaching over 25 hours for a single run. 
-# These two algorithms will not be available in any form in the pymocd source code. 
-# This is because, since the algorithms are from other authors, it is unethical to make them
-# available without proper permission. 
-# The wrappers are still here, in case you want to reimplement them from scratch.
-
-register_algorithm('MOCD', mocd_w, needs_conversion=False, parallel=True)
-register_algorithm('MogaNet', moganet_w, needs_conversion=False, parallel=True)
-#register_algorithm('Girvan Newman', newman_w, needs_conversion=True, parallel=True)
-
-# ======================================================================
-# Main
-# ======================================================================
-if __name__ == "__main__":
+def main():
     print(f"Available algorithms: {list(ALGORITHM_REGISTRY.keys())}")
+    
     if JUST_PLOT_AVAILABLE_RESULTS:
         results = read_results_from_csv(SAVE_PATH + CSV_FILE_PATH)
     else:
+        runner = ExperimentRunner(n_runs=NUM_RUNS)
+        
         if MU_EXPERIMENT:
-            results = run_experiment(mus=np.arange(MIN_MU, MAX_MU + STEP_MU, STEP_MU), n_runs=NUM_RUNS)
+            results = runner.run_mu_experiment(
+                mus=np.arange(MIN_MU, MAX_MU + STEP_MU, STEP_MU)
+            )
         else:
-            results = run_nodes_experiment(n_runs=NUM_RUNS)
+            results = runner.run_nodes_experiment()
+    
     plot_results(results)
+
+if __name__ == "__main__":
+    main()
