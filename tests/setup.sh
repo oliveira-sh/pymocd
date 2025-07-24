@@ -39,7 +39,8 @@ setup() {
     pymoo \
     networkx \
     pybind11 \
-    walker
+    walker \
+    seaborn
 
   echo "[..] Building the Rust extension via maturin…"
   maturin develop --release
