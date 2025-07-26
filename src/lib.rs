@@ -6,21 +6,21 @@
 
 use pyo3::prelude::*;
 mod csicea_m;
-mod graph; 
+mod graph;
 mod hpmocd;
-mod macros;     
-mod mocd;       // deprecated
-mod operators; 
-mod utils; 
-mod xfeats;     // extra-features
+mod macros;
+mod mocd; // deprecated
+mod operators;
+mod utils;
+mod xfeats; // extra-features
 
 // ================================================================================================
 
 // proposed csicea (2026)
 use csicea_m::csicea;
 
-// proposed hpmocd (2025) 
-use hpmocd::HpMocd; 
+// proposed hpmocd (2025)
+use hpmocd::HpMocd;
 
 use xfeats::{fitness, set_thread_count};
 
