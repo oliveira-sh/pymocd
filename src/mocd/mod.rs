@@ -4,8 +4,8 @@
 //! Copyright 2024 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-//! This isn't the corrected implementation of Shi 2012, MOCD. This is just the early
-//! stages of the HP-MOCD Algorithm, which is deprecated now. If you want MOCD Implementation
+//! This isn't the corrected implementation of Shi 2012, Mocd. This is just the early
+//! stages of the HP-Mocd Algorithm, which is deprecated now. If you want Mocd Implementation
 //! You ask for authors permission, and start fixing this class. :)
 #![allow(deprecated)] // just to ignore warnings from this file.
 
@@ -25,7 +25,7 @@ use pyo3::types::PyAny;
 
 #[deprecated]
 #[pyclass]
-pub struct MOCD {
+pub struct Mocd {
     graph: Graph,
     debug_level: i8,
     rand_networks: usize,
@@ -35,7 +35,7 @@ pub struct MOCD {
     mut_rate: f64,
 }
 
-impl MOCD {
+impl Mocd {
     pub fn envolve(&self) -> Vec<Solution> {
         if self.debug_level >= 1 {
             self.graph.print();
@@ -54,7 +54,7 @@ impl MOCD {
 }
 
 #[pymethods]
-impl MOCD {
+impl Mocd {
     #[new]
     #[pyo3(signature = (graph,
         debug_level = 0,
@@ -77,7 +77,7 @@ impl MOCD {
         let edges = get_edges(graph);
         let graph = build_graph(nodes.unwrap(), edges.unwrap());
 
-        Ok(MOCD {
+        Ok(Mocd {
             graph,
             debug_level,
             rand_networks,
