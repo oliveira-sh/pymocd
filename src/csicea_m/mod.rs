@@ -6,17 +6,13 @@
 // ================================================================================================
 
 mod moea;
-use moea::MOEA;
+use moea::Moea;
 
-use pyo3::{
-    types::PyAny, 
-    prelude::*
-};
-use std::usize;
-use rustc_hash::FxHashMap;
-use ndarray::Array2;
 use crate::graph::{Graph, NodeId};
 use crate::utils;
+use ndarray::Array2;
+use pyo3::{prelude::*, types::PyAny};
+use rustc_hash::FxHashMap;
 
 // ================================================================================================
 
@@ -47,11 +43,10 @@ pub fn csicea(
     let node_count: usize = graph.num_nodes();
     if node_count == 0 {
         return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
-        "Unable to get node list from NetworkX or igraph",
-        ))
+            "Unable to get node list from NetworkX or igraph",
+        ));
     }
 
-    // Pre-allocate with known capacity
     let mut node_id_to_index: FxHashMap<NodeId, usize> =
         FxHashMap::with_capacity_and_hasher(node_count, Default::default());
     let mut index_to_node_id: Vec<NodeId> = Vec::with_capacity(node_count);
@@ -61,10 +56,8 @@ pub fn csicea(
         index_to_node_id.push(node_id);
     }
 
-    // Create adjacency matrix 
     let mut adj_matrix = Array2::<f64>::zeros((node_count, node_count));
 
-    // Batch process edges
     for chunk in graph.edges.chunks(1000) {
         for &(from, to) in chunk {
             if let (Some(&i), Some(&j)) = (node_id_to_index.get(&from), node_id_to_index.get(&to)) {
@@ -74,7 +67,7 @@ pub fn csicea(
         }
     }
 
-    let mut moea: MOEA = MOEA::new(
+    let mut moea = Moea::new(
         adj_matrix,
         popsize,
         t,
@@ -87,7 +80,7 @@ pub fn csicea(
 
     let result_by_index = moea.run();
 
-    // partition = NodeId -> CommunityId 
+    // partition = NodeId -> CommunityId
     let mut partition =
         FxHashMap::with_capacity_and_hasher(result_by_index.len(), Default::default());
     for (idx, comm) in result_by_index {

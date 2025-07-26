@@ -1,28 +1,23 @@
-// Community Structure Identification Co‑evolutionary Algorithm
+//! Community Structure Identification Parallel Co‑evolutionary Algorithm (CSICEA)
+//! This Source Code Form is subject to the terms of The GNU General Public License v3.0
+//! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use rustc_hash::FxHashMap;
-use rustc_hash::FxHashSet;
-
+// ================================================================================================
+use crate::debug;
 use ndarray::{Array1, Array2, ArrayView1, ArrayView2, Axis};
 use rand::distr::weighted::WeightedIndex;
 use rand::{prelude::*, rng};
 use rayon::prelude::*;
-
+use rustc_hash::{FxHashMap, FxHashSet};
+// ===============================================================================================
+// STRUCTS
+// ===============================================================================================
 #[derive(Debug, Clone)]
 pub struct Chromosome {
     pub nodes: Vec<usize>,
-    pub obj1: f64,  // Conductance (minimize)
-    pub obj2: f64,  // Key nodes count (minimize)
-}
-
-impl Chromosome {
-    pub fn new(nodes: Vec<usize>, obj1: f64, obj2: f64) -> Self {
-        Self {
-            nodes,
-            obj1,
-            obj2,
-        }
-    }
+    pub obj1: f64, // Conductance (minimize)
+    pub obj2: f64, // Key nodes count (minimize)
 }
 
 #[derive(Debug, Clone)]
@@ -30,7 +25,7 @@ pub struct Community {
     pub nodes: Vec<usize>,
 }
 
-pub struct MOEA {
+pub struct Moea {
     adj_matrix: Array2<f64>,
     num_nodes: usize,
     popsize: usize,
@@ -44,12 +39,21 @@ pub struct MOEA {
     avg_degree: f64,
     active_nodes: Vec<usize>,
     key_nodes: Option<Vec<usize>>,
-    // Cache for expensive computations
     neighbor_cache: FxHashMap<usize, Vec<usize>>,
     verbose: bool,
 }
 
-impl MOEA {
+// ===============================================================================================
+// IMPL
+// ===============================================================================================
+
+impl Chromosome {
+    pub fn new(nodes: Vec<usize>, obj1: f64, obj2: f64) -> Self {
+        Self { nodes, obj1, obj2 }
+    }
+}
+
+impl Moea {
     pub fn new(
         adj_matrix: Array2<f64>,
         popsize: usize,
@@ -62,7 +66,6 @@ impl MOEA {
     ) -> Self {
         let num_nodes = adj_matrix.nrows();
 
-        // Calculate network properties
         let degree: Array1<f64> = adj_matrix.sum_axis(Axis(1));
         let edge_num: f64 = degree.sum() / 2.0;
         let avg_degree: f64 = degree.mean().unwrap_or(0.0);
@@ -76,7 +79,7 @@ impl MOEA {
             .collect();
 
         let filtered_adj_matrix = if active_nodes.len() < num_nodes {
-            let indices: Vec<_> = active_nodes.iter().cloned().collect();
+            let indices: Vec<_> = active_nodes.to_vec();
             let mut new_matrix = Array2::zeros((active_nodes.len(), active_nodes.len()));
             for (i, &row_idx) in indices.iter().enumerate() {
                 for (j, &col_idx) in indices.iter().enumerate() {
@@ -90,7 +93,6 @@ impl MOEA {
 
         let filtered_degree: Array1<f64> = active_nodes.iter().map(|&i| degree[i]).collect();
 
-        // Pre-compute neighbor cache for all nodes using FxHashMap
         let mut neighbor_cache = FxHashMap::default();
         for i in 0..active_nodes.len() {
             let neighbors: Vec<usize> = (0..active_nodes.len())
@@ -114,7 +116,7 @@ impl MOEA {
             active_nodes,
             key_nodes: None,
             neighbor_cache,
-            verbose
+            verbose,
         }
     }
 
@@ -124,21 +126,21 @@ impl MOEA {
         &self.neighbor_cache[&node]
     }
 
-    /// Find key nodes with improved algorithm
+    /// Find key nodes
     pub fn find_key_nodes(&mut self) -> Vec<usize> {
         let mut key_nodes = Vec::new();
 
-        // Find all nodes with degree larger than average degree using FxHashSet
+        // Find all nodes with degree larger than (average degree + 1)
         let mut lset: FxHashSet<usize> = self
             .degree
             .indexed_iter()
-            .filter(|(_, d)| **d > self.avg_degree)
+            .filter(|(_, d)| **d > self.avg_degree + 1.0)
             .map(|(i, _)| i)
             .collect();
 
         if lset.is_empty() {
-            // If no nodes above average, take top 10% by degree
-            let top_count = (self.num_nodes / 10).max(1);
+            // If no nodes above average, take top 5% by degree
+            let top_count = (self.num_nodes / 5).max(1);
             let mut degree_indices: Vec<_> = self.degree.indexed_iter().collect();
             degree_indices.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
             lset = degree_indices
@@ -149,7 +151,6 @@ impl MOEA {
         }
 
         while !lset.is_empty() {
-            // Find node with maximum degree in Lset
             let max_node = *lset
                 .iter()
                 .max_by(|&&a, &&b| self.degree[a].partial_cmp(&self.degree[b]).unwrap())
@@ -157,7 +158,6 @@ impl MOEA {
 
             key_nodes.push(max_node);
 
-            // Use cached neighbors and FxHashSet
             let neighbors: FxHashSet<usize> = self
                 .get_neighbors(max_node)
                 .iter()
@@ -165,7 +165,6 @@ impl MOEA {
                 .cloned()
                 .collect();
 
-            // Remove max_node and all its neighbors from Lset
             lset.remove(&max_node);
             for neighbor in neighbors {
                 lset.remove(&neighbor);
@@ -213,8 +212,7 @@ impl MOEA {
         }
     }
 
-    /// Count number of key nodes in community (unchanged but inlined)
-    #[inline]
+    #[inline(always)]
     pub fn count_key_nodes_in_community(&self, community_nodes: &[usize]) -> f64 {
         if let Some(ref key_nodes) = self.key_nodes {
             let community_set: FxHashSet<usize> = community_nodes.iter().cloned().collect();
@@ -226,8 +224,6 @@ impl MOEA {
             0.0
         }
     }
-
-    /// Initialize weight vectors - optimized with pre-allocation
     pub fn init_weights(&self) -> (Array2<f64>, Array2<usize>) {
         let mut weights = Array2::zeros((self.popsize, 2));
         let inv_popsize = 1.0 / (self.popsize - 1) as f64;
@@ -238,7 +234,6 @@ impl MOEA {
             weights[[i, 1]] = 1.0 - w0;
         }
 
-        // Optimized neighbor finding with pre-allocation
         let mut neighbors = Array2::zeros((self.popsize, self.niche));
         let mut distances = Vec::with_capacity(self.popsize);
 
@@ -252,7 +247,6 @@ impl MOEA {
                 distances.push((j, dist));
             }
 
-            // Use partial sort for better performance
             distances.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
 
             for (k, &(idx, _)) in distances.iter().take(self.niche).enumerate() {
@@ -262,21 +256,17 @@ impl MOEA {
 
         (weights, neighbors)
     }
-
-    /// Optimized initial population generation
     pub fn initial_population(&self, key_node: usize) -> (Vec<Chromosome>, Array1<f64>) {
         let mut chromosomes = Vec::with_capacity(self.popsize);
         let mut ideal_point = Array1::from_elem(2, f64::INFINITY);
         let mut rng = rng();
 
-        // Use cached neighbors
         let neighbors = self.get_neighbors(key_node);
 
         for _ in 0..self.popsize {
             let community_nodes = if neighbors.is_empty() {
                 vec![key_node]
             } else {
-                // More intelligent selection strategy
                 let num_select = if neighbors.len() <= 2 {
                     neighbors.len()
                 } else {
@@ -286,7 +276,6 @@ impl MOEA {
                 let mut selected = Vec::with_capacity(num_select + 1);
                 selected.push(key_node);
 
-                // Use reservoir sampling for better distribution
                 for &neighbor in neighbors.choose_multiple(&mut rng, num_select) {
                     selected.push(neighbor);
                 }
@@ -296,9 +285,8 @@ impl MOEA {
                 selected
             };
 
-            // Calculate objectives
-            let obj1 = self.calculate_conductance(&community_nodes);
-            let obj2 = self.count_key_nodes_in_community(&community_nodes);
+            let obj1: f64 = self.calculate_conductance(&community_nodes);
+            let obj2: f64 = self.count_key_nodes_in_community(&community_nodes);
 
             let chromosome = Chromosome::new(community_nodes, obj1, obj2);
             chromosomes.push(chromosome);
@@ -311,7 +299,6 @@ impl MOEA {
         (chromosomes, ideal_point)
     }
 
-    /// Optimized interest calculation with caching
     pub fn calculate_interest(&self, node: usize, community_nodes: &[usize]) -> f64 {
         if community_nodes.contains(&node) {
             return 0.0;
@@ -338,8 +325,6 @@ impl MOEA {
 
     pub fn crossover_operator(&self, parent1: &Chromosome, parent2: &Chromosome) -> Vec<usize> {
         let nodes1: FxHashSet<usize> = parent1.nodes.iter().cloned().collect();
-
-        // Pre-allocate with estimated capacity
         let mut child_nodes = Vec::with_capacity(parent1.nodes.len() + 5);
         child_nodes.extend_from_slice(&parent1.nodes);
 
@@ -361,7 +346,7 @@ impl MOEA {
     pub fn mutation_operator(&self, individual_nodes: &mut Vec<usize>, key_node: usize) {
         let mut rng = rng();
 
-        if rng.random::<f64>() > 0.5 {
+        if rng.random::<f64>() < self.mutate_rate {
             let current_set: FxHashSet<usize> = individual_nodes.iter().cloned().collect();
             let mut candidates = Vec::new();
 
@@ -384,8 +369,7 @@ impl MOEA {
                 }
             }
         } else {
-            // Removal operation - preserve key node
-            let retention_prob = 0.5;
+            let retention_prob: f64 = self.mutate_rate;
             individual_nodes
                 .retain(|&node| node == key_node || rng.random::<f64>() <= retention_prob);
         }
@@ -394,14 +378,11 @@ impl MOEA {
         if !individual_nodes.contains(&key_node) {
             individual_nodes.push(key_node);
         }
-
-        // Efficient deduplication
         individual_nodes.sort_unstable();
         individual_nodes.dedup();
     }
 
-    /// Inlined scalar function for better performance
-    #[inline]
+    #[inline(always)]
     pub fn scalar_func(
         &self,
         obj: &[f64],
@@ -420,8 +401,6 @@ impl MOEA {
         }
         max_val
     }
-
-    /// Optimized crossover and mutation with better parent selection
     pub fn crossover_mutation(
         &self,
         key_node: usize,
@@ -437,36 +416,30 @@ impl MOEA {
 
         let mut rng = rng();
 
-        // More efficient parent selection
         let parent1_idx = rng.random_range(0..neighbor_chromosomes.len());
         let mut parent2_idx = rng.random_range(0..neighbor_chromosomes.len());
         while parent2_idx == parent1_idx && neighbor_chromosomes.len() > 1 {
             parent2_idx = rng.random_range(0..neighbor_chromosomes.len());
         }
 
-        let parent1 = &neighbor_chromosomes[parent1_idx];
-        let parent2 = &neighbor_chromosomes[parent2_idx];
+        let parent1: &Chromosome = &neighbor_chromosomes[parent1_idx];
+        let parent2: &Chromosome = &neighbor_chromosomes[parent2_idx];
 
-        // Apply crossover
         let mut child_nodes = if rng.random::<f64>() < self.cross_rate {
             self.crossover_operator(parent1, parent2)
         } else {
             parent1.nodes.clone()
         };
 
-        // Apply mutation
         if rng.random::<f64>() < self.mutate_rate {
             self.mutation_operator(&mut child_nodes, key_node);
         }
 
-        // Calculate objectives
         let obj1 = self.calculate_conductance(&child_nodes);
         let obj2 = self.count_key_nodes_in_community(&child_nodes);
 
         Some(Chromosome::new(child_nodes, obj1, obj2))
     }
-
-    /// Optimized neighbor update with batch operations
     pub fn update_neighbor(
         &self,
         ideal_point: &mut Array1<f64>,
@@ -489,17 +462,13 @@ impl MOEA {
             }
         }
 
-        // Update ideal point
         ideal_point[0] = ideal_point[0].min(child.obj1);
         ideal_point[1] = ideal_point[1].min(child.obj2);
     }
-
-    /// Run MOEA for a single key node with optimizations
     pub fn run_moea_for_key_node(&self, key_node: usize) -> Vec<Chromosome> {
         let (mut chromosomes, mut ideal_point) = self.initial_population(key_node);
         let (weights, neighbors) = self.init_weights();
 
-        // Pre-allocate vectors to avoid repeated allocations
         let mut neighbor_indices = Vec::with_capacity(self.niche);
         let mut neighbor_chromosomes = Vec::with_capacity(self.niche);
 
@@ -508,7 +477,6 @@ impl MOEA {
                 neighbor_indices.clear();
                 neighbor_chromosomes.clear();
 
-                // Collect neighbor data
                 for j in 0..self.niche {
                     let idx = neighbors[[i, j]];
                     neighbor_indices.push(idx);
@@ -539,32 +507,23 @@ impl MOEA {
         let m = self.edge_num;
         let mut q = 0.0;
 
-        // Pre-compute community memberships using FxHashMap with capacity hint
         let mut communities: FxHashMap<usize, Vec<usize>> = FxHashMap::default();
         let mut community_degrees: FxHashMap<usize, f64> = FxHashMap::default();
-
-        // Single pass to build communities and calculate degrees
         for (i, &label) in labels.iter().enumerate() {
             if label > 0 {
-                communities.entry(label).or_insert_with(Vec::new).push(i);
+                communities.entry(label).or_default();
                 *community_degrees.entry(label).or_insert(0.0) += self.degree[i];
             }
         }
-
-        // Early exit if only one community
         if communities.len() <= 1 {
             return 0.0;
         }
-
-        // Calculate modularity for each community
         for (label, nodes) in communities {
             if nodes.is_empty() {
                 continue;
             }
 
             let d_c = community_degrees[&label];
-
-            // Optimized internal edges calculation using cached neighbors
             let mut l_c = 0.0;
             for &node in &nodes {
                 let neighbors = self.get_neighbors(node);
@@ -581,8 +540,6 @@ impl MOEA {
 
         q
     }
-
-    /// Enhanced Community determination EA with improved performance
     pub fn community_determination_ea(
         &self,
         all_communities_by_key_node: &[Vec<Chromosome>],
@@ -595,8 +552,6 @@ impl MOEA {
 
         let num_key_nodes = all_communities_by_key_node.len();
         let mut rng = rng();
-
-        // Initialize population with better diversity and pre-allocation
         let mut population: Vec<Vec<usize>> = Vec::with_capacity(ga_popsize);
         for _ in 0..ga_popsize {
             let individual: Vec<usize> = (0..num_key_nodes)
@@ -611,33 +566,25 @@ impl MOEA {
         let mut best_fitness = f64::NEG_INFINITY;
         let mut best_individual: Option<Vec<usize>> = None;
 
-        // Pre-allocate fitness vector
         let mut fitness_values = Vec::with_capacity(ga_popsize);
 
         for _generation in 0..ga_generations {
-            // Parallel fitness evaluation
             fitness_values.clear();
             fitness_values.par_extend(population.par_iter().map(|individual| {
                 self.evaluate_community_combination(individual, all_communities_by_key_node)
             }));
-
-            // Update best solution
             for (i, &fitness) in fitness_values.iter().enumerate() {
                 if fitness > best_fitness {
                     best_fitness = fitness;
                     best_individual = Some(population[i].clone());
                 }
             }
-
-            // Enhanced genetic operators
             population = self.enhanced_ga_operators(
                 population,
                 &fitness_values,
                 all_communities_by_key_node,
             );
         }
-
-        // Extract best communities
         let best_communities = if let Some(ref best_ind) = best_individual {
             best_ind
                 .iter()
@@ -658,18 +605,14 @@ impl MOEA {
 
         (best_communities, best_fitness)
     }
-
-    /// Optimized fitness evaluation with better memory management
     pub fn evaluate_community_combination(
         &self,
         individual: &[usize],
         all_communities_by_key_node: &[Vec<Chromosome>],
     ) -> f64 {
-        // Pre-allocate labels vector
         let mut labels = vec![0; self.num_nodes];
         let mut community_id = 1;
 
-        // More efficient community assignment
         for (i, &selection) in individual.iter().enumerate() {
             if i < all_communities_by_key_node.len()
                 && selection < all_communities_by_key_node[i].len()
@@ -685,8 +628,6 @@ impl MOEA {
 
         self.modularity(&labels)
     }
-
-    /// Enhanced genetic algorithm operators with better performance
     pub fn enhanced_ga_operators(
         &self,
         population: Vec<Vec<usize>>,
@@ -698,7 +639,7 @@ impl MOEA {
 
         // Elitism - keep top performers
         if !fitness_values.is_empty() {
-            let elite_count = (population.len() / 10).max(1).min(5);
+            let elite_count = (population.len() / 10).clamp(1, 5);
             let mut indexed_fitness: Vec<(usize, f64)> = fitness_values
                 .iter()
                 .enumerate()
@@ -781,8 +722,6 @@ impl MOEA {
         new_population.truncate(population.len());
         new_population
     }
-
-    /// Tournament selection for better diversity
     fn tournament_selection(
         &self,
         probabilities: &[f64],
@@ -802,8 +741,6 @@ impl MOEA {
 
         best_idx
     }
-
-    /// Optimized community merging
     pub fn merge_overlapping_communities(&self, communities: &[Chromosome]) -> Vec<Community> {
         if communities.is_empty() {
             return Vec::new();
@@ -819,8 +756,6 @@ impl MOEA {
 
             let mut current_community: FxHashSet<usize> = comm1.nodes.iter().cloned().collect();
             used[i] = true;
-
-            // Check for overlaps with remaining communities
             for (j, comm2) in communities.iter().enumerate().skip(i + 1) {
                 if used[j] {
                     continue;
@@ -833,20 +768,15 @@ impl MOEA {
                 if intersection.is_empty() {
                     continue;
                 }
-
-                // Enhanced similarity calculation
                 let union_size = current_community.union(&nodes2).count();
                 let similarity =
                     intersection.len() as f64 / current_community.len().min(nodes2.len()) as f64;
                 let jaccard = intersection.len() as f64 / union_size as f64;
 
-                // Use both similarity measures
                 if similarity > self.alpha || jaccard > self.alpha * 0.5 {
-                    // Merge communities
                     current_community.extend(nodes2);
                     used[j] = true;
                 } else {
-                    // Enhanced conflict resolution - assign to better fitting community
                     for &node in &intersection {
                         let mut temp_comm1 = current_community.clone();
                         temp_comm1.remove(&node);
@@ -878,9 +808,7 @@ impl MOEA {
 
         merged_communities
     }
-
-    /// Optimized community fit calculation
-    #[inline]
+    #[inline(always)]
     pub fn calculate_community_fit(&self, node: usize, community_nodes: &[usize]) -> f64 {
         if community_nodes.is_empty() {
             return 0.0;
@@ -900,8 +828,6 @@ impl MOEA {
             internal_edges / total_edges
         }
     }
-
-    /// Optimized assignment of remaining nodes with batch processing
     pub fn assign_remaining_nodes(&self, labels: &mut [usize]) {
         let unassigned: Vec<usize> = labels
             .iter()
@@ -967,8 +893,11 @@ impl MOEA {
     }
 
     pub fn run(&mut self) -> FxHashMap<usize, usize> {
-        let key_nodes = self.find_key_nodes();
-        println!("Found {} key nodes", key_nodes.len());
+        let key_nodes: Vec<usize> = self.find_key_nodes();
+
+        if self.verbose {
+            debug!(debug, "Found {} key nodes", key_nodes.len())
+        }
 
         if key_nodes.is_empty() {
             let mut partition = FxHashMap::default();
@@ -978,7 +907,9 @@ impl MOEA {
             return partition;
         }
 
-        println!("Step 2: Running MOEA for each key node in parallel...");
+        if self.verbose {
+            debug!(debug, "Running Moea for each key node");
+        }
         let start_time = std::time::Instant::now();
 
         let chunk_size = (key_nodes.len() / rayon::current_num_threads()).max(1);
@@ -991,24 +922,14 @@ impl MOEA {
             })
             .collect();
 
-        println!(
-            "Parallel processing completed in {:.2} seconds",
-            start_time.elapsed().as_secs_f64()
-        );
-
-        // Step 3: Community determination using EA with adaptive parameters
-        println!("Step 3: Determining final communities using EA...");
         let (selected_communities, best_modularity) = self.community_determination_ea(
             &all_communities_by_key_node,
             std::cmp::min(50, key_nodes.len() * 2), // Adaptive generations
             std::cmp::min(50, key_nodes.len() * 3), // Adaptive population size
         );
 
-        // Step 4: Enhanced post-processing
-        println!("Step 4: Post-processing communities...");
         let merged_communities = self.merge_overlapping_communities(&selected_communities);
 
-        // Create final labels with pre-allocation
         let mut labels = vec![0; self.num_nodes];
         let mut community_id = 1;
 
@@ -1021,17 +942,14 @@ impl MOEA {
             community_id += 1;
         }
 
-        // Assign remaining nodes with enhanced method
         self.assign_remaining_nodes(&mut labels);
 
-        // Convert to final result format with original node mapping using FxHashMap
         let mut partition =
             FxHashMap::with_capacity_and_hasher(self.active_nodes.len(), Default::default());
         for (i, &original_node) in self.active_nodes.iter().enumerate() {
             partition.insert(original_node, labels[i]);
         }
 
-        // Add isolated nodes as separate communities if any exist
         let all_original_nodes: FxHashSet<usize> = (0..self.active_nodes.len() + 100).collect(); // Adjust based on your graph size
         let active_set: FxHashSet<usize> = self.active_nodes.iter().cloned().collect();
         let isolated_nodes: Vec<usize> = all_original_nodes
@@ -1048,10 +966,15 @@ impl MOEA {
         let unique_communities = partition.values().collect::<FxHashSet<_>>().len();
         let total_time = start_time.elapsed().as_secs_f64();
 
-        println!("Final result: {} communities detected", unique_communities);
-        println!("Total execution time: {:.2} seconds", total_time);
-        println!("Best modularity: {:.4}", best_modularity);
-
+        if self.verbose {
+            debug!(
+                debug,
+                "Result: {} communities | {:.2} seconds | Modularity {:.4}",
+                unique_communities,
+                total_time,
+                best_modularity
+            );
+        }
         partition
     }
 }
