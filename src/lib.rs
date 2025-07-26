@@ -5,18 +5,22 @@
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use pyo3::prelude::*;
-mod graph; // graph custom implementation;
+mod csicea_m;
+mod graph; 
 mod hpmocd;
-mod macros; // debug!, and more or future macros
-mod mocd; // deprecated
-mod operators; // genetic algorithm operators;
-mod utils; // networkx to graph conversion, some useful funcs.
-mod xfeats; // extra-features
+mod macros;     
+mod mocd;       // deprecated
+mod operators; 
+mod utils; 
+mod xfeats;     // extra-features
 
 // ================================================================================================
 
-pub use hpmocd::HpMocd; // proposed hpmocd (2025)
-pub use mocd::MOCD; // shi 2010, (with a lot of changes) [deprecated]
+// proposed csicea (2026)
+use csicea_m::csicea;
+
+// proposed hpmocd (2025) 
+use hpmocd::HpMocd; 
 
 use xfeats::{fitness, set_thread_count};
 
@@ -31,7 +35,7 @@ use xfeats::{fitness, set_thread_count};
 fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(set_thread_count, m)?)?;
     m.add_function(wrap_pyfunction!(fitness, m)?)?;
+    m.add_function(wrap_pyfunction!(csicea, m)?)?;
     m.add_class::<HpMocd>()?;
-    m.add_class::<MOCD>()?;
     Ok(())
 }
