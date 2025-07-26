@@ -8,10 +8,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 use std::collections::{BTreeMap, HashMap};
 
-pub fn normalize_community_ids(
-    graph: &Graph,
-    partition: Partition,
-) -> Partition {
+pub fn normalize_community_ids(graph: &Graph, partition: Partition) -> Partition {
     let mut new_partition: BTreeMap<NodeId, CommunityId> = BTreeMap::new();
     let mut id_mapping: HashMap<CommunityId, CommunityId> = HashMap::new();
     let mut next_id: CommunityId = 0;
@@ -59,9 +56,7 @@ pub fn get_nodes(graph: &Bound<'_, PyAny>) -> PyResult<Vec<NodeId>> {
         for node_obj_result in nx_nodes.try_iter()? {
             let node_obj = node_obj_result?;
             let node_id = match node_obj.extract::<i64>() {
-                Ok(int_val) => {
-                    int_val as NodeId
-                }
+                Ok(int_val) => int_val as NodeId,
                 Err(_) => {
                     return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
                         "Failed getting node id's. Verify if all Graph.nodes are positive integers; <str> as node_id isn't supported",
@@ -124,22 +119,22 @@ pub fn get_edges(graph: &Bound<'_, PyAny>) -> PyResult<Vec<(NodeId, NodeId)>> {
 }
 pub fn build_graph(nodes: Vec<NodeId>, edges: Vec<(NodeId, NodeId)>) -> Graph {
     let mut graph = Graph::new();
-    
+
     for node in nodes {
         graph.nodes.insert(node);
         graph.adjacency_list.entry(node).or_default();
     }
-    
+
     for (from, to) in edges {
         graph.edges.push((from, to));
-        
+
         graph.nodes.insert(from);
         graph.nodes.insert(to);
 
         graph.adjacency_list.entry(from).or_default().push(to);
         graph.adjacency_list.entry(to).or_default().push(from);
     }
-    
+
     graph
 }
 
