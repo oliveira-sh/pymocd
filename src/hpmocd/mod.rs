@@ -1,4 +1,4 @@
-//! Implements the Pareto Envelope-based Selection Algorithm II (PESA-II)
+//! High-Perfomance Multiobjective community detection
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -150,9 +150,14 @@ impl HpMocd {
         let graph = build_graph(nodes.unwrap(), edges.unwrap());
 
         if debug_level >= 1 {
-            debug!(debug, "Debug: {} | Level: {}", debug_level >= 1, debug_level);
+            debug!(
+                debug,
+                "Debug: {} | Level: {}",
+                debug_level >= 1,
+                debug_level
+            );
             graph.print();
-        } 
+        }
 
         Ok(HpMocd {
             graph,
@@ -170,25 +175,33 @@ impl HpMocd {
 
         Ok(first_front
             .into_iter()
-            .map(|ind| (normalize_community_ids(&self.graph, ind.partition), ind.objectives))
+            .map(|ind| {
+                (
+                    normalize_community_ids(&self.graph, ind.partition),
+                    ind.objectives,
+                )
+            })
             .collect())
     }
 
     /// Algorithm main function, run the NSGA-II for community detection and do a pareto front selection
     /// to find the best partition of the network.
-    /// 
+    ///
     /// Returns:
-    /// 
+    ///
     /// A dict of node:community, both integers
-    /// 
+    ///
     /// Note:
-    /// 
+    ///
     /// If a node has degree = 0, it's community will be -1.
     #[pyo3(signature = ())]
     pub fn run(&self) -> PyResult<Partition> {
         let first_front = self.envolve();
         let best_solution = max_q_selection(&first_front);
 
-        Ok(normalize_community_ids(&self.graph, best_solution.partition.clone()))
+        Ok(normalize_community_ids(
+            &self.graph,
+            best_solution.partition.clone(),
+        ))
     }
 }
