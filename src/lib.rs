@@ -5,22 +5,21 @@
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use pyo3::prelude::*;
-mod csicea_m;
 mod graph;
 mod hpmocd;
+mod leobenalg;
 mod macros;
 mod mocd; // deprecated
 mod operators;
 mod utils;
 mod xfeats; // extra-features
 
-// ================================================================================================
 
-// proposed csicea (2026)
-use csicea_m::csicea;
+// ================================================================================================
 
 // proposed hpmocd (2025)
 use hpmocd::HpMocd;
+use leobenalg::leoben;
 
 use xfeats::{fitness, set_thread_count};
 
@@ -35,7 +34,7 @@ use xfeats::{fitness, set_thread_count};
 fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(set_thread_count, m)?)?;
     m.add_function(wrap_pyfunction!(fitness, m)?)?;
-    m.add_function(wrap_pyfunction!(csicea, m)?)?;
+    m.add_function(wrap_pyfunction!(leoben, m)?)?;
     m.add_class::<HpMocd>()?;
     Ok(())
 }
