@@ -1,4 +1,4 @@
-//! Implements the Pareto Envelope-based Selection Algorithm II (PESA-II)
+//! High-Perfomance Multiobjective community detection
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -7,7 +7,7 @@ mod individual;
 mod utils;
 
 use crate::graph::{Graph, Partition};
-use crate::utils::{build_graph, get_edges, get_nodes, normalize_community_ids};
+use crate::utils::normalize_community_ids;
 use crate::{debug, operators};
 use individual::{Individual, create_offspring};
 use utils::{calculate_crowding_distance, fast_non_dominated_sort, max_q_selection};
@@ -41,8 +41,7 @@ impl HpMocd {
     ) {
         individuals.par_iter_mut().for_each(|ind| {
             let metrics = operators::get_fitness(graph, &ind.partition, degrees, true);
-            ind.objectives = vec![metrics.intra, metrics.inter];
-            ind.calculate_fitness();
+            ind.objectives = [metrics.intra, metrics.inter];
         });
     }
 
@@ -134,8 +133,8 @@ impl HpMocd {
         debug_level = 0,
         pop_size = 100,
         num_gens = 100,
-        cross_rate = 0.8,
-        mut_rate = 0.2
+        cross_rate = 0.7,
+        mut_rate = 0.5
     ))]
     pub fn new(
         graph: &Bound<'_, PyAny>,
@@ -145,14 +144,17 @@ impl HpMocd {
         cross_rate: f64,
         mut_rate: f64,
     ) -> PyResult<Self> {
-        let nodes = get_nodes(graph);
-        let edges = get_edges(graph);
-        let graph = build_graph(nodes.unwrap(), edges.unwrap());
+        let graph = Graph::from_python(graph);
 
         if debug_level >= 1 {
-            debug!(debug, "Debug: {} | Level: {}", debug_level >= 1, debug_level);
+            debug!(
+                debug,
+                "Debug: {} | Level: {}",
+                debug_level >= 1,
+                debug_level
+            );
             graph.print();
-        } 
+        }
 
         Ok(HpMocd {
             graph,
@@ -165,30 +167,38 @@ impl HpMocd {
     }
 
     #[pyo3(signature = ())]
-    pub fn generate_pareto_front(&self) -> PyResult<Vec<(Partition, Vec<f64>)>> {
+    pub fn generate_pareto_front(&self) -> PyResult<Vec<(Partition, [f64; 2])>> {
         let first_front = self.envolve();
 
         Ok(first_front
             .into_iter()
-            .map(|ind| (normalize_community_ids(&self.graph, ind.partition), ind.objectives))
+            .map(|ind| {
+                (
+                    normalize_community_ids(&self.graph, ind.partition),
+                    ind.objectives,
+                )
+            })
             .collect())
     }
 
     /// Algorithm main function, run the NSGA-II for community detection and do a pareto front selection
     /// to find the best partition of the network.
-    /// 
+    ///
     /// Returns:
-    /// 
+    ///
     /// A dict of node:community, both integers
-    /// 
+    ///
     /// Note:
-    /// 
+    ///
     /// If a node has degree = 0, it's community will be -1.
     #[pyo3(signature = ())]
     pub fn run(&self) -> PyResult<Partition> {
         let first_front = self.envolve();
         let best_solution = max_q_selection(&first_front);
 
-        Ok(normalize_community_ids(&self.graph, best_solution.partition.clone()))
+        Ok(normalize_community_ids(
+            &self.graph,
+            best_solution.partition.clone(),
+        ))
     }
 }
