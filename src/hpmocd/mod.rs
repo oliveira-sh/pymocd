@@ -7,7 +7,7 @@ mod individual;
 mod utils;
 
 use crate::graph::{Graph, Partition};
-use crate::utils::{build_graph, get_edges, get_nodes, normalize_community_ids};
+use crate::utils::normalize_community_ids;
 use crate::{debug, operators};
 use individual::{Individual, create_offspring};
 use utils::{calculate_crowding_distance, fast_non_dominated_sort, max_q_selection};
@@ -41,8 +41,7 @@ impl HpMocd {
     ) {
         individuals.par_iter_mut().for_each(|ind| {
             let metrics = operators::get_fitness(graph, &ind.partition, degrees, true);
-            ind.objectives = vec![metrics.intra, metrics.inter];
-            ind.calculate_fitness();
+            ind.objectives = [metrics.intra, metrics.inter];
         });
     }
 
@@ -134,8 +133,8 @@ impl HpMocd {
         debug_level = 0,
         pop_size = 100,
         num_gens = 100,
-        cross_rate = 0.8,
-        mut_rate = 0.2
+        cross_rate = 0.7,
+        mut_rate = 0.5
     ))]
     pub fn new(
         graph: &Bound<'_, PyAny>,
@@ -145,9 +144,7 @@ impl HpMocd {
         cross_rate: f64,
         mut_rate: f64,
     ) -> PyResult<Self> {
-        let nodes = get_nodes(graph);
-        let edges = get_edges(graph);
-        let graph = build_graph(nodes.unwrap(), edges.unwrap());
+        let graph = Graph::from_python(graph);
 
         if debug_level >= 1 {
             debug!(
@@ -170,7 +167,7 @@ impl HpMocd {
     }
 
     #[pyo3(signature = ())]
-    pub fn generate_pareto_front(&self) -> PyResult<Vec<(Partition, Vec<f64>)>> {
+    pub fn generate_pareto_front(&self) -> PyResult<Vec<(Partition, [f64; 2])>> {
         let first_front = self.envolve();
 
         Ok(first_front
