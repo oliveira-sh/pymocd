@@ -6,11 +6,13 @@
 use std::usize;
 
 use crate::graph::{Graph, Partition};
-use crate::operators;
 use rand::distr::Bernoulli;
 use rand::{prelude::*, rng};
 use rayon::prelude::*;
 use rustc_hash::{FxBuildHasher, FxHashSet as HashSet};
+
+use super::crossover;
+use super::mutation;
 
 const ENSEMBLE_SIZE: usize = 4;
 
@@ -109,12 +111,12 @@ pub fn create_offspring(
                 .collect();
 
             let mut child = if crossover_dist.sample(&mut rng) {
-                operators::ensemble_crossover(&parent_partitions, &mut rng)
+                crossover::ensemble_crossover(&parent_partitions, &mut rng)
             } else {
                 parent_partitions[rng.random_range(0..parent_partitions.len())].clone()
             };
 
-            operators::mutation(&mut child, graph, mutation_rate);
+            mutation::mutate(&mut child, graph, mutation_rate);
             Individual::new(child)
         })
         .collect()

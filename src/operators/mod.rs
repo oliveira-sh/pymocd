@@ -5,6 +5,7 @@
 
 use crate::graph::{Graph, Partition};
 use metrics::Metrics;
+use rand::rngs::ThreadRng;
 use rustc_hash::FxBuildHasher;
 use std::collections::HashMap;
 
@@ -67,11 +68,11 @@ pub fn crossover(parent1: &Partition, parent2: &Partition, crossover_rate: f64) 
 }
 
 pub fn mutation(partition: &mut Partition, graph: &Graph, mutation_rate: f64) {
-    mutation::optimized_mutate(partition, graph, mutation_rate);
+    mutation::mutate(partition, graph, mutation_rate);
 }
 
-pub fn ensemble_crossover(parents: &[Partition], crossover_rate: f64) -> Partition {
-    crossover::ensemble_crossover(parents, crossover_rate)
+pub fn ensemble_crossover(parents: &[&Partition], rng: &mut ThreadRng) -> Partition {
+    crossover::ensemble_crossover(parents, rng)
 }
 
 pub fn get_fitness(
