@@ -10,19 +10,19 @@ hero:
       mobile: "gradient-mobile.webp"
 
   badge:
-    text: v1.2.5
+    text: v1.3.0
     color: primary # primary, secondary, success, danger, warning, info, light, dark
     pill: true # boolean
     soft: true # boolean
 
   titleLogo:
-     path: "images/logos"
-     filename: "title_logo.png"
-     alt: "pymocd logo"
-     height: 80px
+    path: "images/logos"
+    filename: "title_logo.png"
+    alt: "pymocd logo"
+    height: 80px
 
   title: ""
-  subtitle: A **lightweight**, **parallalized** and fast library with multi-objective community detection algorithms. Written in **Rust** exposed to python through PyO3 
+  subtitle: A **lightweight**, **parallalized** and fast library with multi-objective community detection algorithms. Written in **Rust** exposed to python through PyO3
 
   image:
     path: "images" # path to image under configured assets directory. default 'images'
