@@ -74,7 +74,7 @@ featureGrid:
         url: docs/
 
 imageCompare:
-  enable: false
+  enable: true
   weight: 30
   template: image compare
   title: Acknowledgments
@@ -83,3 +83,4 @@ imageCompare:
     - title: Discovery Data Lab
     - title: CDlib
     - title: NetworkX
+    - title: igraph
