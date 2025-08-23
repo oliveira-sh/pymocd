@@ -27,7 +27,7 @@ hero:
   image:
     path: "images" # path to image under configured assets directory. default 'images'
     filename: "banner.png" # filename of your hero image (including file extension)
-    alt: "pymocd Docs" # Optional but recommended
+    alt: "pymocd" # Optional but recommended
     boxShadow: false # default 'false' (excludes .svg images)
     rounded: false # round the image corners? default 'false' (excludes .svg images)
 
@@ -37,7 +37,7 @@ hero:
     url: "docs/quickstart/#install-pymocd"
   cta2Button:
     icon: construction
-    btnText: "In Development"
+    btnText: "Development"
     url: "https://github.com/oliveira-sh/pymocd"
 
   info: "**Open Source** GPLv3 Licensed."
@@ -72,15 +72,3 @@ featureGrid:
       ctaLink:
         text: Learn More
         url: docs/
-
-imageCompare:
-  enable: true
-  weight: 30
-  template: image compare
-
-  title: Acknowledgments
-
-  items:
-    - title: Discovery Data Lab
-    - title: CDlib
-    - title: NetworkX

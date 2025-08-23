@@ -1,29 +1,58 @@
 ---
 weight: 1910
-title: "Financial Contributions"
+title: "Support pymocd Development"
 icon: paid
-description: "Help support the pymocd development team by becoming a financial contributor."
-lead: "Help support the pymocd development team by becoming a financial contributor."
+description: "Help sustain and grow the pymocd project with your financial support. Every contribution helps maintain this open-source tool."
+lead: "Your support helps keep pymocd free, maintained, and continuously improved for the entire community."
 date: 2022-10-19T07:07:38+01:00
-lastmod: 2022-10-19T07:07:38+01:00
+lastmod: 2024-08-23T00:00:00+00:00
 draft: false
 images: []
 toc: true
 ---
 
-## Make a Donation!
-
-Have I helped you with a project, or have any tools I've developed helped you in any way? Consider **buying me a coffee** and supporting monetary decentralization! :)
-
-#### Monero (XMR)
-
-XMR is a privacy-focused cryptocurrency that keeps transactions confidential. Donations are received in XMR, so if you use the wallet address below, you’ll be sending Monero directly.
+## How to Contribute
 
 
-```text
+#### Monero (XMR) - Recommended
+
+Monero offers enhanced privacy and aligns with principles of **financial decentralization**.
+
+**All** donations are gratefully received and help sustain development efforts.
+
+<center>
+
+---
+
+**Donation Address:**
+```python
 45Fm24G4wdzRvfzMBJeEav4A2euBUDRSE2UhGaeRXzSoBktc5bvmQsua8fAuxZqN4Eb1dXRcaJRt95b4Kma77QrELPkhtXV
 ```
 
-## Thanks :green_heart:
+![](images/moneroqr.png)
 
-Thanks for your contribution!
+---
+
+</center>
+
+## Other Support Options
+
+Looking for additional ways to contribute? Consider:
+
+- **GitHub Sponsors** - Set up recurring monthly support
+- **PayPal** - One-time or recurring donations via traditional payment
+- **Corporate sponsorship** - For organizations benefiting from pymocd
+
+{{< alert icon="📧" >}}
+For alternative donation methods or corporate sponsorship inquiries, please reach out through the project's contact channels.
+{{< /alert >}}
+
+## Thank You!
+
+Every contribution, no matter the size, is deeply appreciated. Thank you for supporting open source development!
+
+{{< alert icon="💚" context="success" >}}
+
+Already contributed? Thank you for being part of the open-source community! Your support makes this project possible.
+
+{{< /alert >}}

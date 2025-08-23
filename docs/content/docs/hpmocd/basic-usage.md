@@ -60,9 +60,9 @@ print(solution)
 
 # Further reading
 
-## Rust Parameter Types 
+## Rust Parameter Types
 
-* **`usize`**: An unsigned integer whose size matches the platform’s pointer width (e.g. 64 bits on a 64-bit system). 
+* **`usize`**: An unsigned integer whose size matches the platform’s pointer width (e.g. 64 bits on a 64-bit system).
 
 * **`u8`**: An 8-bit unsigned integer (values 0 to 255).s.
 
