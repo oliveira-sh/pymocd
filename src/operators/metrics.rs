@@ -5,7 +5,6 @@
 
 #[derive(Debug, PartialEq)]
 pub struct Metrics {
-    pub modularity: f64,
     pub intra: f64,
     pub inter: f64,
 }
@@ -13,15 +12,8 @@ pub struct Metrics {
 impl Default for Metrics {
     fn default() -> Self {
         Metrics {
-            modularity: 0.0,
             intra: 0.0,
             inter: 0.0,
         }
-    }
-}
-
-impl Metrics {
-    pub fn get_modularity(&self) -> f64 {
-        self.modularity
     }
 }
