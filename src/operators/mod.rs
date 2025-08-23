@@ -92,5 +92,5 @@ pub fn get_modularity_from_partition(partition: &Partition, graph: &Graph) -> f6
     let metrics: Metrics =
         objective::calculate_objectives(graph, partition, &graph.precompute_degrees(), false);
 
-    metrics.get_modularity()
+    1.0 - metrics.inter - metrics.intra
 }

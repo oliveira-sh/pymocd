@@ -25,32 +25,22 @@ pub fn calculate_objectives(
         communities.entry(comm).or_default().push(node);
     }
 
-    // Pre-compute node to community mapping for O(1) lookups
-    let node_to_community: HashMap<NodeId, i32> = partition
-        .iter()
-        .map(|(&node, &comm)| (node, comm))
-        .collect();
-
     let total_edges_doubled = 2.0 * total_edges;
 
     let folder = |(mut intra_acc, mut inter_acc), (_, nodes): (&i32, &Vec<NodeId>)| {
         let mut community_edges = 0.0;
         let mut community_degree = 0.0;
-
-        // Calculate community degree in one pass
         for &node in nodes {
             let degree = *degrees.get(&node).unwrap_or(&0) as f64;
             community_degree += degree;
         }
-
-        // Count intra-community edges more efficiently
         for &node in nodes {
             if let Some(neighbors) = graph.adjacency_list.get(&node) {
                 for &neighbor in neighbors {
                     // Only count edges once (when source < target)
                     if node < neighbor {
-                        if let Some(neighbor_comm) = node_to_community.get(&neighbor) {
-                            if neighbor_comm == &node_to_community[&node] {
+                        if let Some(neighbor_comm) = partition.get(&neighbor) {
+                            if neighbor_comm == &partition[&node] {
                                 community_edges += 1.0;
                             }
                         }
@@ -74,11 +64,6 @@ pub fn calculate_objectives(
     };
 
     let intra = 1.0 - (intra_sum / total_edges);
-    let modularity = 1.0 - intra - inter;
 
-    Metrics {
-        modularity,
-        intra,
-        inter,
-    }
+    Metrics { intra, inter }
 }

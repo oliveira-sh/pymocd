@@ -3,38 +3,27 @@
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
-
+// ================================================================================================
 use pyo3::prelude::*;
 mod graph;
 mod hpmocd;
-mod leobenalg;
 mod macros;
 mod mocd; // deprecated
 mod operators;
 mod utils;
-mod xfeats; // extra-features
-
-
+mod xfeats;
 // ================================================================================================
-
-// proposed hpmocd (2025)
 use hpmocd::HpMocd;
-use leobenalg::leoben;
-
 use xfeats::{fitness, set_thread_count};
-
 // ================================================================================================
 
-/// pymocd is a Python library, powered by a Rust backend, for performing efficient multi-objective
-/// evolutionary community detection in complex networks.
-/// This library is designed to deliver enhanced performance compared to traditional methods,
-/// making it particularly well-suited for analyzing large-scale graphs.
+/// pymocd is a Python library, powered by a Rust backend, for performing efficient community
+/// detection in complex networks.
 #[pymodule]
 #[pyo3(name = "pymocd")]
 fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(set_thread_count, m)?)?;
     m.add_function(wrap_pyfunction!(fitness, m)?)?;
-    m.add_function(wrap_pyfunction!(leoben, m)?)?;
     m.add_class::<HpMocd>()?;
     Ok(())
 }
