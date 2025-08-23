@@ -72,3 +72,14 @@ featureGrid:
       ctaLink:
         text: Learn More
         url: docs/
+
+imageCompare:
+  enable: false
+  weight: 30
+  template: image compare
+  title: Acknowledgments
+
+  items:
+    - title: Discovery Data Lab
+    - title: CDlib
+    - title: NetworkX
