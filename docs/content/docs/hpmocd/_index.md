@@ -1,6 +1,6 @@
 ---
 weight: 1000
-title: "HPMOCD"
+title: "HP-MOCD"
 description: "A High-Performance Evolutionary Multiobjective Community Detection Algorithm for Large Graphs"
 icon: "light"
 lead: ""

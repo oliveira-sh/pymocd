@@ -11,24 +11,29 @@ images: []
 toc: true
 ---
 
-## Contribute to code
+# Contribute to code
 
-### Create a Pull Request
-
-- Follow the [GitHub flow](https://guides.github.com/introduction/flow/).
-- Follow the [Conventional Commits Specification](https://www.conventionalcommits.org/en/v1.0.0/)
-
-## Improve documentation
+#### Create a Pull Request
 
 - Follow the [GitHub flow](https://guides.github.com/introduction/flow/).
 - Follow the [Conventional Commits Specification](https://www.conventionalcommits.org/en/v1.0.0/)
 
-### Create an issue
+---
+
+# Improve documentation
+
+- Follow the [GitHub flow](https://guides.github.com/introduction/flow/).
+- Follow the [Conventional Commits Specification](https://www.conventionalcommits.org/en/v1.0.0/)
+
+#### Create an issue
 
 - [Bug report](https://github.com/oliveira-sh/pymocd/issues/)
 - [Feature request](https://github.com/oliveira-sh/pymocd/issues/new)
 
+---
 
-## Submit to showcase
+# Submit to showcase
 
 Share what you’ve built with us.
+
+---

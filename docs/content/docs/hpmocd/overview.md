@@ -28,45 +28,14 @@ To achieve this, HP-MOCD is built upon the **NSGA-II** (Non-dominated Sorting Ge
 
 The HP-MOCD algorithm proceeds in two main phases:
 
-1. **Initialization Phase**:  
+1. **Initialization Phase**:
    A population of potential community partitions (called *individuals*) is randomly generated. Each individual is a possible assignment of nodes to communities.
 
-2. **Evolutionary Phase**:  
+2. **Evolutionary Phase**:
    The population evolves through a number of generations using genetic operators—**selection**, **crossover**, and **mutation**. At each generation, individuals are evaluated, ranked, and filtered to maintain only the most promising solutions.
 
-This high-level flow is summarized below.
-
 ---
 
-#### Algorithm 1: HP-MOCD Workflow
-
-```mermaid
-flowchart TD
-    %% Start
-    A["Start HP-MOCD"]--> B["Initialize Population"]
-
-    %% First evaluation
-    B --> C["Evaluate P (Intra/Inter)"]
-
-    %% Main loop condition
-    C --> D{"gen finished?"}
-
-    %% Loop path
-    D -- Yes --> E["Assign Crowding Distances"]
-    E --> F["Select Parents M\n(Tournament Selection)"]
-    F --> G["Generate Offspring Q\n(Apply Crossover & Mutation)"]
-    G --> H["Evaluate Q"]
-    H --> I["Merge P and Q → R"]
-    I --> J["Select Next Generation P\n(Best N from R)"]
-    J --> K["Increment gen"]
-    K --> D
-
-    %% End path
-    D -- No --> L["Extract Pareto Front F1\n(rank = 1)"]
-    L --> M["Return F1"]
-```
-
----
 
 ### Objectives and Representation
 
