@@ -1,7 +1,7 @@
 import pymocd
 import matplotlib.pyplot as plt
 import numpy as np
-from utils import generate_lfr_benchmark, evaluate_communities, SAVE_PATH
+from ..core.utils import generate_lfr_benchmark, evaluate_communities, SAVE_PATH
 
 G, ground_truth = generate_lfr_benchmark()
 pareto_front = pymocd.HpMocd(G).generate_pareto_front()
