@@ -8,6 +8,10 @@ use crate::graph::{CommunityId, Graph, NodeId, Partition};
 use rand::{Rng, rng};
 
 fn random_partition(node_ids: &[NodeId], num_communities: usize, rng: &mut impl Rng) -> Partition {
+    if node_ids.is_empty() || num_communities == 0 {
+        return Partition::default();
+    }
+    
     node_ids
         .iter()
         .map(|&node_id| {
@@ -21,7 +25,8 @@ pub fn generate_initial_population(graph: &Graph, population_size: usize) -> Vec
 
     // Extract node IDs only once
     let node_ids: Vec<NodeId> = graph.nodes.iter().copied().collect();
-    let num_communities = node_ids.len();
+    let num_communities = node_ids.len().max(1); // At least 1 community
+    
     (0..population_size) // Build each individual
         .map(|_| random_partition(&node_ids, num_communities, &mut rng))
         .collect()
