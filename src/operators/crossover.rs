@@ -23,6 +23,12 @@ pub fn two_point_crossover(
     }
     let keys: Vec<NodeId> = parent1.keys().copied().collect();
     let len = keys.len();
+    
+    // Handle empty partitions
+    if len == 0 {
+        return FxHashMap::default();
+    }
+    
     let mut point1 = rng.random_range(0..len);
     let mut point2 = rng.random_range(0..len);
     if point1 > point2 {
