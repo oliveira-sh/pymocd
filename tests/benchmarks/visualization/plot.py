@@ -1,5 +1,5 @@
 import argparse
-from utils import plot_results, read_results_from_csv
+from ..core.utils import plot_results, read_results_from_csv
 
 def main():
     parser = argparse.ArgumentParser(

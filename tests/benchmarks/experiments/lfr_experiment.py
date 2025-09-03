@@ -16,7 +16,7 @@ from networkx.algorithms.community import louvain_communities
 from networkx.algorithms.community import girvan_newman
 import pymocd
 
-from utils import (
+from ..core.utils import (
     generate_lfr_benchmark,
     evaluate_communities,
     plot_results,

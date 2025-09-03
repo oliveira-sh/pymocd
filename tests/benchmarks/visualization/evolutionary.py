@@ -2,7 +2,7 @@ import os
 import pymocd
 import matplotlib.pyplot as plt
 import networkx as nx
-from utils import generate_lfr_benchmark, SAVE_PATH
+from ..core.utils import generate_lfr_benchmark, SAVE_PATH
 
 pymocd.set_thread_count(2)
 

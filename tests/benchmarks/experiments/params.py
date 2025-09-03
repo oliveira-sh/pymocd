@@ -4,7 +4,7 @@ import pymocd
 import networkx as nx
 import pandas as pd
 
-from utils import generate_lfr_benchmark, evaluate_communities
+from ..core.utils import generate_lfr_benchmark, evaluate_communities
 
 network_sizes    = [10000, 20000, 30000]
 population_sizes = [50, 100, 150, 200]
