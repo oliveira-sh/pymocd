@@ -17,6 +17,7 @@ temp.py
 *.userosscache
 *.sln.docstates
 *.adjlist
+*.so
 
 # Allowed-specific files
 !res/**/*.png
