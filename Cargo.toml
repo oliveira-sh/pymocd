@@ -8,6 +8,7 @@ license = "GPL-3.0-or-later"
 [lib]
 name = "pymocd"
 crate-type = ["cdylib"]
+path = "src/mocd/lib.rs"
 
 [profile.release]
 debug = false
@@ -21,7 +22,7 @@ pyo3 = { version = "0.26.0", features = [
 ] } # Python compatibility
 dashmap = "6.1.0" # For concurrent HashMap
 rand_chacha = "0.9.0" # ChaCha random number generator
-ndarray = "0.16.1"
+ndarray = "0.17.0"
 num_cpus = "1.16.0" # CPU core detection for threading
 
 [package.metadata.maturin]
