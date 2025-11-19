@@ -65,10 +65,16 @@ We welcome contributions to `pymocd`\! If you have ideas for new features, bug f
 If you use `pymocd` or the `HP-MOCD` algorithm in your research, please cite the following paper:
 
 ```bibtex
-@article{santos2025high,
-  title={A High-Performance Evolutionary Multiobjective Community Detection Algorithm},
-  author={Santos, Guilherme O and Vieira, Lucas S and Rossetti, Giulio and Ferreira, Carlos HG and Moreira, Gladston},
-  journal={arXiv preprint arXiv:2506.01752},
-  year={2025}
+@article{Santos2025,
+  author    = {Guilherme O. Santos and Lucas S. Vieira and Giulio Rossetti and Carlos H. G. Ferreira and Gladston J. P. Moreira},
+  title     = {A high-performance evolutionary multiobjective community detection algorithm},
+  journal   = {Social Network Analysis and Mining},
+  year      = {2025},
+  volume    = {15},
+  number    = {1},
+  pages     = {110},
+  issn      = {1869-5469},
+  doi       = {10.1007/s13278-025-01519-7},
+  url       = {https://doi.org/10.1007/s13278-025-01519-7}
 }
 ```
