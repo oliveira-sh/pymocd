@@ -12,4 +12,33 @@
 .hero {
     background-size: cover;
     padding-top: 70px;
+    position: relative;
+    overflow: hidden;
+
+    // Enhanced title styling for animations
+    h1, .hero-title {
+        will-change: transform, opacity;
+    }
+
+    // Badge styling
+    .badge {
+        will-change: transform;
+        display: inline-block;
+    }
+
+    // Button enhancements
+    .btn {
+        will-change: transform;
+        position: relative;
+        overflow: hidden;
+
+        &:hover {
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+    }
+
+    // Subtitle/lead text
+    p, .lead {
+        will-change: opacity, transform;
+    }
 }

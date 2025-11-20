@@ -50,6 +50,9 @@ $code-block-padding-top: {{ if eq .Site.Params.docs.prism true -}}0{{ else }}1.2
 @import "custom/components/tabs";
 @import "custom/components/tooltip";
 
+// Animations
+@import "custom/animations/animations";
+
 // Pages
 @import "custom/pages/features";
 @import "custom/pages/helper";

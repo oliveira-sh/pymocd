@@ -119,10 +119,11 @@
                     margin: 4px 0 4px 0;
                     border: none;
                     letter-spacing: normal;
-                    transition: all 0.3s ease;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                     display: flex;
                     align-items: center;
                     text-align: left;
+                    will-change: transform, background-color;
 
                     @media (max-width: 1024px) {
                         padding: 6px 24px 6px 24px;
@@ -158,6 +159,7 @@
                     background-color: var(--sidebar-dropdown-hover-bg);
                     border-radius: 4px 0 0 4px;
                     margin: 4px 0 4px 0;
+                    transform: translateX(3px);
                 }
                 &:hover,
                 &.active {
