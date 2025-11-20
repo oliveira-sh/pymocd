@@ -110,6 +110,19 @@ body .toggle-light {
     transition: all 0.3s;
     font-weight: 600;
     border-radius: 6px;
+    position: relative;
+    overflow: hidden;
+    will-change: transform;
+
+    // Enhanced hover effect
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    &:active {
+        transform: translateY(0);
+    }
 
     &:focus {
         box-shadow: none !important;

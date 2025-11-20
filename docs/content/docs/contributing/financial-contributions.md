@@ -1,6 +1,6 @@
 ---
 weight: 1910
-title: "Support pymocd Development"
+title: "Financial Support"
 icon: paid
 description: "Help sustain and grow the pymocd project with your financial support. Every contribution helps maintain this open-source tool."
 lead: "Your support helps keep pymocd free, maintained, and continuously improved for the entire community."

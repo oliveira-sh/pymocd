@@ -1,5 +1,5 @@
 ---
-weight: 200
+weight: 230
 title: "Generate Pareto Front"
 icon: dashboard
 description: "Step-by-step guide to extract and interpret the Pareto front of community-detection solutions."
@@ -9,6 +9,9 @@ lastmod: 2023-08-24T16:34:38+01:00
 draft: false
 images: []
 toc: true
+aliases:
+  - /docs/hpmocd/pareto/
+  - /hpmocd/pareto/
 ---
 
 ## Pareto Front Generation

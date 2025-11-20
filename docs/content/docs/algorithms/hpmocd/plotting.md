@@ -1,5 +1,5 @@
 ---
-weight: 250
+weight: 240
 title: "Plotting"
 description: "How to plot the result graph or the Pareto front"
 icon: quick_reference_all
@@ -8,6 +8,9 @@ date: 2023-01-21T16:13:15+00:00
 lastmod: 2023-01-21T16:13:15+00:00
 draft: false
 images: []
+aliases:
+  - /docs/hpmocd/plotting/
+  - /hpmocd/plotting/
 ---
 
 ## Plotting Results
@@ -95,8 +98,3 @@ def plot_pareto_front(frontier):
 ```python
 plot_pareto_front(frontier)
 ```
-
-### Expected Outputs
-
-![](images/hpmocd/comms.png) 
-![](images/hpmocd/pareto.png)

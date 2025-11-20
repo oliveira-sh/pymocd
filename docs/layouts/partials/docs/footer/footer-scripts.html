@@ -1,8 +1,9 @@
 {{ $dayjs := resources.Get (printf "/%s/%s" ($.Scratch.Get "pathName") "js/dayjs.min.js") }}
 {{ $relativeTime := resources.Get (printf "/%s/%s" ($.Scratch.Get "pathName") "js/relativeTime.min.js") }}
 {{ $app := resources.Get (printf "/%s/%s" ($.Scratch.Get "pathName") "js/app.js") -}}
+{{ $gsapAnimations := resources.Get (printf "/%s/%s" ($.Scratch.Get "pathName") "js/gsap-animations.js") -}}
 
-{{ $slice := slice $dayjs $relativeTime $app -}}
+{{ $slice := slice $dayjs $relativeTime $app $gsapAnimations -}}
 
 {{ if and (.Site.Params.docsearch.appID) (.Site.Params.docsearch.apiKey) -}}
     {{ $docsearch := resources.Get (printf "/%s/%s" ($.Scratch.Get "pathName") "js/docsearch.min.js") }}

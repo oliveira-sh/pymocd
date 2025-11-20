@@ -1,5 +1,5 @@
 ---
-weight: 100
+weight: 220
 title: "Basic Usage"
 icon: menu_book
 description: "Learn how to run the HpMocd default community detection function"
@@ -9,6 +9,9 @@ lastmod: 2023-08-24T16:34:38+01:00
 draft: false
 images: []
 toc: true
+aliases:
+  - /docs/hpmocd/basic-usage/
+  - /hpmocd/basic-usage/
 ---
 
 {{% alert context="warning" text="**Note**: Here it is assumed that you have read the quickstarting section and have already installed the library on your operating system, whatever it may be." /%}}

@@ -80,6 +80,10 @@
         <!-- Back to top -->
         {{ end }}
 
+        <!-- GSAP Animation Library -->
+        <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+
         <!-- Dark Mode Switch JS -->
         {{ if eq .Site.Params.docs.darkMode true -}}
             {{ $darkModeSwitch := resources.Get (printf "/%s/%s" ($.Scratch.Get "pathName") "js/darkmode-switch.js") | js.Build | minify }}
