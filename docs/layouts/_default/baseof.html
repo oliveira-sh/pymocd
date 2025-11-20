@@ -38,13 +38,18 @@ If so, collect and consolidate the items config from each enabled instance
         </div>
             {{- partial "footer.html" . -}}
 
+        <!-- GSAP Animation Library -->
+        <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+
         <!-- Lotus Docs JS -->
         {{ $app := resources.Get "/js/app.js" }}
+        {{ $gsapAnimations := resources.Get "/docs/js/gsap-animations.js" }}
         {{- if not hugo.IsServer }}
-            {{- $js := (slice $app) | resources.Concat "/js/bundle.js" | minify | fingerprint "sha384" }}
+            {{- $js := (slice $app $gsapAnimations) | resources.Concat "/js/bundle.js" | minify | fingerprint "sha384" }}
             <script type="text/javascript" src="{{ $js.Permalink }}" integrity="{{ $js.Data.Integrity }}"></script>
         {{- else }}
-            {{- $js := (slice $app) | resources.Concat "/js/bundle.js" }}
+            {{- $js := (slice $app $gsapAnimations) | resources.Concat "/js/bundle.js" }}
             <script type="text/javascript" src="{{ $js.Permalink }}" {{ if hugo.IsProduction }}integrity="{{ $js.Data.Integrity }}"{{ end }}></script>
         {{- end }}
 

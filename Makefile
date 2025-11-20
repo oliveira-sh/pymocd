@@ -1,6 +1,6 @@
 .PHONY: setup build test clean
 
-setup:
+install:
 	@echo "Setting up development environment..."
 	@if [ -d "venv" ]; then \
 		echo "Removing existing venv..."; \

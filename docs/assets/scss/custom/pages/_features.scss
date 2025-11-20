@@ -123,10 +123,28 @@ $value in $theme-colors {
     }
 
     &.key-feature {
-        transition: all 0.3s ease;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        transform-style: preserve-3d;
+        perspective: 1000px;
+        will-change: transform;
+
+        .material-icons,
+        i,
+        svg {
+            transition: transform 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            will-change: transform;
+        }
+
         &:hover {
             transform: scale(1.05);
             box-shadow: $shadow-md !important;
+            cursor: pointer;
+
+            .material-icons,
+            i,
+            svg {
+                transform: rotate(360deg);
+            }
         }
     }
 
@@ -172,7 +190,9 @@ $value in $theme-colors {
 .key-feature {
     .title {
         font-size: 22px !important;
+        transition: color 0.3s ease;
     }
+
     .icon,
     .no-icon {
         height: 45px;
@@ -180,6 +200,29 @@ $value in $theme-colors {
         display: flex;
         align-items: center;
         justify-content: center;
+        transition: transform 0.3s ease;
+    }
+}
+
+// Feature cards for 3D tilt animation support
+.feature-card,
+.card.feature {
+    transform-style: preserve-3d;
+    perspective: 1000px;
+    will-change: transform, opacity;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    .material-icons,
+    i,
+    svg {
+        transition: transform 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        will-change: transform;
+    }
+
+    &:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+        cursor: pointer;
     }
 }
 

@@ -9,6 +9,9 @@ lastmod: 2024-08-22T10:00:00+00:00
 draft: false
 images: []
 toc: true
+aliases:
+  - /docs/hpmocd/selection_strategies/
+  - /hpmocd/selection_strategies/
 ---
 
 {{% alert context="info" text="**Prerequisites**: This guide assumes you have completed the [Basic Usage](/docs/basic-usage) tutorial and understand how to generate Pareto fronts using HpMocd." /%}}
@@ -104,16 +107,10 @@ print(f"Selected solution has {len(set(best_solution[0].values()))} communities"
 
 ### Problems that you may encounter.
 
-{{% alert context="danger" text="**WARNING:** Just because you know the best solution doesn't mean the algorithm does too. Sometimes the \"optimal\" solution may have been **dominated** in the algorithm's evolution; see the example below." /%}}
-
-![](images/hpmocd/perspectives.png)
-
-Here, we have a **lot** of solutions with high coerence, but none 1. Why?
+{{% alert context="danger" text="**WARNING:** Just because you know the best solution doesn't mean the algorithm does too. Sometimes the \"optimal\" solution may have been **dominated** in the algorithm's evolution;" /%}}
 
 - Because the best ground truth solution, it is **not** a non-dominated solution;
 - Your "best" solution probably had less intra or inter values, so, another one dominate it.
-
-![](images/hpmocd/dominated.jpg)
 
 ---
 

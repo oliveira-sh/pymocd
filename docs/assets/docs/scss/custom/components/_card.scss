@@ -16,15 +16,35 @@
     background: var(--card-bg);
     border-color: var(--card-border-color);
     border-radius: 4px;
-    transition: all 0.2s;
-    -webkit-transition: all 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    -webkit-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+
     .card-body {
         padding: 1.5rem;
     }
+
     &:hover {
         border-color: var(--card-border-hover-color);
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        cursor: pointer;
+
         .card-title {
             color: #fff;
+        }
+    }
+
+    // Support for feature cards
+    &.feature {
+        transform-style: preserve-3d;
+        perspective: 1000px;
+
+        .material-icons,
+        i,
+        svg {
+            transition: transform 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         }
     }
 }

@@ -1,0 +1,630 @@
+/**
+ * GSAP Animation Helpers for PyMOCD Documentation
+ * Playful & Energetic styles to complement GSAP animations
+ */
+
+// ===========================================
+// ANIMATION VARIABLES
+// ===========================================
+
+$animation-duration-fast: 0.2s;
+$animation-duration-normal: 0.4s;
+$animation-duration-slow: 0.6s;
+$animation-easing-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+$animation-easing-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+$animation-easing-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+// ===========================================
+// FLOATING ORBS
+// ===========================================
+
+.floating-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(60px);
+    opacity: 0.15;
+    pointer-events: none;
+    z-index: 0;
+    will-change: transform;
+}
+
+// ===========================================
+// HERO ENHANCEMENTS
+// ===========================================
+
+.hero {
+    position: relative;
+    overflow: hidden;
+
+    h1, .hero-title {
+        span {
+            display: inline-block;
+            transform-origin: center;
+        }
+    }
+
+    .btn {
+        will-change: transform;
+        position: relative;
+        overflow: hidden;
+
+        &:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+    }
+
+    .badge {
+        will-change: transform;
+    }
+}
+
+// ===========================================
+// FEATURE CARDS
+// ===========================================
+
+.feature-card,
+.card.feature {
+    will-change: transform, opacity;
+    transform-style: preserve-3d;
+    transition: box-shadow $animation-duration-normal $animation-easing-smooth;
+
+    &:hover {
+        .material-icons,
+        i,
+        svg {
+            will-change: transform;
+        }
+    }
+}
+
+// ===========================================
+// NAVIGATION ENHANCEMENTS
+// ===========================================
+
+// Landing Header
+.navbar,
+.topbar {
+    transition: transform $animation-duration-normal $animation-easing-smooth,
+                box-shadow $animation-duration-normal $animation-easing-smooth;
+    will-change: transform;
+
+    .navbar-brand,
+    .logo {
+        will-change: transform;
+    }
+
+    .navbar-nav .nav-link,
+    .nav-menu a {
+        position: relative;
+        overflow: hidden;
+        will-change: transform;
+
+        &:hover {
+            transform: translateY(-1px);
+        }
+    }
+}
+
+// Sidebar
+.sidebar-nav,
+.docs-links {
+    .nav-link {
+        position: relative;
+        transition: background-color $animation-duration-fast,
+                    transform $animation-duration-fast;
+        will-change: transform;
+
+        &:hover {
+            transform: translateX(3px);
+        }
+
+        .dropdown-chevron,
+        .material-icons {
+            transition: transform $animation-duration-normal $animation-easing-bounce;
+            will-change: transform;
+        }
+    }
+
+    .active {
+        position: relative;
+
+        &::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 70%;
+            background: var(--primary-color, #4F46E5);
+            border-radius: 0 2px 2px 0;
+            animation: pulse-highlight 2s ease-in-out infinite;
+        }
+    }
+}
+
+@keyframes pulse-highlight {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.6;
+    }
+}
+
+// Table of Contents
+#TableOfContents,
+.toc {
+    position: relative;
+
+    a {
+        position: relative;
+        transition: all $animation-duration-fast $animation-easing-smooth;
+        will-change: transform;
+
+        &:hover {
+            padding-left: 0.5rem;
+        }
+
+        &.active {
+            font-weight: 600;
+            color: var(--primary-color, #4F46E5);
+        }
+    }
+}
+
+.toc-indicator {
+    position: absolute;
+    left: 0;
+    width: 2px;
+    height: 20px;
+    background: linear-gradient(to bottom, #4F46E5, #06B6D4);
+    border-radius: 2px;
+    transition: top $animation-duration-normal $animation-easing-smooth;
+    pointer-events: none;
+    box-shadow: 0 0 10px rgba(79, 70, 229, 0.5);
+}
+
+// Breadcrumbs
+.breadcrumb,
+nav[aria-label="breadcrumb"] {
+    will-change: transform, opacity;
+
+    .material-icons {
+        transition: transform $animation-duration-fast;
+        will-change: transform;
+    }
+}
+
+// ===========================================
+// CONTENT ANIMATIONS
+// ===========================================
+
+.docs-content,
+.main-content {
+    h1, h2, h3, h4, h5, h6 {
+        will-change: transform, opacity;
+    }
+
+    p {
+        will-change: opacity, transform;
+    }
+
+    a:not(.btn) {
+        position: relative;
+        transition: transform $animation-duration-fast,
+                    color $animation-duration-fast;
+        will-change: transform;
+
+        &::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: currentColor;
+            transition: width $animation-duration-normal $animation-easing-smooth;
+        }
+
+        &:hover::after {
+            width: 100%;
+        }
+    }
+
+    img {
+        will-change: transform, opacity, filter;
+        transition: transform $animation-duration-normal $animation-easing-smooth;
+
+        &:hover {
+            transform: scale(1.02);
+        }
+    }
+
+    pre,
+    .highlight {
+        will-change: transform, opacity;
+        transition: box-shadow $animation-duration-normal;
+
+        &:hover {
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+    }
+
+    ul, ol {
+        li {
+            will-change: transform, opacity;
+        }
+    }
+}
+
+// ===========================================
+// CARDS
+// ===========================================
+
+.card {
+    transition: transform $animation-duration-normal $animation-easing-smooth,
+                box-shadow $animation-duration-normal $animation-easing-smooth;
+    will-change: transform;
+
+    &:hover {
+        cursor: pointer;
+    }
+}
+
+// Alerts
+.alert {
+    will-change: transform, opacity;
+    position: relative;
+    overflow: hidden;
+
+    .material-icons,
+    i,
+    svg {
+        will-change: transform;
+    }
+
+    &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+        transition: left 0.5s;
+    }
+
+    &:hover::before {
+        left: 100%;
+    }
+}
+
+// ===========================================
+// BUTTONS
+// ===========================================
+
+.btn {
+    position: relative;
+    overflow: hidden;
+    transition: all $animation-duration-normal $animation-easing-smooth;
+    will-change: transform;
+
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    &:active {
+        transform: translateY(0);
+    }
+
+    .material-icons,
+    i,
+    svg {
+        transition: transform $animation-duration-fast;
+        will-change: transform;
+    }
+}
+
+// Ripple effect container
+.btn-ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.6);
+    pointer-events: none;
+    transform: scale(0);
+    animation: ripple-animation 0.6s ease-out;
+}
+
+@keyframes ripple-animation {
+    to {
+        transform: scale(2);
+        opacity: 0;
+    }
+}
+
+// ===========================================
+// DOC NAVIGATION
+// ===========================================
+
+.doc-nav-prev,
+.doc-nav-next,
+.docs-nav-prev,
+.docs-nav-next {
+    will-change: transform, opacity;
+    transition: all $animation-duration-normal $animation-easing-smooth;
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(79, 70, 229, 0.05), transparent);
+        transition: left 0.5s;
+    }
+
+    &:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+
+        &::before {
+            left: 100%;
+        }
+    }
+
+    .material-icons,
+    i,
+    svg {
+        will-change: transform;
+    }
+}
+
+// ===========================================
+// TABS
+// ===========================================
+
+[role="tablist"] {
+    position: relative;
+
+    [role="tab"] {
+        position: relative;
+        transition: all $animation-duration-fast;
+        will-change: color;
+
+        &:hover {
+            transform: translateY(-2px);
+        }
+
+        &[aria-selected="true"] {
+            font-weight: 600;
+        }
+    }
+}
+
+[role="tabpanel"] {
+    will-change: opacity, transform;
+}
+
+// ===========================================
+// BACK TO TOP BUTTON
+// ===========================================
+
+#back-to-top,
+.back-to-top {
+    will-change: transform, opacity;
+    transition: all $animation-duration-normal $animation-easing-smooth;
+    transform-origin: center;
+
+    &:hover {
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+    }
+
+    svg {
+        will-change: transform;
+    }
+}
+
+// ===========================================
+// DARK MODE TOGGLE
+// ===========================================
+
+#darkModeSwitch,
+.dark-mode-toggle {
+    .material-icons,
+    i,
+    svg {
+        will-change: transform;
+        transition: transform $animation-duration-normal;
+    }
+}
+
+// Smooth theme transition
+body {
+    transition: background-color $animation-duration-normal $animation-easing-smooth,
+                color $animation-duration-normal $animation-easing-smooth;
+}
+
+// ===========================================
+// UTILITY CLASSES
+// ===========================================
+
+// Animation helper classes
+.animate-on-hover {
+    transition: transform $animation-duration-normal $animation-easing-bounce;
+
+    &:hover {
+        transform: translateY(-5px);
+    }
+}
+
+.animate-bounce {
+    animation: bounce 1s ease-in-out infinite;
+}
+
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+.animate-pulse {
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.8;
+        transform: scale(1.05);
+    }
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.animate-wiggle {
+    animation: wiggle 0.5s ease-in-out;
+}
+
+@keyframes wiggle {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    25% {
+        transform: translateX(-5px);
+    }
+    75% {
+        transform: translateX(5px);
+    }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.6s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.animate-slide-up {
+    animation: slideUp 0.6s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+// Performance optimization
+.will-change-transform {
+    will-change: transform;
+}
+
+.will-change-opacity {
+    will-change: opacity;
+}
+
+.gpu-accelerated {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
+}
+
+// ===========================================
+// LOADING STATES
+// ===========================================
+
+.skeleton-loading {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+// ===========================================
+// SCROLL BEHAVIOR
+// ===========================================
+
+html {
+    scroll-behavior: smooth;
+}
+
+// Smooth scrolling override for GSAP
+html.gsap-smooth-scroll {
+    scroll-behavior: auto;
+}
+
+// ===========================================
+// ACCESSIBILITY
+// ===========================================
+
+// Respect user preferences for reduced motion
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+// ===========================================
+// PRINT STYLES
+// ===========================================
+
+@media print {
+    .floating-orb,
+    .toc-indicator,
+    #back-to-top,
+    .back-to-top {
+        display: none !important;
+    }
+
+    * {
+        animation: none !important;
+        transition: none !important;
+    }
+}
