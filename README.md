@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="res/logo.png" alt="pymocd logo" width="50%">  
+  <img src="docs/assets/images/readme/logo.png" alt="pymocd logo" width="50%">  
   
   <strong>Python Multi-Objective Community Detection Algorithms</strong>  
 
@@ -15,6 +15,7 @@
 **Navigate the [Documentation](https://oliveira-sh.github.io/pymocd/) for detailed guidance and usage instructions.**
 
 ## Table of Contents
+
 - [Understanding Community Detection with HP-MOCD](#understanding-community-detection-with-hp-mocd)
 - [Getting Started](#getting-started)
   - [Key Features](#key-features)
@@ -29,7 +30,7 @@ The `HP-MOCD` algorithm, central to `pymocd`, identifies community structures wi
 
 | Original Graph                         | Proposed Community Structure             |
 | :------------------------------------: | :--------------------------------------: |
-|  ![](res/original_graph.png)           | ![](res/proposed_solution.png)           |
+|  ![](docs/assets/images/readme/original_graph.png)           | ![](docs/assets/images/readme/proposed_solution.png)           |
 
 ### Getting Started
 
@@ -49,6 +50,7 @@ G = networkx.Graph() # Your graph
 alg = pymocd.HpMocd(G)
 communities = alg.run()
 ```
+
 > [!IMPORTANT]
 > Graphs must be provided in **NetworkX** or **Igraph** compatible format.
 

@@ -1,8 +1,13 @@
 import unittest
 import networkx as nx
-import pymocd
+from pymocd import HpMocd
 import random
-import igraph as ig
+
+
+def karate_club_graph():
+    G = nx.karate_club_graph()
+    return G
+
 
 def build_two_clique_graph():
     G = nx.Graph()
@@ -11,6 +16,7 @@ def build_two_clique_graph():
     G.add_edges_from([(3, 4), (3, 5), (4, 5)])
     G.add_edge(2, 3)
     return G
+
 
 class TestPyMoCDNetworkX(unittest.TestCase):
     def test_simple_two_clique_partition(self):
@@ -74,5 +80,7 @@ class TestPyMoCDIgraph(unittest.TestCase):
         sorted_parts = sorted([tuple(sorted(list(s))) for s in comm_to_nodes.values()])
         self.assertEqual(tuple(sorted_parts), ((0, 1, 2), (3, 4, 5)))
 
+
 if __name__ == "__main__":
     unittest.main()
+
