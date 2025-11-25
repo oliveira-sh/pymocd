@@ -15,6 +15,7 @@
 **Navigate the [Documentation](https://oliveira-sh.github.io/pymocd/) for detailed guidance and usage instructions.**
 
 ## Table of Contents
+
 - [Understanding Community Detection with HP-MOCD](#understanding-community-detection-with-hp-mocd)
 - [Getting Started](#getting-started)
   - [Key Features](#key-features)
@@ -49,6 +50,7 @@ G = networkx.Graph() # Your graph
 alg = pymocd.HpMocd(G)
 communities = alg.run()
 ```
+
 > [!IMPORTANT]
 > Graphs must be provided in **NetworkX** or **Igraph** compatible format.
 
@@ -66,7 +68,7 @@ If you use `pymocd` or the `HP-MOCD` algorithm in your research, please cite the
 
 ```bibtex
 @article{Santos2025,
-  author={Santos, Guilherme O. and Vieira, Lucas S. and Rossetti, Giulio and Ferreira, Carlos H. G. and Moreira, Gladston J. P.},
+  author    = {Santos, Guilherme O. and Vieira, Lucas S. and Rossetti, Giulio and Ferreira, Carlos H. G. and Moreira, Gladston J. P.},
   title     = {A high-performance evolutionary multiobjective community detection algorithm},
   journal   = {Social Network Analysis and Mining},
   year      = {2025},

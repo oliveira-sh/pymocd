@@ -16,7 +16,7 @@ aliases:
 
 ```bib
 @article{Santos2025,
-  author    = {Guilherme O. Santos and Lucas S. Vieira and Giulio Rossetti and Carlos H. G. Ferreira and Gladston J. P. Moreira},
+  author    = {Santos, Guilherme O. and Vieira, Lucas S. and Rossetti, Giulio and Ferreira, Carlos H. G. and Moreira, Gladston J. P.},
   title     = {A high-performance evolutionary multiobjective community detection algorithm},
   journal   = {Social Network Analysis and Mining},
   year      = {2025},
@@ -28,3 +28,4 @@ aliases:
   url       = {https://doi.org/10.1007/s13278-025-01519-7}
 }
 ```
+
