@@ -66,7 +66,7 @@ If you use `pymocd` or the `HP-MOCD` algorithm in your research, please cite the
 
 ```bibtex
 @article{Santos2025,
-  author    = {Guilherme O. Santos and Lucas S. Vieira and Giulio Rossetti and Carlos H. G. Ferreira and Gladston J. P. Moreira},
+  author={Santos, Guilherme O. and Vieira, Lucas S. and Rossetti, Giulio and Ferreira, Carlos H. G. and Moreira, Gladston J. P.},
   title     = {A high-performance evolutionary multiobjective community detection algorithm},
   journal   = {Social Network Analysis and Mining},
   year      = {2025},
