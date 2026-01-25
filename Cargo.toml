@@ -22,7 +22,7 @@ pyo3 = { version = "0.27.2", features = [
 ] } # Python compatibility
 dashmap = "6.1.0" # For concurrent HashMap
 rand_chacha = "0.9.0" # ChaCha random number generator
-ndarray = "0.17.1"
+ndarray = "0.17.2"
 num_cpus = "1.16.0" # CPU core detection for threading
 
 [package.metadata.maturin]
