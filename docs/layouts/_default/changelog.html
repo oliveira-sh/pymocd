@@ -1,0 +1,410 @@
+{{ define "main" }}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-12 text-center mb-5">
+            <h1 class="fw-bold mb-3">{{ .Title }}</h1>
+            <p class="text-muted lead">{{ .Description }}</p>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div id="changelog-container">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="text-muted mt-3">Loading releases...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.release-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.release-nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border: 2px solid var(--bs-primary);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--bs-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.release-nav-btn:hover:not(:disabled) {
+    background: var(--bs-primary);
+    color: #fff;
+}
+
+.release-nav-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.release-nav-btn i {
+    font-size: 1.5rem;
+}
+
+.release-counter {
+    font-size: 1rem;
+    color: #6c757d;
+    min-width: 100px;
+    text-align: center;
+}
+
+.release-content {
+    padding: 2rem 0;
+}
+
+.release-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.release-version {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.release-version a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.release-version a:hover {
+    color: var(--bs-primary);
+}
+
+.release-badges {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.release-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-weight: 500;
+}
+
+.release-badge.latest {
+    background: #198754;
+    color: #fff;
+}
+
+.release-badge.prerelease {
+    background: #ffc107;
+    color: #000;
+}
+
+.release-date {
+    font-size: 1rem;
+    color: #6c757d;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.release-body {
+    font-size: 1rem;
+    line-height: 1.8;
+    color: #444;
+}
+
+.release-body h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.release-body h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+}
+
+.release-body h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.release-body ul {
+    margin-bottom: 1rem;
+    padding-left: 1.5rem;
+}
+
+.release-body li {
+    margin-bottom: 0.5rem;
+}
+
+.release-body code {
+    background: #f1f3f5;
+    padding: 0.125rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.release-body pre {
+    background: #f8f9fa;
+    padding: 1.25rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 1rem 0;
+}
+
+.release-footer {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.release-link {
+    font-size: 1rem;
+    color: var(--bs-primary);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--bs-primary);
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.release-link:hover {
+    background: var(--bs-primary);
+    color: #fff;
+    text-decoration: none;
+}
+
+.release-link i {
+    font-size: 1.25rem;
+}
+
+.no-releases {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #6c757d;
+}
+
+.no-releases i {
+    font-size: 4rem;
+    opacity: 0.5;
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+    .release-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .release-version {
+        font-size: 1.25rem;
+    }
+
+    .release-nav-btn {
+        width: 40px;
+        height: 40px;
+    }
+
+    .release-footer {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .release-link {
+        justify-content: center;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const GITHUB_REPO = 'oliveira-sh/pymocd';
+    const API_URL = 'https://api.github.com/repos/' + GITHUB_REPO + '/releases';
+
+    var allReleases = [];
+    var currentIndex = 0;
+
+    fetch(API_URL)
+        .then(function(response) {
+            if (!response.ok) {
+                throw new Error('Failed to fetch releases');
+            }
+            return response.json();
+        })
+        .then(function(releases) {
+            allReleases = releases;
+            renderReleasesWithNav();
+        })
+        .catch(function(error) {
+            console.error('Error fetching releases:', error);
+            document.getElementById('changelog-container').innerHTML =
+                '<div class="no-releases">' +
+                    '<i class="material-icons">error_outline</i>' +
+                    '<p>Unable to load releases. Please visit the <a href="https://github.com/' + GITHUB_REPO + '/releases" target="_blank">GitHub releases page</a>.</p>' +
+                '</div>';
+        });
+
+    function renderReleasesWithNav() {
+        var container = document.getElementById('changelog-container');
+
+        if (allReleases.length === 0) {
+            container.innerHTML =
+                '<div class="no-releases">' +
+                    '<i class="material-icons">inbox</i>' +
+                    '<p>No releases found.</p>' +
+                '</div>';
+            return;
+        }
+
+        container.innerHTML =
+            '<div class="release-nav">' +
+                '<button class="release-nav-btn" id="prev-btn" aria-label="Previous release">' +
+                    '<i class="material-icons">chevron_left</i>' +
+                '</button>' +
+                '<span class="release-counter" id="release-counter"></span>' +
+                '<button class="release-nav-btn" id="next-btn" aria-label="Next release">' +
+                    '<i class="material-icons">chevron_right</i>' +
+                '</button>' +
+            '</div>' +
+            '<div id="current-release"></div>';
+
+        var prevBtn = document.getElementById('prev-btn');
+        var nextBtn = document.getElementById('next-btn');
+
+        prevBtn.addEventListener('click', function() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                showRelease(currentIndex);
+            }
+        });
+
+        nextBtn.addEventListener('click', function() {
+            if (currentIndex < allReleases.length - 1) {
+                currentIndex++;
+                showRelease(currentIndex);
+            }
+        });
+
+        showRelease(0);
+    }
+
+    function showRelease(index) {
+        var release = allReleases[index];
+        var isLatest = index === 0 && !release.prerelease;
+        var publishedDate = new Date(release.published_at);
+        var formattedDate = publishedDate.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+        var relativeDate = getRelativeTime(publishedDate);
+
+        document.getElementById('release-counter').textContent = (index + 1) + ' of ' + allReleases.length;
+        document.getElementById('prev-btn').disabled = index === 0;
+        document.getElementById('next-btn').disabled = index === allReleases.length - 1;
+
+        var badgesHtml = '';
+        if (isLatest) badgesHtml += '<span class="release-badge latest">Latest</span>';
+        if (release.prerelease) badgesHtml += '<span class="release-badge prerelease">Pre-release</span>';
+
+        var bodyHtml = release.body ? '<div class="release-body">' + parseMarkdown(release.body) + '</div>' : '<p class="text-muted">No release notes provided.</p>';
+
+        var footerHtml =
+            '<a href="' + release.html_url + '" class="release-link" target="_blank" rel="noopener">' +
+                '<i class="material-icons">open_in_new</i> View on GitHub' +
+            '</a>';
+
+        if (release.zipball_url) {
+            footerHtml += '<a href="' + release.zipball_url + '" class="release-link"><i class="material-icons">download</i> Source (zip)</a>';
+        }
+        if (release.tarball_url) {
+            footerHtml += '<a href="' + release.tarball_url + '" class="release-link"><i class="material-icons">download</i> Source (tar.gz)</a>';
+        }
+
+        document.getElementById('current-release').innerHTML =
+            '<div class="release-content">' +
+                '<div class="release-header">' +
+                    '<div class="release-version">' +
+                        '<i class="material-icons">local_offer</i>' +
+                        '<a href="' + release.html_url + '" target="_blank" rel="noopener">' + (release.name || release.tag_name) + '</a>' +
+                        '<div class="release-badges">' + badgesHtml + '</div>' +
+                    '</div>' +
+                    '<div class="release-date">' +
+                        '<i class="material-icons">schedule</i>' +
+                        '<span title="' + formattedDate + '">' + relativeDate + '</span>' +
+                    '</div>' +
+                '</div>' +
+                bodyHtml +
+                '<div class="release-footer">' + footerHtml + '</div>' +
+            '</div>';
+    }
+
+    function parseMarkdown(text) {
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+            .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+            .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/```[\w]*\n?([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+            .replace(/^\s*[-*]\s+(.*)$/gm, '<li>$1</li>')
+            .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+            .replace(/\n\n/g, '</p><p>')
+            .replace(/\n/g, '<br>');
+    }
+
+    function getRelativeTime(date) {
+        var now = new Date();
+        var diffMs = now - date;
+        var diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        var diffWeeks = Math.floor(diffDays / 7);
+        var diffMonths = Math.floor(diffDays / 30);
+        var diffYears = Math.floor(diffDays / 365);
+
+        if (diffYears > 0) return diffYears + ' year' + (diffYears > 1 ? 's' : '') + ' ago';
+        if (diffMonths > 0) return diffMonths + ' month' + (diffMonths > 1 ? 's' : '') + ' ago';
+        if (diffWeeks > 0) return diffWeeks + ' week' + (diffWeeks > 1 ? 's' : '') + ' ago';
+        if (diffDays > 0) return diffDays + ' day' + (diffDays > 1 ? 's' : '') + ' ago';
+        return 'today';
+    }
+});
+</script>
+{{ end }}
