@@ -8,7 +8,7 @@ python-source = "src"
 [project]
 name = "pymocd"
 requires-python = ">=3.10"
-version = "1.5.0"
+version = "1.5.1"
 authors = [
     { name = "Guilherme O. Santos", email = "guilherme.os1@aluno.ufop.edu.br" },
     { name = "Lucas Salgado Vieira", email = "lucas.sv@aluno.ufop.edu.br" },
