@@ -91,6 +91,12 @@ identifier = "docs/"
 weight = 10
 
 [[menu.primary]]
+name = "Changelog"
+url = "changelog/"
+identifier = "changelog"
+weight = 20
+
+[[menu.primary]]
 name = "Contribute"
 url = "https://github.com/oliveira-sh/pymocd/pulls"
 identifier = "prs"
