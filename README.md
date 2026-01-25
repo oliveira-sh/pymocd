@@ -6,7 +6,7 @@
 [![PyPI Publish](https://github.com/oliveira-sh/pymocd/actions/workflows/release.yml/badge.svg)](https://github.com/oliveira-sh/pymocd/actions/workflows/release.yml)
 ![Rust Compilation](https://img.shields.io/github/actions/workflow/status/oliveira-sh/pymocd/rust.yml)
 ![PyPI - Version](https://img.shields.io/pypi/v/pymocd)
-![PyPI - License](https://img.shields.io/pypi/l/pymocd)
+![PyPI - License](https://img.shields.io/github/license/oliveira-sh/pymocd)
 
 </div>
 
