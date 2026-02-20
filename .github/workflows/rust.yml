@@ -30,10 +30,11 @@ jobs:
         run: pip install maturin
 
       - name: Build with maturin
-        run: maturin develop --release
+        run: python3 -m venv .venv && source .venv/bin/activate && maturin develop --release
 
       - name: Test Python package
         run: |
+          source .venv/bin/activate
           python -c "import pymocd; print('Package import: OK')"
           python -c "import pymocd; print('hello_world():', pymocd.hello_world())"
           python -c "import pymocd; print('Functions available:', len([x for x in dir(pymocd) if not x.startswith('_')]))"
