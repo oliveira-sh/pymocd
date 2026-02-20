@@ -34,6 +34,7 @@ jobs:
 
       - name: Test Python package
         run: |
+          source .venv/bin/activate
           python -c "import pymocd; print('Package import: OK')"
           python -c "import pymocd; print('hello_world():', pymocd.hello_world())"
           python -c "import pymocd; print('Functions available:', len([x for x in dir(pymocd) if not x.startswith('_')]))"
