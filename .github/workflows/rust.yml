@@ -30,7 +30,7 @@ jobs:
         run: pip install maturin
 
       - name: Build with maturin
-        run: maturin develop --release
+        run: python3 -m venv .venv && source .venv/bin/activate && maturin develop --release
 
       - name: Test Python package
         run: |
