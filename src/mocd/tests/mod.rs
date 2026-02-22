@@ -75,7 +75,7 @@ pub mod common {
 
     /// Creates a random graph with specified parameters
     pub fn create_random_graph(num_nodes: usize, edge_probability: f64, seed: u64) -> Graph {
-        use rand::{Rng, SeedableRng};
+        use rand::{RngExt, SeedableRng};
         use rand_chacha::ChaCha8Rng;
         
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
