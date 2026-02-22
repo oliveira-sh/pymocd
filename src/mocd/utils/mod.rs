@@ -172,18 +172,16 @@ impl MemoryEstimator {
 /// Random number generation utilities
 pub mod random {
     use rand::prelude::*;
-    use rand_chacha::ChaCha8Rng;
+    use rand::rngs::StdRng;
 
     /// Creates a seeded random number generator for reproducible results
-    pub fn seeded_rng(seed: u64) -> ChaCha8Rng {
-        ChaCha8Rng::seed_from_u64(seed)
+    pub fn seeded_rng(seed: u64) -> StdRng {
+        StdRng::seed_from_u64(seed)
     }
 
     /// Creates a random number generator from entropy
-    pub fn entropy_rng() -> ChaCha8Rng {
-        use rand::SeedableRng;
-        let mut rng = rand::rng();
-        ChaCha8Rng::from_rng(&mut rng)
+    pub fn entropy_rng() -> StdRng {
+        StdRng::from_rng(&mut rand::rng())
     }
 
     /// Generates a random partition for a graph
