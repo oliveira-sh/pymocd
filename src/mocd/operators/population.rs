@@ -5,7 +5,7 @@
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use crate::graph::{CommunityId, Graph, NodeId, Partition};
-use rand::{Rng, rng};
+use rand::{Rng, RngExt, rng};
 
 fn random_partition(node_ids: &[NodeId], num_communities: usize, rng: &mut impl Rng) -> Partition {
     if node_ids.is_empty() || num_communities == 0 {
