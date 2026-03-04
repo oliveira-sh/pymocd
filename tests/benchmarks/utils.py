@@ -37,7 +37,7 @@ rcParams.update({
     'savefig.pad_inches': 0.1
 })
 
-SAVE_PATH = "tests/output"
+SAVE_PATH = "tests/output/"
 
 # Color palette for algorithms (colorblind-friendly)
 ALGORITHM_COLORS = {
