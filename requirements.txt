@@ -1,0 +1,10 @@
+networkx==3.6.1
+igraph==1.0.0
+maturin==1.12.6
+pandas==3.0.1
+matplotlib==3.10.8
+scikit-learn==1.8.0
+tqdm==4.67.3
+numpy==2.4.2
+python-louvain==0.16
+seaborn==0.13.2
