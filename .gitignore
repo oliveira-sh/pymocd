@@ -6,6 +6,7 @@
 # User-specific files
 web_media
 temp.py
+benchmarks/tests
 *.png
 *.csv
 .ignore
