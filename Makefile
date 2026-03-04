@@ -21,7 +21,6 @@ test: build
 	cargo test --manifest-path=Cargo.toml
 
 benchmark: build
-	$(PYTHON) -m unittest tests.test
 	cd tests/benchmarks && $(CURDIR)/$(PYTHON) evolutionary.py
 	cd tests/benchmarks && $(CURDIR)/$(PYTHON) pareto_front.py
 	cd tests/benchmarks && $(CURDIR)/$(PYTHON) lfr_experiment.py

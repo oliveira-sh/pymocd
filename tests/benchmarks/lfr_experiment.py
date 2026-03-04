@@ -11,9 +11,7 @@ from functools import wraps
 from typing import Callable, Dict, Any, List, Set, Union
 
 import community as community_louvain
-from networkx.algorithms.community import asyn_lpa_communities
-from networkx.algorithms.community import louvain_communities
-from networkx.algorithms.community import girvan_newman
+import igraph as ig
 import pymocd
 
 from utils import (
@@ -80,6 +78,20 @@ def error_handler(func: Callable):
             print(f"Error in {func.__name__}: {e}")
             return []
     return wrapper
+
+@algorithm('Louvain', needs_conversion=False, parallel=True)
+@error_handler
+@seed_handler
+def louvain_algorithm(G):
+    return community_louvain.best_partition(G)
+
+@algorithm('Leiden', needs_conversion=False, parallel=True)
+@error_handler
+@seed_handler
+def leiden_algorithm(G):
+    ig_graph = ig.Graph.from_networkx(G)
+    partition = ig_graph.community_leiden(objective_function='modularity')
+    return {ig_graph.vs[i]['name']: partition.membership[i] for i in range(ig_graph.vcount())}
 
 @algorithm('HPMOCD', needs_conversion=False, parallel=False)
 @error_handler

@@ -11,6 +11,7 @@ temp.py
 .ignore
 *.pdf
 *.out
+tests/output/
 .venv
 *.suo
 *.user
