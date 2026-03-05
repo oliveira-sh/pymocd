@@ -4,6 +4,7 @@
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.h
 
 use crate::graph::Partition;
+use rand::RngExt;
 use rayon::prelude::*;
 use rustc_hash::FxHashSet;
 use std::cmp::Ordering;
