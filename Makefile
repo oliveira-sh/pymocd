@@ -21,9 +21,11 @@ test: build
 	cargo test --manifest-path=Cargo.toml
 
 benchmark: build
-	cd tests/benchmarks && $(CURDIR)/$(PYTHON) evolutionary.py
-	cd tests/benchmarks && $(CURDIR)/$(PYTHON) pareto_front.py
-	cd tests/benchmarks && $(CURDIR)/$(PYTHON) lfr_experiment.py
+	$(eval BENCHMARK_RUN_ID := $(shell date +%Y-%m-%d_%H-%M-%S))
+	cd tests/benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(CURDIR)/$(PYTHON) evolutionary.py
+	cd tests/benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(CURDIR)/$(PYTHON) pareto_front.py
+	cd tests/benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(CURDIR)/$(PYTHON) lfr_experiment.py
+	@echo "Results saved to tests/outputs/$(BENCHMARK_RUN_ID)/"
 
 clean:
 	@cargo clean
