@@ -5,7 +5,7 @@
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use crate::graph::{NodeId, Partition};
-use rand::{Rng, rngs::ThreadRng, seq::IndexedRandom};
+use rand::{RngExt, rngs::ThreadRng, seq::IndexedRandom};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 pub fn two_point_crossover(
