@@ -6,10 +6,10 @@ PIP := $(VENV)/bin/pip
 
 all: build test
 
-$(VENV)/bin/activate: requirements.txt
+$(VENV)/bin/activate: res/requirements.txt
 	python3 -m venv $(VENV)
 	$(PIP) install --upgrade pip
-	$(PIP) install -r requirements.txt
+	$(PIP) install -r res/requirements.txt
 	@touch $(VENV)/bin/activate
 
 dependencies: $(VENV)/bin/activate
