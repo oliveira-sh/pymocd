@@ -12,7 +12,7 @@ benchmarks/tests
 .ignore
 *.pdf
 *.out
-tests/output/
+tests/outputs/
 .venv
 *.suo
 *.user
