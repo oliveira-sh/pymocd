@@ -1,4 +1,4 @@
-.PHONY: all dependencies build test benchmark clean
+.PHONY: all dependencies build test benchmark bump clean
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -26,6 +26,14 @@ benchmark: build
 	cd tests/benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(CURDIR)/$(PYTHON) pareto_front.py
 	cd tests/benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(CURDIR)/$(PYTHON) lfr_experiment.py
 	@echo "Results saved to tests/outputs/$(BENCHMARK_RUN_ID)/"
+
+bump:
+	$(if $(V),,$(error Usage: make bump V=2.0.2))
+	sed -i 's/^version = ".*"/version = "$(V)"/' Cargo.toml pyproject.toml
+	git add Cargo.toml pyproject.toml
+	git commit -m "chore: bump version to $(V)"
+	git tag v$(V)
+	git push origin master --follow-tags
 
 clean:
 	@cargo clean
