@@ -11,6 +11,14 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 import warnings
 
+# Output directory — timestamped so each run is isolated for comparison.
+# BENCHMARK_RUN_ID is set by the Makefile so all scripts in one `make benchmark`
+# share the same folder; falls back to a fresh timestamp for manual runs.
+import os
+from datetime import datetime
+_run_id = os.environ.get('BENCHMARK_RUN_ID') or datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+SAVE_PATH = str(Path(__file__).resolve().parent.parent.parent / "tests" / "outputs" / _run_id) + "/"
+
 # Configure matplotlib for publication-quality plots
 plt.style.use('seaborn-v0_8-whitegrid')
 rcParams.update({
@@ -36,8 +44,6 @@ rcParams.update({
     'savefig.bbox': 'tight',
     'savefig.pad_inches': 0.1
 })
-
-SAVE_PATH = "tests/output/"
 
 # Color palette for algorithms (colorblind-friendly)
 ALGORITHM_COLORS = {
