@@ -113,7 +113,7 @@ class ExperimentRunner:
         alg_name, alg_func, needs_conversion, n_runs, param_name, param_value, fixed_param = args
         metrics = {'modularity': [], 'nmi': [], 'ami': [], 'time': []}
 
-        for run_id in range(n_runs):
+        for run_id in tqdm(range(n_runs), desc=f'{alg_name}', leave=False, disable=n_runs == 1):
             if param_name == 'mu':
                 G, ground_truth = generate_lfr_benchmark(n=fixed_param, mu=param_value, seed=run_id)
             else:
@@ -159,12 +159,21 @@ class ExperimentRunner:
 
     def _run(self, param_name, param_values, fixed_param) -> pd.DataFrame:
         parallel_args, sequential_args = self._build_args(param_name, param_values, fixed_param)
+        total = len(parallel_args) + len(sequential_args)
 
         results = []
-        if parallel_args:
-            with Pool() as pool:
-                results += pool.map(self._run_single, parallel_args)
-        results += [self._run_single(a) for a in sequential_args]
+        with tqdm(total=total, desc='Benchmarking', unit='task') as pbar:
+            if parallel_args:
+                with Pool() as pool:
+                    for result in pool.imap_unordered(self._run_single, parallel_args):
+                        results.append(result)
+                        pbar.set_postfix(alg=result['algorithm'], **{param_name: result[param_name]})
+                        pbar.update()
+            for args in sequential_args:
+                result = self._run_single(args)
+                results.append(result)
+                pbar.set_postfix(alg=result['algorithm'], **{param_name: result[param_name]})
+                pbar.update()
 
         df = pd.DataFrame(results).rename(columns={
             'modularity_mean': 'modularity', 'nmi_mean': 'nmi',
@@ -181,7 +190,7 @@ class ExperimentRunner:
 
     def run_nodes_experiment(self, n_list=None, mu=0.3) -> pd.DataFrame:
         if n_list is None:
-            n_list = np.arange(500, 5500, 500)
+            n_list = np.arange(10_000, 40_000, 10_000)
         return self._run('nodes', n_list, mu)
 
 
