@@ -90,9 +90,11 @@ def louvain_algorithm(G):
 @_safe
 @_with_seed
 def leiden_algorithm(G):
-    ig_graph = ig.Graph.from_networkx(G)
+    nodes = list(G.nodes())
+    idx = {n: i for i, n in enumerate(nodes)}
+    ig_graph = ig.Graph(n=len(nodes), edges=[(idx[u], idx[v]) for u, v in G.edges()])
     partition = ig_graph.community_leiden(objective_function='modularity')
-    return {ig_graph.vs[i]['name']: partition.membership[i] for i in range(ig_graph.vcount())}
+    return {nodes[i]: partition.membership[i] for i in range(ig_graph.vcount())}
 
 @algorithm('HPMOCD', needs_conversion=False, parallel=False)
 @_safe
@@ -130,7 +132,7 @@ class ExperimentRunner:
         result = {'algorithm': alg_name, param_name: param_value}
         for m in metrics:
             result[f'{m}_mean'] = np.mean(metrics[m])
-            result[f'{m}_std'] = np.std(metrics[m], ddof=1)
+            result[f'{m}_std'] = np.std(metrics[m], ddof=min(1, len(metrics[m]) - 1))
 
         # Incremental backup after each run
         try:
