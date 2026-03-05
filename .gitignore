@@ -19,6 +19,7 @@ tests/outputs/
 *.userosscache
 *.sln.docstates
 *.adjlist
+Cargo.lock
 
 # Allowed-specific files
 !res/**/*.png
