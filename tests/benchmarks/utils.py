@@ -104,6 +104,9 @@ def evaluate_communities(G, detected_communities, ground_truth_communities, conv
     else:
         detected_partition = detected_communities
 
+    if not detected_partition:
+        return {'modularity': 0.0, 'nmi': 0.0, 'ami': 0.0}
+
     ground_truth_partition = {}
     for node, comms in ground_truth_communities.items():
         ground_truth_partition[node] = list(comms)[0] if isinstance(comms, frozenset) else comms
