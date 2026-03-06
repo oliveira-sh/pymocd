@@ -10,7 +10,7 @@ import numpy as np
 import time
 from multiprocessing import Pool
 from functools import wraps
-from typing import Callable, Dict, Any, List
+from typing import Callable, Dict, Any
 
 import community as community_louvain
 import igraph as ig
@@ -20,29 +20,18 @@ from utils import (
     generate_lfr_benchmark,
     evaluate_communities,
     plot_results,
-    read_results_from_csv,
     SAVE_PATH
 )
 
-CSV_FILE = os.path.join(SAVE_PATH, 'lfr.csv')
-BACKUP_CSV_FILE = CSV_FILE.replace('.csv', '_bk.csv')
 MIN_MU = 0.1
 MAX_MU = 0.8
 STEP_MU = 0.1
 NUM_RUNS = 1
-JUST_PLOT = False  # Set True to skip experiments and plot existing CSV
-MU_EXPERIMENT = False  # True = vary mu, False = vary n
 
 ALGORITHM_REGISTRY = {}
 
 def algorithm(name: str, needs_conversion: bool = True, parallel: bool = True):
-    """Decorator to register a community detection algorithm.
-
-    Add a new algorithm by decorating a function that takes (G, seed=None)
-    and returns a partition dict {node: community_id}.
-    Set parallel=False for algorithms that use all CPU cores internally
-    (they will run sequentially to avoid CPU oversubscription).
-    """
+    """Decorator to register a community detection algorithm."""
     def decorator(func: Callable):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -75,11 +64,6 @@ def _safe(func: Callable):
             return {}
     return wrapper
 
-
-# ── Algorithm definitions ────────────────────────────────────────────────────
-# To add a new algorithm: apply @algorithm(...), @_safe, @_with_seed in that
-# order and implement (G) → partition dict.
-
 @algorithm('Louvain', needs_conversion=False, parallel=True)
 @_safe
 @_with_seed
@@ -102,15 +86,12 @@ def leiden_algorithm(G):
 def hpmocd_algorithm(G):
     return pymocd.HpMocd(G, debug_level=0).run()
 
-
-# ── Experiment runner ────────────────────────────────────────────────────────
-
 class ExperimentRunner:
     def __init__(self, n_runs: int = NUM_RUNS):
         self.n_runs = n_runs
 
     def _run_single(self, args: tuple) -> Dict[str, Any]:
-        alg_name, alg_func, needs_conversion, n_runs, param_name, param_value, fixed_param = args
+        alg_name, alg_func, needs_conversion, n_runs, param_name, param_value, fixed_param, backup_csv = args
         metrics = {'modularity': [], 'nmi': [], 'ami': [], 'time': []}
 
         for run_id in tqdm(range(n_runs), desc=f'{alg_name}', leave=False, disable=n_runs == 1):
@@ -134,31 +115,30 @@ class ExperimentRunner:
             result[f'{m}_mean'] = np.mean(metrics[m])
             result[f'{m}_std'] = np.std(metrics[m], ddof=min(1, len(metrics[m]) - 1))
 
-        # Incremental backup after each run
         try:
             os.makedirs(SAVE_PATH, exist_ok=True)
             row = pd.DataFrame([result]).rename(columns={
                 'modularity_mean': 'modularity', 'nmi_mean': 'nmi',
                 'ami_mean': 'ami', 'time_mean': 'time'
             })
-            row.to_csv(BACKUP_CSV_FILE, mode='a', header=not os.path.exists(BACKUP_CSV_FILE), index=False)
+            row.to_csv(backup_csv, mode='a', header=not os.path.exists(backup_csv), index=False)
         except Exception as e:
             print(f"[Backup ERROR] {e}")
 
         return result
 
-    def _build_args(self, param_name, param_values, fixed_param) -> tuple:
-        """Split args into parallel and sequential based on algorithm registry."""
+    def _build_args(self, param_name, param_values, fixed_param, backup_csv) -> tuple:
         parallel_args, sequential_args = [], []
         for name, info in ALGORITHM_REGISTRY.items():
             for val in param_values:
                 entry = (name, info['function'], info['needs_conversion'],
-                         self.n_runs, param_name, val, fixed_param)
+                         self.n_runs, param_name, val, fixed_param, backup_csv)
                 (parallel_args if info['parallel'] else sequential_args).append(entry)
         return parallel_args, sequential_args
 
-    def _run(self, param_name, param_values, fixed_param) -> pd.DataFrame:
-        parallel_args, sequential_args = self._build_args(param_name, param_values, fixed_param)
+    def _run(self, param_name, param_values, fixed_param, csv_file, plot_subdir) -> pd.DataFrame:
+        backup_csv = csv_file.replace('.csv', '_bk.csv')
+        parallel_args, sequential_args = self._build_args(param_name, param_values, fixed_param, backup_csv)
         total = len(parallel_args) + len(sequential_args)
 
         results = []
@@ -180,30 +160,26 @@ class ExperimentRunner:
             'ami_mean': 'ami', 'time_mean': 'time',
         })
         os.makedirs(SAVE_PATH, exist_ok=True)
-        df.to_csv(CSV_FILE, index=False)
+        df.to_csv(csv_file, index=False)
+        plot_results(df, save_path=plot_subdir)
         return df
 
     def run_mu_experiment(self, mus=None, n_nodes=250) -> pd.DataFrame:
         if mus is None:
             mus = np.arange(MIN_MU, MAX_MU + STEP_MU, STEP_MU)
-        return self._run('mu', mus, n_nodes)
+        csv_file = os.path.join(SAVE_PATH, 'lfr_mu.csv')
+        plot_subdir = os.path.join(SAVE_PATH, 'mu') + '/'
+        return self._run('mu', mus, n_nodes, csv_file, plot_subdir)
 
     def run_nodes_experiment(self, n_list=None, mu=0.3) -> pd.DataFrame:
         if n_list is None:
-            n_list = np.arange(10_000, 40_000, 10_000)
-        return self._run('nodes', n_list, mu)
-
-
-def main():
-    print(f"Registered algorithms: {list(ALGORITHM_REGISTRY.keys())}")
-
-    if JUST_PLOT:
-        results = read_results_from_csv(CSV_FILE)
-    else:
-        runner = ExperimentRunner(n_runs=NUM_RUNS)
-        results = runner.run_mu_experiment() if MU_EXPERIMENT else runner.run_nodes_experiment()
-
-    plot_results(results)
+            n_list = np.arange(10_000, 30_000, 10_000)
+        csv_file = os.path.join(SAVE_PATH, 'lfr_nodes.csv')
+        plot_subdir = os.path.join(SAVE_PATH, 'nodes') + '/'
+        return self._run('nodes', n_list, mu, csv_file, plot_subdir)
 
 if __name__ == "__main__":
-    main()
+    print(f"Registered algorithms: {list(ALGORITHM_REGISTRY.keys())}")
+    runner = ExperimentRunner(n_runs=NUM_RUNS)
+    runner.run_mu_experiment(n_nodes = 100_000)
+    runner.run_nodes_experiment()

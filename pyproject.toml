@@ -30,6 +30,6 @@ license = {file = "LICENSE"}
 readme = { file = "README.md", content-type = "text/markdown" }
 
 [project.urls]
-Documentation = "https://oliveira-sh.github.io/pymocd/"
+Documentation = "https://oliveira-sh.github.io/dpymocd/"
 Repository = "https://github.com/oliveira-sh/pymocd"
 Issues = "https://github.com/oliveira-sh/pymocd/issues"
