@@ -144,7 +144,8 @@ pub fn calculate_crowding_distance(population: &mut [Individual]) {
 
 #[inline(always)]
 pub fn q(ind: &Individual) -> f64 {
-    1.0 - ind.objectives[0] - ind.objectives[1]
+    let n: f64 = ind.objectives.len() as f64;
+    n - ind.objectives.iter().sum::<f64>()
 }
 #[inline(always)]
 pub fn max_q_selection(population: &[Individual]) -> &Individual {
