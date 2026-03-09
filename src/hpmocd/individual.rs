@@ -14,7 +14,7 @@ use rustc_hash::{FxBuildHasher, FxHashSet as HashSet};
 
 const ENSEMBLE_SIZE: usize = 4;
 
-pub type ObjVec = [f64; 2];
+pub type ObjVec = Vec<f64>;
 
 #[derive(Clone, Debug)]
 pub struct Individual {
@@ -28,7 +28,7 @@ impl Individual {
     pub fn new(partition: Partition) -> Self {
         Individual {
             partition,
-            objectives: [0.0, 0.0],
+            objectives: vec![0.0, 0.0],
             rank: usize::MAX,
             crowding_distance: f64::MAX,
         }
