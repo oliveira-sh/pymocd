@@ -1,11 +1,12 @@
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import pymocd
 import matplotlib.pyplot as plt
 import networkx as nx
-from utils import generate_lfr_benchmark, SAVE_PATH
+from utils import generate_lfr_benchmark, SAVE_PATH  # noqa: E402
 
 pymocd.set_thread_count(2)
 
@@ -19,13 +20,14 @@ for gen in GENERATIONS:
     partition = model.run()
     plt.figure(figsize=(4, 3))
     nx.draw(
-        G, pos,
+        G,
+        pos,
         node_color=[partition[n] for n in G.nodes()],
         with_labels=False,
         node_size=40,
         width=0.001,
-        cmap="tab20"
+        cmap="tab20",
     )
     out_path = os.path.join(SAVE_PATH, f"communities_gen_{gen}.pdf")
-    plt.savefig(out_path, dpi=600, format='pdf', bbox_inches='tight')
+    plt.savefig(out_path, dpi=600, format="pdf", bbox_inches="tight")
     plt.close()
