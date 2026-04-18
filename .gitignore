@@ -21,6 +21,15 @@ tests/outputs/
 *.adjlist
 Cargo.lock
 
+# Agent/dev artifacts
+CLAUDE.md
+output/
+perf.data
+perf.data.old
+flame*.svg
+*.prof
+.claude/
+
 # Allowed-specific files
 !res/**/*.png
 !docs/**/*.png
