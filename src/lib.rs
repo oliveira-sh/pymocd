@@ -10,10 +10,12 @@ mod hpmocd;
 mod macros;
 mod mocd; // deprecated
 mod operators;
+mod ufop;
 mod utils;
 mod xfeats;
 // ================================================================================================
 use hpmocd::HpMocd;
+use ufop::Ufop;
 use xfeats::{fitness, set_thread_count};
 // ================================================================================================
 
@@ -25,5 +27,6 @@ fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(set_thread_count, m)?)?;
     m.add_function(wrap_pyfunction!(fitness, m)?)?;
     m.add_class::<HpMocd>()?;
+    m.add_class::<Ufop>()?;
     Ok(())
 }
