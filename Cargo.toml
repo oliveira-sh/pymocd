@@ -10,7 +10,7 @@ name = "pymocd"
 crate-type = ["cdylib"]
 
 [profile.release]
-debug = false 
+debug = 1
 
 [dependencies]
 rand = "0.10.0"                                                   
