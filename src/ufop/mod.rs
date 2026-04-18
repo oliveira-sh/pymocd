@@ -18,7 +18,7 @@ use crate::utils::normalize_community_ids;
 
 use archive::Archive;
 use dense::{
-    DenseGraph, DensePartition, Solution, crowding_distance, evaluate_mod_cond, lpa_partition,
+    DenseGraph, DensePartition, Solution, crowding_distance, evaluate_q_gamma, lpa_partition,
     q_score,
 };
 use particle::{
@@ -100,7 +100,7 @@ impl Ufop {
     ) -> PyResult<()> {
         if self.py_objectives.is_empty() {
             swarm.par_iter_mut().for_each(|p| {
-                let objs = evaluate_mod_cond(dg, &p.current.partition);
+                let objs = evaluate_q_gamma(dg, &p.current.partition);
                 p.current.objectives.clear();
                 p.current.objectives.extend_from_slice(&objs);
             });
@@ -257,7 +257,7 @@ impl Ufop {
                 let top: Vec<usize> = idxs.into_iter().take(MEMETIC_TOP_N).collect();
                 for i in top {
                     louvain_refine(&mut swarm[i].current.partition, dg_ref, MEMETIC_ITERS);
-                    let objs = evaluate_mod_cond(dg_ref, &swarm[i].current.partition);
+                    let objs = evaluate_q_gamma(dg_ref, &swarm[i].current.partition);
                     swarm[i].current.objectives.clear();
                     swarm[i].current.objectives.extend_from_slice(&objs);
                 }
