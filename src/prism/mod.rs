@@ -1,9 +1,11 @@
-//! ufop/mod.rs
-//! Extended SMPSO (UFOP) for community detection:
-//!   - EM-momentum velocity with adaptive χ constriction
-//!   - NRA + RC dual-objective fitness
-//!   - LPA-seeded initial swarm (topology-aware priors)
-//!   - VNR turbulence to prevent node leakage in high-μ regimes
+//! prism/mod.rs
+//! PRISM — Pareto Resolution-Invariant Swarm for Modularity.
+//! Multi-objective PSO for community detection:
+//!   - Q_γ multi-resolution Pareto front (γ = 0.5, 1.0, 2.0) over
+//!     TOM/Jaccard-reweighted edges
+//!   - EM-momentum velocity with adaptive Clerc-Kennedy constriction
+//!   - LPA-seeded swarm + memetic Louvain refinement on top Pareto particles
+//!   - Non-dominated archive with crowding-distance leader selection
 //!
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos.
@@ -51,7 +53,7 @@ fn constriction(phi: f64) -> f64 {
 }
 
 #[pyclass]
-pub struct Ufop {
+pub struct Prism {
     graph: Graph,
     debug_level: i8,
     swarm_size: usize,
@@ -91,7 +93,7 @@ fn perturb_partition(p: &[CommunityId], frac: f64) -> DensePartition {
     out
 }
 
-impl Ufop {
+impl Prism {
     fn evaluate_swarm(
         &self,
         py: Option<Python<'_>>,
@@ -277,7 +279,7 @@ impl Ufop {
             {
                 debug!(
                     debug,
-                    "UFOP: Gen {} | Archive: {}/{} | χ={:.3}",
+                    "PRISM: Gen {} | Archive: {}/{} | χ={:.3}",
                     generation,
                     archive.len(),
                     self.archive_cap,
@@ -324,9 +326,9 @@ fn adaptive_chi(archive: &Archive, generation: usize, total_gens: usize) -> f64 
     if diverse { base } else { base * 0.9 }
 }
 
-impl Ufop {
+impl Prism {
     pub fn _new(graph: Graph) -> Self {
-        Ufop {
+        Prism {
             graph,
             debug_level: 0,
             swarm_size: 100,
@@ -353,7 +355,7 @@ impl Ufop {
 }
 
 #[pymethods]
-impl Ufop {
+impl Prism {
     #[new]
     #[pyo3(signature = (graph,
         debug_level = 0,
@@ -390,7 +392,7 @@ impl Ufop {
         if debug_level >= 1 {
             debug!(
                 debug,
-                "UFOP Debug: {} | Level: {}",
+                "PRISM Debug: {} | Level: {}",
                 debug_level >= 1,
                 debug_level
             );
@@ -402,7 +404,7 @@ impl Ufop {
             .map(|obj_list| obj_list.iter().map(|item| item.unbind()).collect())
             .unwrap_or_default();
 
-        Ok(Ufop {
+        Ok(Prism {
             graph: rust_graph,
             debug_level,
             swarm_size,
