@@ -9,9 +9,9 @@ from .objectives import make_motif_average_degree, make_motif_conductance
 MIN_MU = 0.1
 MAX_MU = 0.7
 STP_MU = 0.1
-NUM_ND = 10_000
+NUM_ND = 1_000
 
-NUM_RUNS = 1
+NUM_RUNS = 2
 DEBUG = True
 
 
@@ -48,17 +48,42 @@ def hpmocd_algorithm(G):
     return _make_hpmocd(G, "HPMOCD").run()
 
 
-@algorithm("HPMOCD-II", needs_conversion=False, parallel=False)
+def _make_esmpso(
+    G,
+    name,
+    swarm_size=100,
+    num_gens=100,
+    archive_cap=100,
+    mut_rate=0.1,
+    turbulence_frac=0.1,
+):
+    model = pymocd.Ufop(
+        G,
+        debug_level=0,
+        swarm_size=swarm_size,
+        num_gens=num_gens,
+        archive_cap=archive_cap,
+        mut_rate=mut_rate,
+        turbulence_frac=turbulence_frac,
+    )
+    if DEBUG:
+        bar = tqdm(total=model.num_gens, desc=name, leave=False, unit="gen")
+
+        def _on_gen(gen, num_gens, archive_size):
+            bar.set_postfix(archive=archive_size)
+            bar.update(1)
+            if gen == num_gens - 1:
+                bar.close()
+
+        model.set_on_generation(_on_gen)
+    return model
+
+
+@algorithm("UFOP", needs_conversion=False, parallel=False)
 @_safe
 @_with_seed
-def hpmocd_motif_algorithm(G):
-    return _make_hpmocd(
-        G,
-        "HPMOCD-II",
-        [make_motif_average_degree, make_motif_conductance],
-        pop_size=PY_OBJ_POP_SIZE,
-        num_gens=PY_OBJ_NUM_GENS,
-    ).run()
+def esmpso_algorithm(G):
+    return _make_esmpso(G, "UFOP").run()
 
 
 @algorithm("Louvain", needs_conversion=False, parallel=True)
