@@ -1,4 +1,4 @@
-"""Ablation & next-gen experiment harness for UFOP.
+"""Ablation & next-gen experiment harness for PRISM.
 
 Run from tests/benchmarks:
     python exp_bench.py <tag>
@@ -34,9 +34,9 @@ def leiden(G, seed):
     return {nodes[i]: part.membership[i] for i in range(ig_g.vcount())}
 
 
-def ufop(G, seed, **kw):
+def prism(G, seed, **kw):
     polish = kw.pop("polish_iters", 20)
-    model = pymocd.Ufop(G, swarm_size=SWARM, num_gens=GENS, **kw)
+    model = pymocd.Prism(G, swarm_size=SWARM, num_gens=GENS, **kw)
     return model.run(polish_iters=polish)
 
 
@@ -82,11 +82,11 @@ def run(variant_name, algo_fn, tag):
 
 if __name__ == "__main__":
     tag = sys.argv[1] if len(sys.argv) > 1 else "default"
-    variants = sys.argv[2].split(",") if len(sys.argv) > 2 else ["leiden", "ufop"]
+    variants = sys.argv[2].split(",") if len(sys.argv) > 2 else ["leiden", "prism"]
     for v in variants:
         if v == "leiden":
             run("leiden", leiden, tag)
-        elif v == "ufop":
-            run("ufop", ufop, tag)
-        elif v == "ufop_no_polish":
-            run("ufop_no_polish", lambda G, s: ufop(G, s, polish_iters=0), tag)
+        elif v == "prism":
+            run("prism", prism, tag)
+        elif v == "prism_no_polish":
+            run("prism_no_polish", lambda G, s: prism(G, s, polish_iters=0), tag)
