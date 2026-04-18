@@ -251,10 +251,54 @@ pub fn q_score(s: &Solution) -> f64 {
     (s.objectives.len() as f64) - s.objectives.iter().sum::<f64>()
 }
 
+/// Multi-resolution weighted modularity Pareto: [-Q_0.5, -Q_1.0, -Q_2.0].
+/// All minimised. Uses TOM/Jaccard-reweighted graph.
+///
+/// Q_γ = Σ_c [ L_c / m_w  -  γ · (vol_c / 2 m_w)² ]
+///
+/// Three γ axes span community scales simultaneously: γ=0.5 favours coarse
+/// groupings, γ=2.0 penalises large communities so small ground-truth
+/// communities survive on the Pareto front. Structurally defeats the classic
+/// modularity resolution limit and prevents giant-community collapse at
+/// high μ (γ=2.0 dominates any single-community solution).
+pub fn evaluate_q_gamma(dg: &DenseGraph, p: &[CommunityId]) -> [f64; 3] {
+    if dg.n == 0 || dg.total_weight <= 0.0 {
+        return [0.0, 0.0, 0.0];
+    }
+    let m2 = 2.0 * dg.total_weight;
+    let mut intra: FxHashMap<CommunityId, f64> =
+        FxHashMap::with_capacity_and_hasher(64, FxBuildHasher);
+    let mut wdeg: FxHashMap<CommunityId, f64> =
+        FxHashMap::with_capacity_and_hasher(64, FxBuildHasher);
+    for (i, &c) in p.iter().enumerate() {
+        *wdeg.entry(c).or_insert(0.0) += dg.weighted_deg[i];
+    }
+    for (eidx, &(u, v)) in dg.edges.iter().enumerate() {
+        let cu = p[u as usize];
+        let cv = p[v as usize];
+        if cu == cv {
+            *intra.entry(cu).or_insert(0.0) += dg.edge_w[eidx];
+        }
+    }
+    let mut q05 = 0.0;
+    let mut q10 = 0.0;
+    let mut q20 = 0.0;
+    for (c, &vol) in wdeg.iter() {
+        let ec = *intra.get(c).unwrap_or(&0.0);
+        let l = ec / dg.total_weight;
+        let v2 = (vol / m2).powi(2);
+        q05 += l - 0.5 * v2;
+        q10 += l - v2;
+        q20 += l - 2.0 * v2;
+    }
+    [-q05, -q10, -q20]
+}
+
 /// Weighted modularity (-Q) + avg conductance (Q, conductance) pair.
 /// Both minimized (we minimize -Q and avg conductance).
 /// Uses TOM/Jaccard-reweighted graph to survive high-μ regimes where
 /// absolute edge counts become non-informative (inter > intra).
+#[allow(dead_code)]
 pub fn evaluate_mod_cond(dg: &DenseGraph, p: &[CommunityId]) -> [f64; 2] {
     if dg.n == 0 || dg.total_weight <= 0.0 {
         return [0.0, 0.0];
