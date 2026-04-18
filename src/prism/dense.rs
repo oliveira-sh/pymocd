@@ -1,4 +1,4 @@
-//! smpso/dense.rs
+//! prism/dense.rs
 //! SMPSO-local dense graph + solution + objective + crowding-distance.
 //! Bypasses HP-MOCD hash-map-based structures to eliminate lookup overhead
 //! that profiling showed dominated runtime (~56% in objective, ~26% in particle update).
