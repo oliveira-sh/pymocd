@@ -48,7 +48,7 @@ def hpmocd_algorithm(G):
     return _make_hpmocd(G, "HPMOCD").run()
 
 
-def _make_esmpso(
+def _make_prism(
     G,
     name,
     swarm_size=100,
@@ -57,7 +57,7 @@ def _make_esmpso(
     mut_rate=0.1,
     turbulence_frac=0.1,
 ):
-    model = pymocd.Ufop(
+    model = pymocd.Prism(
         G,
         debug_level=0,
         swarm_size=swarm_size,
@@ -79,11 +79,11 @@ def _make_esmpso(
     return model
 
 
-@algorithm("UFOP", needs_conversion=False, parallel=False)
+@algorithm("PRISM", needs_conversion=False, parallel=False)
 @_safe
 @_with_seed
-def esmpso_algorithm(G):
-    return _make_esmpso(G, "UFOP").run()
+def prism_algorithm(G):
+    return _make_prism(G, "PRISM").run()
 
 
 @algorithm("Louvain", needs_conversion=False, parallel=True)
