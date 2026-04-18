@@ -1,9 +1,9 @@
-//! ufop/particle.rs
+//! prism/particle.rs
 //! Extended SMPSO particle: EM-momentum velocity, adaptive χ, VNR mutation.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos.
 
-use crate::ufop::dense::{DenseGraph, Solution};
+use crate::prism::dense::{DenseGraph, Solution};
 use crate::graph::CommunityId;
 use rand::RngExt;
 use rustc_hash::{FxBuildHasher, FxHashMap};
