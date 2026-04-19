@@ -1,15 +1,3 @@
-"""Real-world network benchmark.
-
-Runs the configured algorithm registry (PRISM, Leiden, Louvain) against a
-small zoo of real networks bundled with NetworkX / igraph. Graphs with a
-known reference partition report NMI and AMI against that ground truth;
-graphs without it report modularity + runtime only.
-
-Output lands under ``<SAVE_PATH>/real_nets/``:
-- ``real_nets.csv`` with per-(network, algorithm) means/stds
-- grouped-bar plots per metric (modularity, nmi, ami, time) per theme
-"""
-
 from __future__ import annotations
 
 import os
@@ -43,33 +31,20 @@ from lfr_experiment.registry import ALGORITHM_REGISTRY  # noqa: F811
 N_RUNS = 3
 
 
-def _relabel_int(G: nx.Graph, gt: dict | None = None) -> tuple[nx.Graph, dict | None]:
-    """PRISM requires integer node IDs; normalize any string-labeled graph."""
-    if all(isinstance(n, int) for n in G.nodes()):
-        return G, gt
-    mapping = {old: idx for idx, old in enumerate(sorted(G.nodes(), key=str))}
-    H = nx.relabel_nodes(G, mapping, copy=True)
-    if gt is not None:
-        gt = {mapping[k]: v for k, v in gt.items()}
-    return H, gt
-
-
 def _karate() -> tuple[nx.Graph, dict[int, int]]:
     G = nx.karate_club_graph()
     gt = {n: 0 if G.nodes[n]["club"] == "Mr. Hi" else 1 for n in G.nodes()}
-    return _relabel_int(G, gt)
+    return G, gt
 
 
 def _les_miserables() -> tuple[nx.Graph, None]:
-    G, _ = _relabel_int(nx.Graph(nx.les_miserables_graph()))
-    return G, None
+    return nx.Graph(nx.les_miserables_graph()), None
 
 
 def _florentine() -> tuple[nx.Graph, None]:
     G = nx.florentine_families_graph()
     # Isolate "Pucci" has no edges → drop to keep algorithms happy.
     G = G.subgraph([n for n, d in G.degree() if d > 0]).copy()
-    G, _ = _relabel_int(G)
     return G, None
 
 
@@ -151,7 +126,12 @@ def _bar_plot(
     if metric not in df.columns or df[metric].isna().all():
         return
 
-    networks = sorted(df["network"].unique().tolist(), key=lambda s: s.lower())
+    # Only include networks that have at least one non-NaN value for this
+    # metric — keeps NMI/AMI plots restricted to networks with ground truth.
+    networks_with_data = df.dropna(subset=[metric])["network"].unique().tolist()
+    if not networks_with_data:
+        return
+    networks = sorted(networks_with_data, key=lambda s: s.lower())
     algorithms = _sort_algorithms(df["algorithm"].unique())
     x = np.arange(len(networks), dtype=float)
     n_algos = max(len(algorithms), 1)
