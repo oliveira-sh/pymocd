@@ -7,6 +7,9 @@
 //!   - LPA-seeded swarm + memetic Louvain refinement on top Pareto particles
 //!   - Non-dominated archive with crowding-distance leader selection
 //!
+//! Flat-array hot path: all community-keyed work runs against per-particle
+//! `Scratch` buffers (Vec<T>, size n). No FxHashMap in the inner loops.
+//!
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos.
 
@@ -20,12 +23,10 @@ use crate::utils::normalize_community_ids;
 
 use archive::Archive;
 use dense::{
-    DenseGraph, DensePartition, Solution, crowding_distance, evaluate_q_gamma, lpa_partition,
-    q_score,
+    DenseGraph, DensePartition, Scratch, Solution, crowding_distance, evaluate_q_gamma,
+    lpa_partition, q_score,
 };
-use particle::{
-    Particle, dense_mutate, louvain_refine, maybe_update_pbest, update_particle,
-};
+use particle::{Particle, dense_mutate, louvain_refine, maybe_update_pbest, update_particle};
 
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
@@ -79,8 +80,6 @@ fn random_dense_partition(n: usize) -> DensePartition {
         .collect()
 }
 
-/// Perturb an LPA partition by randomly relabelling `frac` fraction of nodes.
-/// Keeps topology signal while injecting diversity across the swarm.
 fn perturb_partition(p: &[CommunityId], frac: f64) -> DensePartition {
     let mut rng = rand::rng();
     let n = p.len();
@@ -102,9 +101,12 @@ impl Prism {
     ) -> PyResult<()> {
         if self.py_objectives.is_empty() {
             swarm.par_iter_mut().for_each(|p| {
-                let objs = evaluate_q_gamma(dg, &p.current.partition);
-                p.current.objectives.clear();
-                p.current.objectives.extend_from_slice(&objs);
+                let Particle {
+                    current, scratch, ..
+                } = p;
+                let objs = evaluate_q_gamma(dg, &current.partition, scratch);
+                current.objectives.clear();
+                current.objectives.extend_from_slice(&objs);
             });
             return Ok(());
         }
@@ -139,9 +141,6 @@ impl Prism {
         let initial_v = DEFAULT_INITIAL_V.min(self.v_max);
         let n_lpa = ((self.swarm_size as f64) * self.lpa_frac).round() as usize;
         let n_lpa = n_lpa.min(self.swarm_size);
-        // Build a canonical LPA seed once, then perturb for diversity.
-        // Guard against LPA collapse at high μ: if unique-label count is tiny,
-        // fall back to random partitions for this batch.
         let mut lpa_seed = if n_lpa > 0 {
             lpa_partition(dg, self.lpa_iters)
         } else {
@@ -157,7 +156,6 @@ impl Prism {
         }
 
         let mut swarm: Vec<Particle> = Vec::with_capacity(self.swarm_size);
-
         let effective_lpa = if lpa_seed.is_empty() { 0 } else { n_lpa };
         let lpa_batch: Vec<Particle> = (0..effective_lpa)
             .into_par_iter()
@@ -165,7 +163,6 @@ impl Prism {
                 let part = if i == 0 {
                     lpa_seed.clone()
                 } else {
-                    // increasing perturbation so swarm spreads, head stays clean
                     let frac = 0.02 + 0.08 * (i as f64 / (effective_lpa.max(1) as f64));
                     perturb_partition(&lpa_seed, frac)
                 };
@@ -212,9 +209,6 @@ impl Prism {
                 }
             }
 
-            // Constriction Fairness: adapt χ from archive diversity.
-            // High avg CD → exploratory archive, boost χ to exploit; low CD →
-            // collapsed archive, shrink χ to diversify.
             let chi = adaptive_chi(&archive, generation, self.num_gens);
 
             swarm.par_iter_mut().for_each(|p| {
@@ -233,36 +227,52 @@ impl Prism {
             });
 
             let swarm_len = swarm.len();
-            let n_turb = (((swarm_len as f64) * self.turbulence_frac).ceil() as usize)
-                .min(swarm_len);
+            let n_turb =
+                (((swarm_len as f64) * self.turbulence_frac).ceil() as usize).min(swarm_len);
             if n_turb > 0 && self.mut_rate > 0.0 {
+                let rate = self.mut_rate;
                 swarm[..n_turb].par_iter_mut().for_each(|p| {
-                    dense_mutate(&mut p.current.partition, dg_ref, self.mut_rate);
+                    let Particle {
+                        current, scratch, ..
+                    } = p;
+                    dense_mutate(&mut current.partition, dg_ref, rate, scratch);
                 });
             }
 
             self.evaluate_swarm(py, &mut swarm, &dg)?;
 
-            // Memetic Leiden-style local search on top Pareto particles.
-            // Every MEMETIC_EVERY generations, take top-N by q_score, apply
-            // louvain_refine (1 iter) to escape modularity local optima.
+            // Memetic Louvain on top-N by q_score. Runs the top particles in
+            // parallel — each owns its own scratch, so there's no aliasing.
             const MEMETIC_EVERY: usize = 5;
             const MEMETIC_TOP_N: usize = 10;
             const MEMETIC_ITERS: usize = 2;
             if generation > 0 && generation % MEMETIC_EVERY == 0 {
                 let mut idxs: Vec<usize> = (0..swarm.len()).collect();
-                idxs.sort_by(|&a, &b| {
+                idxs.sort_unstable_by(|&a, &b| {
                     q_score(&swarm[b].current)
                         .partial_cmp(&q_score(&swarm[a].current))
                         .unwrap_or(Ordering::Equal)
                 });
-                let top: Vec<usize> = idxs.into_iter().take(MEMETIC_TOP_N).collect();
-                for i in top {
-                    louvain_refine(&mut swarm[i].current.partition, dg_ref, MEMETIC_ITERS);
-                    let objs = evaluate_q_gamma(dg_ref, &swarm[i].current.partition);
-                    swarm[i].current.objectives.clear();
-                    swarm[i].current.objectives.extend_from_slice(&objs);
+                let top_n = MEMETIC_TOP_N.min(idxs.len());
+                let mut is_top: Vec<bool> = vec![false; swarm.len()];
+                for &i in &idxs[..top_n] {
+                    is_top[i] = true;
                 }
+                swarm
+                    .par_iter_mut()
+                    .zip(is_top.into_par_iter())
+                    .for_each(|(p, top)| {
+                        if !top {
+                            return;
+                        }
+                        let Particle {
+                            current, scratch, ..
+                        } = p;
+                        louvain_refine(&mut current.partition, dg_ref, MEMETIC_ITERS, scratch);
+                        let objs = evaluate_q_gamma(dg_ref, &current.partition, scratch);
+                        current.objectives.clear();
+                        current.objectives.extend_from_slice(&objs);
+                    });
             }
 
             for p in swarm.iter_mut() {
@@ -274,9 +284,7 @@ impl Prism {
             }
             archive.prune_if_over(prune_buffer);
 
-            if self.debug_level >= 1
-                && (generation % 10 == 0 || generation == self.num_gens - 1)
-            {
+            if self.debug_level >= 1 && (generation % 10 == 0 || generation == self.num_gens - 1) {
                 debug!(
                     debug,
                     "PRISM: Gen {} | Archive: {}/{} | χ={:.3}",
@@ -306,22 +314,14 @@ impl Prism {
     }
 }
 
-/// Adaptive constriction χ.
-/// Baseline φ = c1+c2 in [3, 4.1]; pick φ dynamically:
-///   early generations → exploration (lower χ)
-///   late generations  → exploitation (higher χ bounded)
-/// Also nudge by archive avg crowding distance.
 fn adaptive_chi(archive: &Archive, generation: usize, total_gens: usize) -> f64 {
     let t = if total_gens <= 1 {
         1.0
     } else {
         generation as f64 / (total_gens as f64 - 1.0)
     };
-    // φ ramps from 4.05 → 4.2 over the run.
     let phi = 4.05 + 0.15 * t;
     let base = constriction(phi);
-
-    // Diversity nudge: if archive small or collapsed, shrink χ by 10%.
     let diverse = archive.len() >= 3;
     if diverse { base } else { base * 0.9 }
 }
@@ -461,7 +461,8 @@ impl Prism {
         let best = self.best_solution(&front);
         let mut refined = best.partition.clone();
         if polish_iters > 0 {
-            louvain_refine(&mut refined, &dg, polish_iters);
+            let mut scratch = Scratch::new(dg.n);
+            louvain_refine(&mut refined, &dg, polish_iters, &mut scratch);
         }
         Ok(normalize_community_ids(
             &self.graph,
