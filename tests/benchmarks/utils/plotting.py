@@ -27,7 +27,13 @@ METRIC_METADATA = {
     "modularity": {"label": "Modularity (Q)", "direction": "higher"},
     "time": {"label": "Runtime (s)", "direction": "lower"},
 }
-MARKER_OVERRIDES = {"HPMOCD": "^", "SMPSO": "D", "Leiden": "o", "Louvain": "s"}
+MARKER_OVERRIDES = {
+    "PRISM": "*",
+    "HPMOCD": "^",
+    "SMPSO": "D",
+    "Leiden": "o",
+    "Louvain": "s",
+}
 MARKER_FALLBACK = ("o", "s", "^", "D", "P", "X", "v", "<", ">", "h")
 SUMMARY_METRICS = ("nmi", "ami", "modularity", "time")
 
@@ -132,6 +138,12 @@ def add_panel_tag(ax: plt.Axes, tag: str, theme: PlotTheme) -> None:
 
 def _x_label(x_var: str) -> str:
     return "Mixing parameter (μ)" if x_var == "mu" else "Number of nodes"
+
+
+def _facet_label(var: str, value: float) -> str:
+    if var == "mu":
+        return f"μ = {float(value):.2f}"
+    return f"n = {_format_nodes_tick(float(value), 0)}"
 
 
 def _format_nodes_tick(value: float, _position: int) -> str:
@@ -479,12 +491,118 @@ def plot_performance_scorecard(
             export_figure(fig, save_path, "performance_scorecard", theme)
 
 
+def plot_metric_facets(
+    df: pd.DataFrame,
+    metric: str,
+    x_var: str,
+    facet_var: str,
+    save_path: str = SAVE_PATH,
+    theme_names: Sequence[str] | None = None,
+) -> None:
+    algorithms = _sort_algorithms(df["algorithm"].unique())
+    facet_values = sorted(df[facet_var].astype(float).unique())
+    x_values = sorted(df[x_var].astype(float).unique())
+    n_facets = len(facet_values)
+    if n_facets == 0:
+        return
+
+    ncols = min(n_facets, 3)
+    nrows = (n_facets + ncols - 1) // ncols
+    fig_w = 4.8 * ncols + 1.0
+    fig_h = 3.6 * nrows + 1.4
+
+    for theme in resolve_themes(theme_names):
+        styles = build_algorithm_styles(algorithms, theme)
+        with theme_context(theme):
+            fig, axes = plt.subplots(
+                nrows,
+                ncols,
+                figsize=(fig_w, fig_h),
+                sharey=True,
+                squeeze=False,
+            )
+            axes_flat = axes.flatten()
+
+            for idx, facet_value in enumerate(facet_values):
+                ax = axes_flat[idx]
+                mask = df[facet_var].astype(float) == facet_value
+                sub = df[mask]
+                _plot_metric_series(
+                    ax,
+                    sub,
+                    metric,
+                    x_var,
+                    styles,
+                    theme,
+                    with_labels=(idx == 0),
+                )
+                style_axis(
+                    ax,
+                    theme=theme,
+                    x_label=_x_label(x_var),
+                    y_label=METRIC_METADATA[metric]["label"] if idx % ncols == 0 else "",
+                    x_var=x_var,
+                    x_values=x_values,
+                    log_scale="y" if metric == "time" else None,
+                )
+                ax.set_title(
+                    _facet_label(facet_var, facet_value),
+                    fontsize=11.5,
+                    color=theme.text,
+                    pad=8,
+                )
+
+            for hidden in range(n_facets, nrows * ncols):
+                axes_flat[hidden].set_visible(False)
+
+            handles, labels = axes_flat[0].get_legend_handles_labels()
+            legend = fig.legend(
+                handles,
+                labels,
+                loc="upper center",
+                bbox_to_anchor=(0.5, 0.02),
+                ncol=min(len(algorithms), 5),
+                columnspacing=1.5,
+                handlelength=2.2,
+            )
+            _legend_frame(legend, theme)
+            fig.subplots_adjust(
+                top=0.92, bottom=0.16, hspace=0.40, wspace=0.18
+            )
+            export_figure(
+                fig,
+                save_path,
+                f"{metric}_by_{x_var}_facet_{facet_var}",
+                theme,
+            )
+
+
+def plot_facet_results(
+    df: pd.DataFrame,
+    save_path: str = SAVE_PATH,
+    theme_names: Sequence[str] | None = None,
+) -> None:
+    for metric in SUMMARY_METRICS:
+        if metric not in df.columns:
+            continue
+        plot_metric_facets(df, metric, "mu", "nodes", save_path, theme_names)
+        plot_metric_facets(df, metric, "nodes", "mu", save_path, theme_names)
+
+
 def plot_results(
     results: Union[Dict, pd.DataFrame],
     save_path: str = SAVE_PATH,
     theme_names: Sequence[str] | None = None,
 ) -> None:
     df = _prepare_results_frame(results)
+
+    has_mu = "mu" in df.columns and df["mu"].nunique() > 1
+    has_nodes = "nodes" in df.columns and df["nodes"].nunique() > 1
+
+    if has_mu and has_nodes:
+        plot_facet_results(df, save_path, theme_names)
+        return
+
     x_var = infer_x_var(df)
 
     for metric in SUMMARY_METRICS:
