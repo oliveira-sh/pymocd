@@ -8,7 +8,7 @@ from typing import Dict, Any, Iterable, Sequence
 
 from utils import generate_lfr_benchmark, evaluate_communities, plot_results, SAVE_PATH
 from .registry import ALGORITHM_REGISTRY
-from .algorithms import MIN_MU, MAX_MU, STP_MU, NUM_RUNS
+from .constants import MIN_MU, MAX_MU, STP_MU, NUM_RUNS
 
 
 class ExperimentRunner:
@@ -106,9 +106,7 @@ class ExperimentRunner:
         plot_subdir: str,
     ) -> pd.DataFrame:
         backup_csv = csv_file.replace(".csv", "_bk.csv")
-        parallel_args, sequential_args = self._build_args(
-            mus, n_nodes_list, backup_csv
-        )
+        parallel_args, sequential_args = self._build_args(mus, n_nodes_list, backup_csv)
         total = len(parallel_args) + len(sequential_args)
 
         results = []
