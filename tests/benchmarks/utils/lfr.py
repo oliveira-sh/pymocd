@@ -51,12 +51,10 @@ def evaluate_communities(
             list(comms)[0] if isinstance(comms, frozenset) else comms
         )
 
-    communities_as_list = []
-    max_community = max(detected_partition.values())
-    for i in range(max_community + 1):
-        community = {node for node, comm in detected_partition.items() if comm == i}
-        if community:
-            communities_as_list.append(community)
+    communities_dict: dict[int, set] = {}
+    for node, comm in detected_partition.items():
+        communities_dict.setdefault(comm, set()).add(node)
+    communities_as_list = list(communities_dict.values())
 
     mod = modularity(G, communities_as_list)
     n_nodes = len(G.nodes())
