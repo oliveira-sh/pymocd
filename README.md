@@ -1,7 +1,7 @@
 <div align="center">
   <img src="res/logo.png" alt="pymocd logo" width="50%">  
   
-  <strong>Python Multi-Objective Community Detection Algorithms</strong>  
+  <strong>Multi-Objective Community Detection Algorithms</strong>  
 
 [![PyPI Publish](https://github.com/oliveira-sh/pymocd/actions/workflows/release.yml/badge.svg)](https://github.com/oliveira-sh/pymocd/actions/workflows/release.yml)
 ![Rust Compilation](https://img.shields.io/github/actions/workflow/status/oliveira-sh/pymocd/rust.yml)
@@ -14,18 +14,11 @@
 
 **Navigate the [Documentation](https://oliveira-sh.github.io/dpymocd/) for detailed guidance and usage instructions.**
 
-## Table of Contents
-- [Understanding Community Detection with HP-MOCD](#understanding-community-detection-with-hp-mocd)
-- [Getting Started](#getting-started)
-  - [Key Features](#key-features)
-- [Contributing](#contributing)
-- [Citation](#citation)
-
 ---
 
-### Understanding Community Detection with HP-MOCD
+### Community Detection
 
-The `HP-MOCD` algorithm, central to `pymocd`, identifies community structures within a graph. It proposes a solution by grouping nodes into distinct communities, as illustrated below:
+The `HP-MOCD` algorithm for example, identifies community structures within a graph. It proposes a solution by grouping nodes into distinct communities, as illustrated below:
 
 | Original Graph                         | Proposed Community Structure             |
 | :------------------------------------: | :--------------------------------------: |
@@ -49,6 +42,7 @@ G = networkx.Graph() # Your graph
 alg = pymocd.HpMocd(G)
 communities = alg.run()
 ```
+
 > [!IMPORTANT]
 > Graphs must be provided in **NetworkX** or **Igraph** compatible format.
 
@@ -62,7 +56,7 @@ We welcome contributions to `pymocd`\! If you have ideas for new features, bug f
 
 ### Citation
 
-If you use `pymocd` or the `HP-MOCD` algorithm in your research, please cite the following paper:
+If you use `pymocd`, `PRISM` or the `HP-MOCD` algorithm in your research, please cite the following paper:
 
 ```bibtex
 @article{Santos2025,
