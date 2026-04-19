@@ -118,10 +118,17 @@ impl Prism {
         let py_objs = &self.py_objectives;
         let partition_dict = PyDict::new(py);
         let graph_ref = py_graph.bind(py);
+        let has_labels = !self.graph.labels.is_empty();
         for p in swarm.iter_mut() {
             partition_dict.clear();
             for (i, &comm) in p.current.partition.iter().enumerate() {
-                partition_dict.set_item(dg.nodes[i], comm)?;
+                let nid = dg.nodes[i];
+                if has_labels {
+                    let label = &self.graph.labels[nid as usize];
+                    partition_dict.set_item(label.bind(py), comm)?;
+                } else {
+                    partition_dict.set_item(nid, comm)?;
+                }
             }
             let mut objectives = Vec::with_capacity(py_objs.len());
             for obj in py_objs.iter() {
@@ -372,7 +379,7 @@ impl Prism {
         objectives = None
     ))]
     pub fn new(
-        _py: Python<'_>,
+        py: Python<'_>,
         graph: &Bound<'_, PyAny>,
         debug_level: i8,
         swarm_size: usize,
@@ -387,7 +394,7 @@ impl Prism {
         vnr_frac: f64,
         objectives: Option<&Bound<'_, PyList>>,
     ) -> PyResult<Self> {
-        let rust_graph = Graph::from_python(graph);
+        let rust_graph = Graph::from_python_any(py, graph)?;
 
         if debug_level >= 1 {
             debug!(
@@ -444,19 +451,19 @@ impl Prism {
     pub fn generate_pareto_front(
         &self,
         py: Python<'_>,
-    ) -> PyResult<Vec<(Partition, Vec<f64>)>> {
+    ) -> PyResult<Vec<(Py<pyo3::types::PyDict>, Vec<f64>)>> {
         let (dg, front) = self.envolve(Some(py))?;
-        Ok(front
-            .into_iter()
-            .map(|sol| {
-                let sparse = dg.sparse_partition(&sol.partition);
-                (normalize_community_ids(&self.graph, sparse), sol.objectives)
-            })
-            .collect())
+        let mut out = Vec::with_capacity(front.len());
+        for sol in front.into_iter() {
+            let sparse = dg.sparse_partition(&sol.partition);
+            let normalized = normalize_community_ids(&self.graph, sparse);
+            out.push((self.graph.py_partition(py, &normalized)?, sol.objectives));
+        }
+        Ok(out)
     }
 
     #[pyo3(signature = (polish_iters = 20))]
-    pub fn run(&self, py: Python<'_>, polish_iters: usize) -> PyResult<Partition> {
+    pub fn run(&self, py: Python<'_>, polish_iters: usize) -> PyResult<Py<pyo3::types::PyDict>> {
         let (dg, front) = self.envolve(Some(py))?;
         let best = self.best_solution(&front);
         let mut refined = best.partition.clone();
@@ -464,10 +471,8 @@ impl Prism {
             let mut scratch = Scratch::new(dg.n);
             louvain_refine(&mut refined, &dg, polish_iters, &mut scratch);
         }
-        Ok(normalize_community_ids(
-            &self.graph,
-            dg.sparse_partition(&refined),
-        ))
+        let normalized = normalize_community_ids(&self.graph, dg.sparse_partition(&refined));
+        self.graph.py_partition(py, &normalized)
     }
 
     #[pyo3(signature = ())]

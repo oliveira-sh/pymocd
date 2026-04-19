@@ -1,10 +1,22 @@
 from tqdm import tqdm
+import networkx as nx
 import pymocd
 import community as community_louvain
 import igraph as ig
 
 from .registry import algorithm, _safe, _with_seed
 from .constants import MIN_MU, MAX_MU, STP_MU, NUM_ND, NUM_RUNS, DEBUG
+
+
+def _ensure_int_nodes(G):
+    """HPMOCD requires non-negative int node ids. Relabel if necessary,
+    returning (H, inverse) where inverse maps new int -> original label."""
+    if all(isinstance(n, int) and n >= 0 for n in G.nodes()):
+        return G, None
+    mapping = {old: i for i, old in enumerate(G.nodes())}
+    H = nx.relabel_nodes(G, mapping, copy=True)
+    inverse = {i: old for old, i in mapping.items()}
+    return H, inverse
 
 
 def _make_hpmocd(G, name, objective_factories=None, pop_size=100, num_gens=100):
@@ -33,7 +45,11 @@ def _make_hpmocd(G, name, objective_factories=None, pop_size=100, num_gens=100):
 @_safe
 @_with_seed
 def hpmocd_algorithm(G):
-    return _make_hpmocd(G, "HPMOCD").run()
+    H, inverse = _ensure_int_nodes(G)
+    part = _make_hpmocd(H, "HPMOCD").run()
+    if inverse is None:
+        return part
+    return {inverse[n]: c for n, c in part.items()}
 
 
 def _make_prism(
