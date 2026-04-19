@@ -21,7 +21,7 @@ SAVE_PATH = (
 
 EXPORT_FORMATS = ("pdf", "png", "svg")
 DEFAULT_THEME_NAMES = ("light", "dark")
-ALGORITHM_ORDER = ("HPMOCD", "SMPSO", "Leiden", "Louvain")
+ALGORITHM_ORDER = ("PRISM", "HPMOCD", "SMPSO", "Leiden", "Louvain")
 
 
 @dataclass(frozen=True)
@@ -68,6 +68,7 @@ LIGHT_THEME = PlotTheme(
     q_cmap="cividis",
     band_alpha=0.14,
     algorithm_colors={
+        "PRISM": "#6f3cc2",
         "HPMOCD": "#1f9d8a",
         "SMPSO": "#d1495b",
         "Leiden": "#2878b5",
@@ -119,6 +120,7 @@ DARK_THEME = PlotTheme(
     q_cmap="cividis",
     band_alpha=0.18,
     algorithm_colors={
+        "PRISM": "#b08cff",
         "HPMOCD": "#46d1ba",
         "SMPSO": "#ff7a88",
         "Leiden": "#74b7ff",
