@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
 
     steps:
       - name: Checkout repository
@@ -28,7 +28,7 @@ jobs:
           fetch-depth: 1
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
@@ -48,7 +48,7 @@ jobs:
 
       - name: Build wheels
         run: |
-          maturin build --release --sdist --strip
+          maturin build --release --sdist --strip --interpreter python
         env:
           # Build universal2 wheels on macOS
           MACOSX_DEPLOYMENT_TARGET: "10.12"
@@ -97,7 +97,7 @@ jobs:
         run: ls -l dist/
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
