@@ -7,19 +7,27 @@ license = "GPL-3.0-or-later"
 
 [lib]
 name = "pymocd"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["extension-module"]
+extension-module = ["pyo3/extension-module"]
 
 [profile.release]
 debug = 1
 
 [dependencies]
-rand = "0.10.0"                                                   
+rand = "0.10.0"
 rayon = "1.11.0"                                                # data parallelism and multi-threading support.
 rustc-hash = { version = "2.1.1", default-features = true }     # a fast hash map implementation.
-pyo3 = { version = "0.28.2", features = ["extension-module"] }  # Python compatibility
+pyo3 = { version = "0.28.2", features = [] }                    # Python compatibility (extension-module feature gated)
 dashmap = "6.1.0"                                               # For concurrent HashMap
 rand_chacha = "0.10.0"                                          # ChaCha random number generator
 ndarray = "0.17.2"
+
+[[example]]
+name = "profile_prism"
+path = "examples/profile_prism.rs"
 
 [package.metadata.maturin]
 name = "pymocd"
