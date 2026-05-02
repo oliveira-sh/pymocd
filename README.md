@@ -21,7 +21,7 @@
 The `HP-MOCD` algorithm for example, identifies community structures within a graph. It proposes a solution by grouping nodes into distinct communities, as illustrated below:
 
 <center>
-![](res/example.gif)
+![Example](res/example.gif)
 </center>
 
 ### Getting Started
