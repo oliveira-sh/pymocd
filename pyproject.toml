@@ -6,14 +6,34 @@ build-backend = "maturin"
 
 [project]
 name = "pymocd"
+version = "4.0.0"
+description = "High-performance multi-objective community detection for complex networks, with a Rust backend."
 requires-python = ">=3.10"
-version = "3.0.0"
 authors = [
     {name = "Guilherme O. Santos", email = "guilherme.os1@aluno.ufop.edu.br"},
     {name = "Lucas Salgado Vieira", email = "lucas.sv@aluno.ufop.edu.br"},
 ]
+keywords = [
+    "community-detection",
+    "graph",
+    "networks",
+    "networkx",
+    "multi-objective-optimization",
+    "nsga-ii",
+    "particle-swarm",
+    "modularity",
+    "rust",
+]
 
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
@@ -21,9 +41,13 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Rust",
-    "Intended Audience :: Developers",
-    "Intended Audience :: Information Technology",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
 ]
 
 license = {file = "LICENSE"}
@@ -33,3 +57,10 @@ readme = { file = "README.md", content-type = "text/markdown" }
 Documentation = "https://oliveira-sh.github.io/dpymocd/"
 Repository = "https://github.com/oliveira-sh/pymocd"
 Issues = "https://github.com/oliveira-sh/pymocd/issues"
+
+[tool.maturin]
+module-name = "pymocd"
+include = [
+    { path = "pymocd.pyi", format = ["sdist", "wheel"] },
+    { path = "py.typed", format = ["sdist", "wheel"] },
+]

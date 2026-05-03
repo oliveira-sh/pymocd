@@ -46,6 +46,10 @@ jobs:
         if: runner.os == 'macOS'
         run: rustup target add aarch64-apple-darwin
 
+      - name: Generate type stubs
+        run: |
+          cargo run --no-default-features --bin stub_gen
+
       - name: Build wheels
         run: |
           maturin build --release --sdist --strip --interpreter python
