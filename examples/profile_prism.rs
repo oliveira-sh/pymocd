@@ -6,7 +6,8 @@
 //! Flamegraph:
 //!   flamegraph -o /tmp/flame_prism.svg -- ./target/release/examples/profile_prism path/to/graph.adj
 
-use pymocd::{Graph, Prism};
+use pymocd::core::graph::Graph;
+use pymocd::core::prism::Prism;
 use std::time::Instant;
 
 fn main() {
