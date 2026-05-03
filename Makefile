@@ -1,4 +1,4 @@
-.PHONY: all dependencies build test benchmark bump clean
+.PHONY: all dependencies stubs build test benchmark bump clean
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -14,8 +14,13 @@ $(VENV)/bin/activate: res/requirements.txt
 
 dependencies: $(VENV)/bin/activate
 
+stubs:
+	cargo run --no-default-features --bin stub_gen
+
 build: dependencies
+	cargo run --no-default-features --bin stub_gen
 	$(VENV)/bin/maturin develop --release
+	@rm -f pymocd.pyi
 
 test: build
 	cargo test --manifest-path=Cargo.toml
@@ -38,5 +43,5 @@ bump:
 
 clean:
 	@cargo clean
-	@rm -rf $(VENV) target build dist *.egg-info
+	@rm -rf $(VENV) target build dist *.egg-info pymocd.pyi
 	@find . -type d -name "__pycache__" -exec rm -rf {} +
