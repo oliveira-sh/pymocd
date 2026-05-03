@@ -1,6 +1,6 @@
 [package]
 name = "pymocd" 
-version = "3.0.0"
+version = "4.0.0"
 edition = "2024"
 authors = ["Guilherme Santos"]
 license = "GPL-3.0-or-later"
@@ -24,6 +24,11 @@ pyo3 = { version = "0.28.2", features = [] }                    # Python compati
 dashmap = "6.1.0"                                               # For concurrent HashMap
 rand_chacha = "0.10.0"                                          # ChaCha random number generator
 ndarray = "0.17.2"
+pyo3-stub-gen = "0.22"
+
+[[bin]]
+name = "stub_gen"
+path = "src/bin/stub_gen.rs"
 
 [[example]]
 name = "profile_prism"
