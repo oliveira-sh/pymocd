@@ -30,9 +30,5 @@ pyo3-stub-gen = "0.22"
 name = "stub_gen"
 path = "src/bin/stub_gen.rs"
 
-[[example]]
-name = "profile_prism"
-path = "examples/profile_prism.rs"
-
 [package.metadata.maturin]
 name = "pymocd"
