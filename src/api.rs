@@ -17,6 +17,7 @@ use crate::core::algorithms::hpmocd::{
 };
 use crate::core::algorithms::ccm;
 use crate::core::algorithms::krm;
+use crate::core::algorithms::mmcomo;
 use crate::core::algorithms::mocd;
 use crate::core::algorithms::moganet;
 use crate::core::graph::{Graph, Partition, get_edges, get_nodes};
@@ -279,4 +280,62 @@ pub fn krm_fn(
 ) -> PyResult<Partition> {
     let g = Graph::from_python(graph);
     Ok(krm::krm(&g, pop_size, num_gens, cross_rate, mut_rate, divisions))
+}
+
+/// MMCoMO macro-micro co-evolutionary detector (Zhang et al.); returns the
+/// max-modularity member of the merged rank-1 front. Isolated nodes get -1.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "mmcomo", signature = (graph, pop_size = mmcomo::DEFAULT_POP_SIZE, num_gens = mmcomo::DEFAULT_NUM_GENS, cross_rate = mmcomo::DEFAULT_CROSS_RATE, mut_rate = mmcomo::DEFAULT_MUT_RATE, gap = mmcomo::DEFAULT_GAP, beta = mmcomo::DEFAULT_BETA))]
+#[allow(clippy::too_many_arguments)]
+pub fn mmcomo_fn(
+    graph: &Bound<'_, PyAny>,
+    pop_size: usize,
+    num_gens: usize,
+    cross_rate: f64,
+    mut_rate: f64,
+    gap: usize,
+    beta: f64,
+) -> PyResult<Py<PyAny>> {
+    let py = graph.py();
+    let nodes = get_nodes(graph)?;
+    let edges = get_edges(graph)?;
+    let part = mmcomo::mmcomo(&nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, beta);
+    let d = PyDict::new(py);
+    for (node, comm) in part {
+        d.set_item(node, comm)?;
+    }
+    Ok(d.into_any().unbind())
+}
+
+/// MMCoMO's merged rank-1 front, the candidate set `mmcomo` selects from
+/// (exposed for the paper's Table IV best-NMI rule). Isolated nodes get -1.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "mmcomo_fronts", signature = (graph, pop_size = mmcomo::DEFAULT_POP_SIZE, num_gens = mmcomo::DEFAULT_NUM_GENS, cross_rate = mmcomo::DEFAULT_CROSS_RATE, mut_rate = mmcomo::DEFAULT_MUT_RATE, gap = mmcomo::DEFAULT_GAP, beta = mmcomo::DEFAULT_BETA))]
+#[allow(clippy::too_many_arguments)]
+pub fn mmcomo_fronts_fn(
+    graph: &Bound<'_, PyAny>,
+    pop_size: usize,
+    num_gens: usize,
+    cross_rate: f64,
+    mut_rate: f64,
+    gap: usize,
+    beta: f64,
+) -> PyResult<Py<PyAny>> {
+    use pyo3::types::PyList;
+    let py = graph.py();
+    let nodes = get_nodes(graph)?;
+    let edges = get_edges(graph)?;
+    let fronts =
+        mmcomo::mmcomo_fronts(&nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, beta);
+    let out = PyList::empty(py);
+    for part in fronts {
+        let d = PyDict::new(py);
+        for (node, comm) in part {
+            d.set_item(node, comm)?;
+        }
+        out.append(d)?;
+    }
+    Ok(out.into_any().unbind())
 }
