@@ -314,9 +314,16 @@ pub fn mmcomo_fn(
     mut_rate: f64,
     gap: usize,
     beta: f64,
-) -> PyResult<Partition> {
-    let g = Graph::from_python(graph);
-    Ok(mmcomo::mmcomo(&g, pop_size, num_gens, cross_rate, mut_rate, gap, beta))
+) -> PyResult<Py<PyAny>> {
+    let py = graph.py();
+    let nodes = get_nodes(graph)?;
+    let edges = get_edges(graph)?;
+    let part = mmcomo::mmcomo(&nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, beta);
+    let d = PyDict::new(py);
+    for (node, comm) in part {
+        d.set_item(node, comm)?;
+    }
+    Ok(d.into_any().unbind())
 }
 
 /// Return MMCoMO's full merged rank-1 Pareto front (Algorithm 1, Phase 3) — the
@@ -345,12 +352,14 @@ pub fn mmcomo_fronts_fn(
 ) -> PyResult<Py<PyAny>> {
     use pyo3::types::PyList;
     let py = graph.py();
-    let g = Graph::from_python(graph);
-    let fronts = mmcomo::mmcomo_fronts(&g, pop_size, num_gens, cross_rate, mut_rate, gap, beta);
+    let nodes = get_nodes(graph)?;
+    let edges = get_edges(graph)?;
+    let fronts =
+        mmcomo::mmcomo_fronts(&nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, beta);
     let out = PyList::empty(py);
     for part in fronts {
         let d = PyDict::new(py);
-        for (&node, &comm) in part.iter() {
+        for (node, comm) in part {
             d.set_item(node, comm)?;
         }
         out.append(d)?;
