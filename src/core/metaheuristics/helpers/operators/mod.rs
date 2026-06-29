@@ -4,25 +4,22 @@
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use crate::core::graph::{Graph, Partition};
-use metrics::Metrics;
+use crate::core::metaheuristics::helpers::objectives::decomposed_modularity::calculate_objectives;
+use crate::core::metaheuristics::helpers::objectives::metrics::Metrics;
 use rand::rngs::ThreadRng;
 use rustc_hash::FxBuildHasher;
 use std::collections::HashMap;
 
-pub mod metrics;
-
 mod crossover;
+mod generator;
 mod mutation;
-mod objective;
-mod population;
 
-/// Represents the convergence criteria and state for the genetic algorithm
 #[derive(Debug)]
 pub struct ConvergenceCriteria {
-    current_best_fitness: f64,       // Current best fitness value found
-    generations_unchanged: usize,    // Number of generations without improvement
-    max_stagnant_generations: usize, // Maximum allowed generations without improvement
-    tolerance: f64,                  // Numerical tolerance for fitness comparison
+    current_best_fitness: f64,
+    generations_unchanged: usize,
+    max_stagnant_generations: usize,
+    tolerance: f64,
 }
 
 impl Default for ConvergenceCriteria {
@@ -37,14 +34,11 @@ impl Default for ConvergenceCriteria {
 }
 
 impl ConvergenceCriteria {
-    /// Checks if the algorithm has converged based on the latest fitness value
-    /// Returns true if convergence criteria are met, false otherwise
+    /// Returns true once fitness has stagnated for `max_stagnant_generations`.
     pub fn has_converged(&mut self, new_fitness: f64) -> bool {
-        // Check if there's a significant improvement
         let has_improved = (new_fitness - self.current_best_fitness).abs() > self.tolerance;
 
         if has_improved {
-            // Reset counter if we found a better solution
             self.current_best_fitness = new_fitness;
             self.generations_unchanged = 0;
             return false;
@@ -80,17 +74,17 @@ pub fn get_fitness(
     partition: &Partition,
     degrees: &HashMap<i32, usize, FxBuildHasher>,
     parallel: bool,
-) -> metrics::Metrics {
-    objective::calculate_objectives(graph, partition, degrees, parallel)
+) -> Metrics {
+    calculate_objectives(graph, partition, degrees, parallel)
 }
 
 pub fn generate_population(graph: &Graph, population_size: usize) -> Vec<Partition> {
-    population::generate_initial_population(graph, population_size)
+    generator::generate_initial_population(graph, population_size)
 }
 
 pub fn get_modularity_from_partition(partition: &Partition, graph: &Graph) -> f64 {
     let metrics: Metrics =
-        objective::calculate_objectives(graph, partition, &graph.precompute_degrees(), false);
+        calculate_objectives(graph, partition, graph.precompute_degrees(), false);
 
     1.0 - metrics.inter - metrics.intra
 }
