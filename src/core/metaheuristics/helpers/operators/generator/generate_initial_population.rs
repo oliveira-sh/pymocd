@@ -1,0 +1,28 @@
+//! Random initial population for the label-map encoding (each node a random
+//! community in `[0, n)`).
+//! This Source Code Form is subject to the terms of The GNU General Public License v3.0
+//! Copyright 2024 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+
+use crate::core::graph::{CommunityId, Graph, NodeId, Partition};
+use rand::{Rng, RngExt, rng};
+
+fn random_partition(node_ids: &[NodeId], num_communities: usize, rng: &mut impl Rng) -> Partition {
+    node_ids
+        .iter()
+        .map(|&node_id| {
+            let community = rng.random_range(0..num_communities) as CommunityId;
+            (node_id, community)
+        })
+        .collect()
+}
+
+pub fn generate_initial_population(graph: &Graph, population_size: usize) -> Vec<Partition> {
+    let mut rng = rng();
+
+    let node_ids: Vec<NodeId> = graph.nodes.iter().copied().collect();
+    let num_communities = node_ids.len();
+    (0..population_size)
+        .map(|_| random_partition(&node_ids, num_communities, &mut rng))
+        .collect()
+}

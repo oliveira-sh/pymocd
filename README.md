@@ -48,6 +48,33 @@ communities = alg.run()
 
 Refer to the official **[Documentation](https://oliveira-sh.github.io/dpymocd/)** for detailed instructions and more usage examples.
 
+### Implemented multi-objective community detection algorithms
+
+All detectors below return a single crisp partition (`dict[node, community]`, isolated nodes → `-1`). The classical MOCD baselines (MOGA-Net, Shi-MOCD) are re-implemented on a shared evolutionary backbone for fair comparison, since the original authors released no code.
+
+| Algorithm | Python API | Framework | Objectives | Single-partition selection | Reference | Year |
+|---|---|---|---|---|---|---|
+| **Ariadne** *(this work)* | `ariadne`, `ariadne_fronts` | NSGA-II — auto-γ islands + elite-ring migration | bi-objective CPM (intra / inter density) | label-free SBM / MDL | this repository (`res/article`) | 2026 |
+| **HP-MOCD** | `hpmocd`, `HpMocd` | parallel NSGA-II, topology-aware operators | decomposed modularity (intra / inter) | max modularity *Q* | [Santos et al., *Soc. Netw. Anal. Min.* **15**:110](https://doi.org/10.1007/s13278-025-01519-7) ([arXiv](https://arxiv.org/abs/2506.01752)) | 2025 |
+| **Shi-MOCD** | `mocd_q`, `mocd_d` | PESA-II, locus-based encoding | decomposed modularity (intra / inter) | **MOCD-Q** (max *Q*, Eq. 3.8) · **MOCD-D** (max-min distance to degree-preserving control fronts, Eq. 3.9–3.11) | [Shi et al., *Appl. Soft Comput.* **12**(2):850–859](https://doi.org/10.1016/j.asoc.2011.10.005) | 2012 |
+| **MOGA-Net** | `moga_net` | NSGA-II, locus-based encoding | community score + community fitness (both maximized) | max modularity *Q* | [Pizzuti, *ICTAI 2009*, 379–386](https://doi.org/10.1109/ICTAI.2009.58) ([IEEE TEC ext.](https://doi.org/10.1109/TEVC.2011.2161090)) | 2009 |
+| **NSGA-III-CCM** | `ccm` | NSGA-III, locus-based encoding | community score + community fitness + modularity (3-objective) | max modularity *Q* | [Shaik, Ravi & Deb, *SN Comput. Sci.* **2**:13](https://doi.org/10.1007/s42979-020-00382-x) | 2021 |
+| **NSGA-III-KRM** | `krm` | NSGA-III, locus-based encoding | kernel *k*-means + ratio cut + modularity (3-objective) | max modularity *Q* | [Shaik, Ravi & Deb, *SN Comput. Sci.* **2**:13](https://doi.org/10.1007/s42979-020-00382-x) | 2021 |
+
+```python
+import pymocd
+part_q = pymocd.mocd_q(G)   # Shi-MOCD, max-modularity selection.
+part_d = pymocd.mocd_d(G)   # Shi-MOCD, max-min-distance selection.
+part_m = pymocd.moga_net(G) # Pizzuti, MOGA-Net.
+part_c = pymocd.ccm(G)      # Shaik et al., NSGA-III-CCM.
+part_k = pymocd.krm(G)      # Shaik et al., NSGA-III-KRM.
+part_h = pymocd.hpmocd(G)   # Santos, HP-MOCD.
+part_a = pymocd.ariadne(G)  # Santos, Ariadne.
+
+# Every part_ Returns the selected partition:
+# dict[node, community]. Isolated nodes get -1.
+```
+
 ### Contributing
 
 We welcome contributions to `pymocd`\! If you have ideas for new features, bug fixes, or other improvements, please feel free to open an issue or submit a pull request. This project is licensed under the **GPL-3.0 or later**.
@@ -56,7 +83,7 @@ We welcome contributions to `pymocd`\! If you have ideas for new features, bug f
 
 ### Citation
 
-If you use `pymocd`, `PRISM` or the `HP-MOCD` algorithm in your research, please cite the following paper:
+If you use any algorithm in your research, please cite the following paper:
 
 ```bibtex
 @article{Santos2025,
