@@ -14,7 +14,7 @@
 evolutionary community detection in complex networks. The evolutionary core is
 written in Rust and exposed through [PyO3](https://pyo3.rs), giving it a large
 speed advantage over pure-Python implementations while staying a drop-in for
-the **NetworkX** / **igraph** ecosystem — making it well-suited to large-scale
+the **NetworkX** / **igraph** ecosystem, making it well-suited to large-scale
 graphs.
 
 **Read the [Documentation](https://oliveira-sh.github.io/dpymocd/) for detailed
@@ -44,26 +44,26 @@ Every detector returns a single crisp partition as `dict[node, community]`.
 
 ### Algorithms
 
-`pymocd` ships seven detectors. **Ariadne** and **HP-MOCD** are the library's
-own contributions; the remaining four are faithful re-implementations of
-published baselines on a shared NSGA-II / NSGA-III backbone (the original
-authors released no code).
+`pymocd` ships eight detectors. **Ariadne** and **HP-MOCD** are the library's
+own contributions; the remaining five are faithful re-implementations of
+published baselines (the original authors released no code).
 
-| API | Algorithm | Objectives — engine | Solution selection | Params |
+| API | Algorithm | Objectives & engine | Solution selection | Year |
 |---|---|---|---|---|
-| `ariadne` | **Ariadne** — Santos, 2026 *(in preparation)* | bi-objective CPM — NSGA-II, per-graph auto-γ islands | label-free **SBM/MDL** description length | none |
-| `hpmocd` | **HP-MOCD** — [Santos et al., 2025](https://doi.org/10.1007/s13278-025-01519-7) | decomposed modularity — parallel NSGA-II | max modularity *Q* | none |
-| `mocd_q` | **Shi-MOCD** — [Shi et al., 2012](https://doi.org/10.1016/j.asoc.2011.10.005) | decomposed modularity — PESA-II | max *Q* | optional |
-| `mocd_d` | **Shi-MOCD** — [Shi et al., 2012](https://doi.org/10.1016/j.asoc.2011.10.005) | decomposed modularity — PESA-II | max–min distance to random nets | optional |
-| `moga_net` | **MOGA-Net** — [Pizzuti, 2009](https://doi.org/10.1109/ICTAI.2009.58) | community score + fitness — NSGA-II | max *Q* | optional |
-| `ccm` | **CCM** — [Shaik et al., 2021](https://doi.org/10.1007/s42979-020-00382-x) | score + fitness + modularity — NSGA-III | max *Q* | optional |
-| `krm` | **KRM** — [Shaik et al., 2021](https://doi.org/10.1007/s42979-020-00382-x) | kernel *k*-means + ratio cut + modularity — NSGA-III | max *Q* | optional |
+| `ariadne` | **Ariadne** (Santos, in prep.) | bi-objective CPM, NSGA-II with per-graph auto-γ islands | label-free **SBM/MDL** description length | 2026 |
+| `hpmocd` | **HP-MOCD** ([Santos et al.](https://doi.org/10.1007/s13278-025-01519-7)) | decomposed modularity, parallel NSGA-II | max modularity *Q* | 2025 |
+| `mmcomo` | **MMCoMO** ([Zhang et al.](https://ieeexplore.ieee.org/document/10188453)) | kernel *k*-means + ratio cut, macro/micro co-evolutionary NSGA-II | max *Q* (front via `mmcomo_fronts`) | 2023 |
+| `ccm` | **CCM** ([Shaik et al.](https://doi.org/10.1007/s42979-020-00382-x)) | score + fitness + modularity, NSGA-III | max *Q* | 2021 |
+| `krm` | **KRM** ([Shaik et al.](https://doi.org/10.1007/s42979-020-00382-x)) | kernel *k*-means + ratio cut + modularity, NSGA-III | max *Q* | 2021 |
+| `mocd_q` | **Shi-MOCD** ([Shi et al.](https://doi.org/10.1016/j.asoc.2011.10.005)) | decomposed modularity, PESA-II | max *Q* | 2012 |
+| `mocd_d` | **Shi-MOCD** ([Shi et al.](https://doi.org/10.1016/j.asoc.2011.10.005)) | decomposed modularity, PESA-II | max-min distance to random nets | 2012 |
+| `moga_net` | **MOGA-Net** ([Pizzuti](https://doi.org/10.1109/ICTAI.2009.58)) | community score + fitness, NSGA-II | max *Q* | 2009 |
 
 **Ariadne** is the recommended crisp detector: parameter-free and
 self-terminating. It probes graph density to bracket five resolution values
 (γ), evolves one NSGA-II island per γ, pools the rank-1 fronts, and returns the
 single partition of minimum [microcanonical SBM](https://doi.org/10.1103/PhysRevX.4.011047)
-description length — a label-free model-selection step that recovers the
+description length, a label-free model-selection step that recovers the
 front's best partition without ground truth.
 
 ### Usage
@@ -72,23 +72,25 @@ front's best partition without ground truth.
 import pymocd
 
 # Parameter-free detectors
-part = pymocd.ariadne(G)          # Ariadne  — auto-γ + SBM/MDL selection
+part = pymocd.ariadne(G)          # Ariadne, auto-γ + SBM/MDL selection
 part = pymocd.hpmocd(G)           # HP-MOCD
 
 # Baselines (sensible defaults; pop_size / num_gens / rates are tunable kwargs)
 part = pymocd.mocd_q(G)           # Shi-MOCD, max-modularity selection
-part = pymocd.mocd_d(G)           # Shi-MOCD, max–min-distance selection
+part = pymocd.mocd_d(G)           # Shi-MOCD, max-min-distance selection
 part = pymocd.moga_net(G)         # MOGA-Net (Pizzuti)
 part = pymocd.ccm(G)              # NSGA-III CCM (Shaik et al.)
 part = pymocd.krm(G)              # NSGA-III KRM (Shaik et al.)
+part = pymocd.mmcomo(G)          # MMCoMO (Zhang et al.), macro/micro co-evolution
 
 # All return dict[node, community]; isolated nodes -> -1
 ```
 
-The frontier Ariadne selects *from* is exposed for inspection:
+The frontier of some algorithms are exposed for inspection:
 
 ```python
 fronts = pymocd.ariadne_fronts(G)   # list[dict[node, community]]
+fronts = pymocd.mmcomo_fronts(G)    # list[dict[node, community]]
 ```
 
 HP-MOCD is also available as a class when you want the full Pareto front or
@@ -109,7 +111,7 @@ pymocd.set_thread_count(8)          # set Rayon thread pool (first call wins)
 
 ### Contributing
 
-Contributions are welcome — open an issue or a pull request for features, bug
+Contributions are welcome, open an issue or a pull request for features, bug
 fixes, or improvements. This project is licensed under **GPL-3.0 or later**.
 
 ---
