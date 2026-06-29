@@ -5,5 +5,6 @@ pub mod ariadne;
 pub mod ccm;
 pub mod hpmocd;
 pub mod krm;
+pub mod mmcomo;
 pub mod mocd;
 pub mod moganet;

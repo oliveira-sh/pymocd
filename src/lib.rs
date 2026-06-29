@@ -7,7 +7,8 @@ use pyo3::prelude::*;
 mod api;
 pub mod core;
 use api::{
-    ariadne_fn, ariadne_fronts_fn, ccm_fn, hpmocd_fn, krm_fn, moga_net_fn, mocd_d_fn, mocd_q_fn,
+    ariadne_fn, ariadne_fronts_fn,
+    ccm_fn, hpmocd_fn, krm_fn, mmcomo_fn, mmcomo_fronts_fn, moga_net_fn, mocd_d_fn, mocd_q_fn,
 };
 use core::algorithms::hpmocd::HpMocd;
 use core::algorithms::mocd::Mocd;
@@ -28,6 +29,8 @@ fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(moga_net_fn, m)?)?;
     m.add_function(wrap_pyfunction!(ccm_fn, m)?)?;
     m.add_function(wrap_pyfunction!(krm_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(mmcomo_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(mmcomo_fronts_fn, m)?)?;
     m.add_class::<HpMocd>()?;
     m.add_class::<Mocd>()?;
     Ok(())
