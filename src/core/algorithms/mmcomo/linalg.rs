@@ -1,56 +1,32 @@
-//! linalg — self-contained diffusion-kernel similarity matrix for MMCoMO.
+//! linalg — diffusion-kernel similarity matrix SM for MMCoMO.
 //!
-//! Paper grounding (mmcomo_final.pdf, p.4): "the initial similarity matrix
-//! (denoted by SM) ... size n x n, where each element SM_{i,j} is the
-//! diffusion kernel similarity [68] between nodes v_i and v_j."
-//!
-//! [68] = Kondor-Lafferty diffusion kernel:
-//!     SM = exp(beta * H),   H = A - D
-//! where H is the negative graph Laplacian: H_{ii} = -deg(v_i),
-//! H_{ij} = 1 if i~j else 0. SM is symmetric and entrywise positive
-//! (matrix exponential of a real symmetric matrix), NOT row-normalised
-//! (normalisation happens only later at the Eq.4 membership level).
-//!
-//! beta is NEVER specified in the paper (absent from Table II and
-//! Section IV-A); the caller supplies it.
-//!
-//! The matrix exponential is computed self-contained (no ndarray/nalgebra)
-//! via a symmetric Jacobi eigendecomposition:  H = Q * diag(lambda) * Q^T,
-//! hence  exp(beta*H) = Q * diag(exp(beta*lambda)) * Q^T.
-//! This is exact for symmetric H and numerically stable (no overflow from
-//! repeated squaring of large negative-Laplacian entries).
+//! Kondor-Lafferty diffusion kernel [68]: SM = exp(beta * H), H = A - D.
+//! Computed via symmetric Jacobi eigendecomposition (self-contained, no deps).
+//! beta is NEVER specified in the paper; the caller supplies it.
 
 use super::*;
 
 /// Diffusion-kernel similarity matrix SM = exp(beta * (A - D)).
-///
-/// Returns an n x n `Sm` (`Vec<Vec<f64>>`), guaranteed symmetric with
-/// strictly positive diagonal.
 pub fn diffusion_kernel(g: &Graph, beta: f64) -> Sm {
     let n = g.n;
     if n == 0 {
         return Vec::new();
     }
 
-    // Build H = A - D  (negative graph Laplacian).
-    // H[i][i] = -deg(i); H[i][j] = 1.0 for each edge i~j.
-    // We derive degree directly from the adjacency list so H is consistent
-    // with `adj` regardless of how `g.deg` was populated.
+    // H = A - D (negative graph Laplacian). Degree derived from adj so H stays
+    // consistent with `adj` regardless of how `g.deg` was populated.
     let mut h = vec![vec![0.0f64; n]; n];
     for i in 0..n {
         let mut d = 0.0f64;
         for &j in &g.adj[i] {
-            // Off-diagonal adjacency entry. Use += to tolerate multi-edges /
-            // duplicate listings (rare, but keeps A well-defined).
+            // += to tolerate multi-edges / duplicate listings.
             h[i][j] += 1.0;
             d += 1.0;
         }
         h[i][i] -= d;
     }
 
-    // Symmetrise defensively: A should be symmetric, but undirected adjacency
-    // lists can occasionally carry asymmetric duplicates. Jacobi requires an
-    // exactly symmetric input.
+    // Symmetrise defensively: Jacobi requires an exactly symmetric input.
     for i in 0..n {
         for j in (i + 1)..n {
             let s = 0.5 * (h[i][j] + h[j][i]);
@@ -59,14 +35,11 @@ pub fn diffusion_kernel(g: &Graph, beta: f64) -> Sm {
         }
     }
 
-    // Eigendecompose H = Q diag(eig) Q^T.
     let (eig, q) = jacobi_eigen(&h);
 
     // exp(beta*H) = Q diag(exp(beta*lambda)) Q^T.
     let scaled: Vec<f64> = eig.iter().map(|&lam| (beta * lam).exp()).collect();
 
-    // SM[i][j] = sum_k Q[i][k] * scaled[k] * Q[j][k].
-    // Compute QS = Q * diag(scaled) first, then SM = QS * Q^T.
     let mut qs = vec![vec![0.0f64; n]; n];
     for i in 0..n {
         for k in 0..n {
@@ -92,7 +65,6 @@ pub fn diffusion_kernel(g: &Graph, beta: f64) -> Sm {
 }
 
 /// Dense n x n matrix multiply C = A * B (row-major `Vec<Vec<f64>>`).
-/// Kept self-contained for callers that need a plain matmul over `Sm`.
 #[allow(dead_code)]
 pub fn matmul(a: &[Vec<f64>], b: &[Vec<f64>]) -> Vec<Vec<f64>> {
     let n = a.len();
@@ -118,17 +90,12 @@ pub fn matmul(a: &[Vec<f64>], b: &[Vec<f64>]) -> Vec<Vec<f64>> {
     c
 }
 
-/// Symmetric eigendecomposition via the cyclic Jacobi rotation method.
+/// Symmetric eigendecomposition via cyclic Jacobi rotations.
 ///
-/// Input: a symmetric n x n matrix `a` (row-major). Output: `(eigenvalues,
-/// eigenvectors)` where `eigenvectors[i][k]` is the i-th component of the
-/// k-th eigenvector (columns are eigenvectors), so that
-/// `A = V * diag(eig) * V^T`.
-///
-/// Self-contained, pure std. Converges quadratically for symmetric matrices.
+/// `a` symmetric n x n (row-major) -> `(eigenvalues, eigenvectors)` with
+/// columns of V the eigenvectors, so `A = V * diag(eig) * V^T`.
 fn jacobi_eigen(a: &[Vec<f64>]) -> (Vec<f64>, Vec<Vec<f64>>) {
     let n = a.len();
-    // Working copy that the rotations diagonalise.
     let mut m = a.to_vec();
     // Accumulated rotations -> eigenvectors (start as identity).
     let mut v = vec![vec![0.0f64; n]; n];
@@ -139,8 +106,6 @@ fn jacobi_eigen(a: &[Vec<f64>]) -> (Vec<f64>, Vec<Vec<f64>>) {
         return (vec![m[0][0]], v);
     }
 
-    // Cyclic Jacobi sweeps. 100 sweeps is far beyond what symmetric matrices
-    // need (typically < 10); we also early-exit on convergence.
     let max_sweeps = 100;
     for _ in 0..max_sweeps {
         // Sum of squares of off-diagonal entries (upper triangle).
@@ -162,9 +127,7 @@ fn jacobi_eigen(a: &[Vec<f64>]) -> (Vec<f64>, Vec<Vec<f64>>) {
                 }
                 let app = m[p][p];
                 let aqq = m[q][q];
-                // Rotation angle: theta = (aqq - app) / (2*apq).
                 let theta = (aqq - app) / (2.0 * apq);
-                // t = sign(theta) / (|theta| + sqrt(theta^2 + 1)).
                 let t = if theta >= 0.0 {
                     1.0 / (theta + (theta * theta + 1.0).sqrt())
                 } else {
@@ -173,8 +136,6 @@ fn jacobi_eigen(a: &[Vec<f64>]) -> (Vec<f64>, Vec<Vec<f64>>) {
                 let c = 1.0 / (t * t + 1.0).sqrt();
                 let s = t * c;
 
-                // Apply rotation to rows/cols p and q of M.
-                // Update diagonal entries.
                 m[p][p] = app - t * apq;
                 m[q][q] = aqq + t * apq;
                 m[p][q] = 0.0;
@@ -191,7 +152,6 @@ fn jacobi_eigen(a: &[Vec<f64>]) -> (Vec<f64>, Vec<Vec<f64>>) {
                     }
                 }
 
-                // Accumulate the rotation into the eigenvector matrix.
                 for i in 0..n {
                     let vip = v[i][p];
                     let viq = v[i][q];
@@ -202,7 +162,6 @@ fn jacobi_eigen(a: &[Vec<f64>]) -> (Vec<f64>, Vec<Vec<f64>>) {
         }
     }
 
-    // Eigenvalues are the (now ~diagonal) diagonal entries.
     let eig: Vec<f64> = (0..n).map(|i| m[i][i]).collect();
     (eig, v)
 }
@@ -211,14 +170,13 @@ fn jacobi_eigen(a: &[Vec<f64>]) -> (Vec<f64>, Vec<Vec<f64>>) {
 mod tests {
     use super::*;
 
-    // Build a tiny Graph (path 0-1-2 plus edge 2-3) for tests.
     fn toy_graph() -> Graph {
         // edges: 0-1, 1-2, 2-3
         let adj = vec![
-            vec![1usize],       // 0
-            vec![0usize, 2],    // 1
-            vec![1usize, 3],    // 2
-            vec![2usize],       // 3
+            vec![1usize],
+            vec![0usize, 2],
+            vec![1usize, 3],
+            vec![2usize],
         ];
         let deg: Vec<f64> = adj.iter().map(|a| a.len() as f64).collect();
         let m2: f64 = deg.iter().sum();
@@ -257,8 +215,6 @@ mod tests {
 
     #[test]
     fn sm_entrywise_positive() {
-        // exp of a real symmetric matrix is entrywise positive when the
-        // off-diagonal pattern is connected (Perron-Frobenius on exp).
         let g = toy_graph();
         let sm = diffusion_kernel(&g, 0.1);
         for i in 0..g.n {
@@ -270,7 +226,6 @@ mod tests {
 
     #[test]
     fn beta_zero_gives_identity() {
-        // exp(0 * H) = I.
         let g = toy_graph();
         let sm = diffusion_kernel(&g, 0.0);
         for i in 0..g.n {
@@ -287,7 +242,6 @@ mod tests {
 
     #[test]
     fn eigen_reconstructs_matrix() {
-        // Verify Jacobi: A ~= V diag(eig) V^T on a small symmetric matrix.
         let a = vec![
             vec![2.0, -1.0, 0.0],
             vec![-1.0, 2.0, -1.0],

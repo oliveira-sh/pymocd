@@ -29,7 +29,6 @@ N_RUNS = 10
 LFR_RUNS = 3
 
 
-# --------------------------------------------------------------------- loaders
 def load_gml(path):
     G = nx.read_gml(path)
     remap = {o: i for i, o in enumerate(G.nodes())}
@@ -71,14 +70,13 @@ def load_snap(ungraph, cmty):
     return H, gt
 
 
-# Paper targets: (Q Table III, NMI Table IV). Tolerances: dQ, dNMI.
+# Tuple fields: (Q Table III, NMI Table IV, dQ tol, dNMI tol).
 NETWORKS = [
     ("karate",   lambda: load_gml(DATA / "small/karate.gml"),   0.4198, 1.0000, 0.03, 0.05),
     ("dolphins", lambda: load_gml(DATA / "small/dolphins.gml"), 0.5268, 0.8888, 0.03, 0.06),
     ("football", lambda: load_gml(DATA / "small/football.gml"), 0.6046, 0.9180, 0.03, 0.05),
     ("polbooks", lambda: load_gml(DATA / "small/polbooks.gml"), 0.5272, 0.5374, 0.03, 0.10),
-    # email-Eu-core stands in for the paper's 5th net (no "yeast" data locally);
-    # reported informationally, not gated against the yeast row.
+    # email-Eu-core substitutes for the paper's 5th net (no yeast data); info only.
     ("email",    lambda: load_snap(DATA / "email/email-Eu-core.txt",
                                    DATA / "email/email-Eu-core.cmty.txt"),
                                    0.5818, 0.3290, None, None),
@@ -135,9 +133,8 @@ def run_realworld():
 
 
 def make_lfr(n, mu, seed):
-    # Paper uses tau1=2, tau2=1, but networkx's generator can't match
-    # average_degree=20 at tau1=2 (and requires tau2>1); tau1=3, tau2=1.5 is the
-    # robust standard combo and the mu-trend we check is insensitive to both.
+    # Paper uses tau1=2/tau2=1, infeasible in networkx at average_degree=20;
+    # tau1=3/tau2=1.5 is the robust combo and the mu-trend is insensitive to both.
     for s in range(seed, seed + 25):
         try:
             G = nx.LFR_benchmark_graph(

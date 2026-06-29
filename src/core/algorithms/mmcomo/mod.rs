@@ -1,26 +1,6 @@
-//! MMCoMO — "A Macro-Micro Population-Based Co-Evolutionary Multi-Objective
-//! Algorithm for Community Detection in Complex Networks" (Zhang, Yang, Yang &
-//! Zhang, IEEE Computational Intelligence Magazine).
+//! MMCoMO — macro-micro co-evolutionary multi-objective community detection
+//! (Zhang, Yang, Yang & Zhang, IEEE CIM). Self-contained reimplementation.
 //!
-//! **Self-contained reimplementation, transcribed from the paper.** This module
-//! deliberately reuses NOTHING from the rest of the crate: it has its own
-//! `Graph`, its own NSGA-II (`nsga2`), objectives (`objectives`, Eq. 1),
-//! diffusion-kernel similarity (`linalg`, ref [68]), medoid/label representations
-//! (`repr`, Eqs. 2–8) and genetic operators + local search (`operators`). Only
-//! `std`, `rand` and `rayon` are used. The Python boundary (`api.rs`) hands this
-//! module raw `(node_ids, edges)` and converts the result back to a dict.
-//!
-//! Two populations co-evolve over the minimized (KKM, RC) bi-objective: a
-//! medoid-binary macro population (exploration) and a label-vector micro
-//! population (exploitation, modularity local search). Every `gap` generations
-//! they interact via Guidance (Alg. 2) and Influence (Alg. 3), coupled through
-//! the diffusion-kernel matrix `SM` (Eq. 7). Phase 3 merges both populations and
-//! returns the rank-1 front.
-//!
-//! Selection rules (paper Section IV-B): for a single ground-truth-free answer,
-//! `mmcomo` returns the max-modularity front member (Table III rule). For the
-//! Table IV NMI comparison the paper selects the *best-NMI* front member, so
-//! `mmcomo_fronts` exposes the whole front.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -44,14 +24,12 @@ use objectives::{kkm_rc, modularity};
 use operators::{local_search, macro_offspring, micro_offspring};
 use repr::{decode, encode};
 
-// ----------------------------------------------------------------- shared types
-
 /// Undirected graph in contiguous index space `[0, n)`.
 pub struct Graph {
     pub n: usize,
     pub adj: Vec<Vec<usize>>,
     pub deg: Vec<f64>,
-    pub m2: f64, // 2*|E| = sum of degrees
+    pub m2: f64, // 2*|E|
 }
 
 pub type Sm = Vec<Vec<f64>>; // n x n diffusion-kernel similarity
@@ -59,7 +37,7 @@ pub type Labels = Vec<i32>; // micro vector representation
 pub type Genome = Vec<u8>; // macro medoid representation
 
 impl Graph {
-    /// Build from `n` nodes and index-space `edges` (deduped, self-loops dropped).
+    /// Build from index-space `edges` (deduped, self-loops dropped).
     fn from_indexed(n: usize, edges: &[(usize, usize)]) -> Graph {
         let mut sets: Vec<HashSet<usize>> = vec![HashSet::new(); n];
         for &(u, v) in edges {
@@ -81,8 +59,6 @@ impl Graph {
         Graph { n, adj, deg, m2 }
     }
 }
-
-// ------------------------------------------------------------- population items
 
 #[derive(Clone)]
 struct Mic {
@@ -126,8 +102,6 @@ fn select_macro(pool: Vec<Mac>, keep: usize) -> Vec<Mac> {
         .collect()
 }
 
-// ----------------------------------------------------------------- init
-
 /// Micro init (Alg. 1 line 1): each node's label = a random neighbour's id.
 fn init_micro(g: &Graph, pop: usize) -> Vec<Mic> {
     (0..pop)
@@ -148,11 +122,9 @@ fn init_micro(g: &Graph, pop: usize) -> Vec<Mic> {
         .collect()
 }
 
-/// Macro init (Alg. 1 line 2; ref [46]): half the population seeded from
-/// high-degree candidate central nodes, half random. The number of centres per
-/// individual and the candidate-pool size are NOT pinned by the paper (deferred
-/// to ref [46]); we draw the centre count in `[1, ⌈√n⌉]` and sample the
-/// high-degree half from the top-`3c` by degree.
+/// Macro init (Alg. 1 line 2; ref [46]): half high-degree seeded, half random.
+/// Centre count and pool size are NOT pinned by the paper (deferred to ref [46]):
+/// centre count in `[1, ⌈√n⌉]`, high-degree half sampled from the top-`3c`.
 fn init_macro(g: &Graph, sm: &Sm, pop: usize) -> Vec<Mac> {
     let n = g.n;
     let mut by_deg: Vec<usize> = (0..n).collect();
@@ -189,11 +161,8 @@ fn init_macro(g: &Graph, sm: &Sm, pop: usize) -> Vec<Mac> {
         .collect()
 }
 
-// ----------------------------------------------------- interaction (Alg 2 / 3)
-
-/// Guidance (Alg. 2): the macro rank-1 elites are **freshly decoded with the
-/// current SM** (line 5) and environment-selected with the micro population and
-/// its offspring (line 12).
+/// Guidance (Alg. 2): macro rank-1 elites are freshly decoded with the current
+/// SM (line 5), then environment-selected with micro + offspring (line 12).
 fn guidance(
     g: &Graph,
     sm: &Sm,
@@ -216,7 +185,7 @@ fn guidance(
     select_micro(pool, pop)
 }
 
-/// Modularity local search (Alg. 1 line 11, ref [38]) on the rank-1 micro members.
+/// Modularity local search (Alg. 1 line 11, ref [38]) on rank-1 micro members.
 fn local_search_front(g: &Graph, micro: &mut [Mic]) {
     let ranks = fast_nondominated_sort(&micro_objs(micro));
     for (i, m) in micro.iter_mut().enumerate() {
@@ -228,8 +197,7 @@ fn local_search_front(g: &Graph, micro: &mut [Mic]) {
 }
 
 /// Influence (Alg. 3): micro-elite voting matrix, SM update (Eq. 7), encode each
-/// micro elite to a medoid (Eq. 8, using the updated SM), environment-select with
-/// the macro population and its offspring (line 25).
+/// elite to a medoid (Eq. 8), environment-select with macro + offspring (line 25).
 #[allow(clippy::too_many_arguments)]
 fn influence(
     g: &Graph,
@@ -286,10 +254,7 @@ fn influence(
     select_macro(pool, pop)
 }
 
-// ------------------------------------------------------------------- engine
-
-/// Algorithm 1. Returns the rank-1 front of the merged populations (index-space
-/// label vectors).
+/// Algorithm 1. Returns the rank-1 front of the merged populations.
 #[allow(clippy::too_many_arguments)]
 fn run_fronts(
     g: &Graph,
@@ -309,7 +274,6 @@ fn run_fronts(
     let mut macro_pop = init_macro(g, &sm, pop);
 
     for t in 1..=num_gens {
-        // micro offspring (one-way crossover p_c + neighbour mutation 1/n)
         let (mr, mc) = ranks_and_crowd(&micro_objs(&micro));
         let mlabels: Vec<Labels> = micro.iter().map(|x| x.labels.clone()).collect();
         let micro_off: Vec<Mic> = micro_offspring(g, &mlabels, &mr, &mc, p_c)
@@ -320,7 +284,6 @@ fn run_fronts(
             })
             .collect();
 
-        // macro offspring (uniform crossover + bitwise mutation p_m)
         let (ar, ac) = ranks_and_crowd(&macro_objs(&macro_pop));
         let agen: Vec<Genome> = macro_pop.iter().map(|x| x.genome.clone()).collect();
         let macro_off: Vec<Mac> = macro_offspring(&agen, &ar, &ac, p_m)
@@ -369,10 +332,8 @@ fn run_fronts(
     }
 }
 
-// ------------------------------------------------------------------- driver
-
-/// Build the index-space graph from raw node ids + edges, returning the graph,
-/// the index→id table, and the isolated-node mask.
+/// Build the index-space graph, returning it plus the index→id table and the
+/// isolated-node mask.
 fn build(nodes: &[i32], edges: &[(i32, i32)]) -> (Graph, Vec<i32>, Vec<bool>) {
     let mut ids: Vec<i32> = Vec::with_capacity(nodes.len() + 2 * edges.len());
     ids.extend_from_slice(nodes);
@@ -392,8 +353,8 @@ fn build(nodes: &[i32], edges: &[(i32, i32)]) -> (Graph, Vec<i32>, Vec<bool>) {
     (g, ids, isolated)
 }
 
-/// Map an index-space label vector to `(node_id, community)` pairs: isolated
-/// nodes get `-1`, remaining community ids are renumbered to `0..k`.
+/// Map index-space labels to `(node_id, community)`: isolated nodes get `-1`,
+/// remaining community ids are renumbered to `0..k`.
 fn to_output(labels: &Labels, ids: &[i32], isolated: &[bool]) -> Vec<(i32, i32)> {
     let mut remap: HashMap<i32, i32> = HashMap::new();
     let mut next = 0i32;
@@ -413,9 +374,7 @@ fn to_output(labels: &Labels, ids: &[i32], isolated: &[bool]) -> Vec<(i32, i32)>
     out
 }
 
-/// Run MMCoMO and return the **max-modularity** member of the merged rank-1
-/// front (paper Table III selection rule), as `(node_id, community)` pairs;
-/// isolated nodes get `-1`.
+/// Max-modularity member of the merged rank-1 front (Table III rule).
 #[allow(clippy::too_many_arguments)]
 pub fn mmcomo(
     nodes: &[i32],
@@ -443,8 +402,7 @@ pub fn mmcomo(
     to_output(&best, &ids, &isolated)
 }
 
-/// Run MMCoMO and return the **full merged rank-1 front** (Alg. 1 Phase 3). Used
-/// to apply the paper's Table IV (best-NMI) rule with a known ground truth.
+/// Full merged rank-1 front (Alg. 1 Phase 3); for the Table IV best-NMI rule.
 #[allow(clippy::too_many_arguments)]
 pub fn mmcomo_fronts(
     nodes: &[i32],

@@ -413,3 +413,9 @@ FodyWeavers.xsd
 *.sln.iml
 
 res/article/
+
+# mkdocs build output
+site/
+
+# Generated pyo3 type stub (built into the wheel via pyproject, not tracked)
+pymocd.pyi
