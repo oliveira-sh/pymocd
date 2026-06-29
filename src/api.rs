@@ -282,26 +282,8 @@ pub fn krm_fn(
     Ok(krm::krm(&g, pop_size, num_gens, cross_rate, mut_rate, divisions))
 }
 
-/// Run MMCoMO (Zhang, Yang, Yang & Zhang, IEEE Computational Intelligence
-/// Magazine) — a macro-micro population-based co-evolutionary NSGA-II over the
-/// (Kernel-K-Means, Ratio-Cut) bi-objective. A medoid-based macro population
-/// explores while a label-based micro population (refined by modularity local
-/// search) exploits; the two interact every ``gap`` generations through the
-/// guidance and influence strategies coupled by a diffusion-kernel similarity
-/// matrix. Returns the **max-modularity** member of the merged rank-1 front
-/// (the paper's ground-truth-free decision rule).
-///
-/// Args:
-///     graph: networkx.Graph or igraph.Graph (integer node ids).
-///     pop_size: individuals per population (default 100).
-///     num_gens: generations (default 50).
-///     cross_rate: micro one-way crossover probability ``p_c`` (default 0.1).
-///     mut_rate: macro bitwise mutation probability ``p_m`` (default 0.1).
-///     gap: generations between macro/micro interactions (default 10).
-///     beta: diffusion-kernel bandwidth for ``SM = exp(beta*(A-D))`` (default 0.05).
-///
-/// Returns:
-///     ``dict[node, community]``. Isolated nodes get community ``-1``.
+/// MMCoMO macro-micro co-evolutionary detector (Zhang et al.); returns the
+/// max-modularity member of the merged rank-1 front. Isolated nodes get -1.
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(name = "mmcomo", signature = (graph, pop_size = mmcomo::DEFAULT_POP_SIZE, num_gens = mmcomo::DEFAULT_NUM_GENS, cross_rate = mmcomo::DEFAULT_CROSS_RATE, mut_rate = mmcomo::DEFAULT_MUT_RATE, gap = mmcomo::DEFAULT_GAP, beta = mmcomo::DEFAULT_BETA))]
@@ -326,17 +308,8 @@ pub fn mmcomo_fn(
     Ok(d.into_any().unbind())
 }
 
-/// Return MMCoMO's full merged rank-1 Pareto front (Algorithm 1, Phase 3) — the
-/// candidate set ``mmcomo`` selects a single partition *from*. Exposed so a
-/// caller with ground truth can apply the paper's Table IV (best-NMI) rule, or
-/// study the selection step.
-///
-/// Args:
-///     graph: networkx.Graph or igraph.Graph (integer node ids).
-///
-/// Returns:
-///     ``list[dict[node, community]]`` — one partition per front member.
-///     Isolated nodes get community ``-1``.
+/// MMCoMO's merged rank-1 front, the candidate set `mmcomo` selects from
+/// (exposed for the paper's Table IV best-NMI rule). Isolated nodes get -1.
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(name = "mmcomo_fronts", signature = (graph, pop_size = mmcomo::DEFAULT_POP_SIZE, num_gens = mmcomo::DEFAULT_NUM_GENS, cross_rate = mmcomo::DEFAULT_CROSS_RATE, mut_rate = mmcomo::DEFAULT_MUT_RATE, gap = mmcomo::DEFAULT_GAP, beta = mmcomo::DEFAULT_BETA))]

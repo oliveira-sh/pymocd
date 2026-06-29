@@ -1,10 +1,6 @@
 use rand::RngExt; // rand 0.10: random_range/random_bool live on RngExt
 
-// ───────────────────────── domination ─────────────────────────
-//
-// Both objectives are MINIMIZED and stored as (KKM, RC).
-// `a` dominates `b` ⇔ a ≤ b on both objectives and a < b on at least one
-// (Deb et al. 2002, NSGA-II).
+// Both objectives minimized, stored as (KKM, RC). NSGA-II domination.
 #[inline]
 fn dominates(a: (f64, f64), b: (f64, f64)) -> bool {
     let le = a.0 <= b.0 && a.1 <= b.1;
@@ -12,13 +8,7 @@ fn dominates(a: (f64, f64), b: (f64, f64)) -> bool {
     le && lt
 }
 
-/// Fast non-dominated sort (NSGA-II). Returns a **1-based** rank per
-/// individual: rank 1 is the first (best) Pareto front, rank 2 the next, etc.
-///
-/// Faithful to Deb et al. 2002, Algorithm "fast-non-dominated-sort": for each
-/// `p` compute its domination count `n_p` and the set `S_p` of solutions it
-/// dominates; front 1 is everyone with `n_p == 0`; peeling each front
-/// decrements the counts of dominated members until empty.
+/// Fast non-dominated sort. Returns a 1-based rank per individual.
 pub fn fast_nondominated_sort(objs: &[(f64, f64)]) -> Vec<usize> {
     let n = objs.len();
     let mut rank = vec![0usize; n];
@@ -42,7 +32,6 @@ pub fn fast_nondominated_sort(objs: &[(f64, f64)]) -> Vec<usize> {
         }
     }
 
-    // First front.
     let mut front: Vec<usize> = (0..n).filter(|&p| dom_count[p] == 0).collect();
     let mut r = 1usize;
 
@@ -64,10 +53,7 @@ pub fn fast_nondominated_sort(objs: &[(f64, f64)]) -> Vec<usize> {
     rank
 }
 
-/// Crowding distance (NSGA-II). Computed **per rank-group** (front): within each
-/// front, for each objective sort the members, give the two boundary members an
-/// infinite distance, and accumulate the normalized gap between each member's
-/// two neighbours summed over both objectives.
+/// Crowding distance, computed per front, summed over both objectives.
 pub fn crowding_distance(objs: &[(f64, f64)], ranks: &[usize]) -> Vec<f64> {
     let n = objs.len();
     let mut dist = vec![0.0f64; n];
@@ -75,7 +61,6 @@ pub fn crowding_distance(objs: &[(f64, f64)], ranks: &[usize]) -> Vec<f64> {
         return dist;
     }
 
-    // Group indices by their (1-based) rank.
     let max_rank = *ranks.iter().max().unwrap_or(&0);
     let mut groups: Vec<Vec<usize>> = vec![Vec::new(); max_rank + 1];
     for i in 0..n {
@@ -92,7 +77,6 @@ pub fn crowding_distance(objs: &[(f64, f64)], ranks: &[usize]) -> Vec<f64> {
             continue;
         }
 
-        // Each of the two objectives contributes.
         for obj in 0..2 {
             let key = |idx: usize| -> f64 {
                 if obj == 0 {
@@ -109,12 +93,10 @@ pub fn crowding_distance(objs: &[(f64, f64)], ranks: &[usize]) -> Vec<f64> {
             let f_max = key(order[g - 1]);
             let span = f_max - f_min;
 
-            // Boundary members get infinite distance.
             dist[order[0]] = f64::INFINITY;
             dist[order[g - 1]] = f64::INFINITY;
 
             if span <= 0.0 {
-                // All equal on this objective → no contribution.
                 continue;
             }
 
@@ -129,10 +111,8 @@ pub fn crowding_distance(objs: &[(f64, f64)], ranks: &[usize]) -> Vec<f64> {
     dist
 }
 
-/// Environment selection (NSGA-II μ-survivor step). Fills survivors by ascending
-/// rank; when the next whole front would overflow `keep`, that last front is
-/// truncated by **descending crowding distance**. Returns survivor indices,
-/// of size `min(keep, objs.len())`.
+/// Environment selection: fill survivors by ascending rank, truncating the last
+/// overflowing front by descending crowding distance. Size min(keep, len).
 pub fn environment_selection(objs: &[(f64, f64)], keep: usize) -> Vec<usize> {
     let n = objs.len();
     let target = keep.min(n);
@@ -143,7 +123,6 @@ pub fn environment_selection(objs: &[(f64, f64)], keep: usize) -> Vec<usize> {
     let ranks = fast_nondominated_sort(objs);
     let crowd = crowding_distance(objs, &ranks);
 
-    // Bucket indices per rank.
     let max_rank = *ranks.iter().max().unwrap();
     let mut groups: Vec<Vec<usize>> = vec![Vec::new(); max_rank + 1];
     for i in 0..n {
@@ -159,7 +138,6 @@ pub fn environment_selection(objs: &[(f64, f64)], keep: usize) -> Vec<usize> {
         if survivors.len() + front.len() <= target {
             survivors.extend_from_slice(front);
         } else {
-            // Partially fill the last needed front: highest crowding first.
             let remaining = target - survivors.len();
             let mut ordered = front.clone();
             ordered.sort_by(|&a, &b| {
@@ -178,10 +156,8 @@ pub fn environment_selection(objs: &[(f64, f64)], keep: usize) -> Vec<usize> {
     survivors
 }
 
-/// Binary tournament selection (NSGA-II crowded-comparison operator). Picks two
-/// random contestants; the winner has the **lower rank**, ties broken by the
-/// **higher crowding distance**. Returns the winning individual's index.
-/// (Provided for completeness; the genetic operators carry their own copy.)
+/// Binary tournament: lower rank wins, ties broken by higher crowding distance.
+/// Unused by the operators (they carry their own copy); kept for completeness.
 #[allow(dead_code)]
 pub fn tournament(ranks: &[usize], crowd: &[f64], r: &mut impl rand::Rng) -> usize {
     let n = ranks.len();
@@ -213,8 +189,7 @@ mod tests {
 
     #[test]
     fn test_nondominated_sort_two_fronts() {
-        // Front 1: (1,4),(2,2),(4,1) are mutually non-dominating.
-        // (3,3) is dominated by (2,2) → front 2.
+        // (1,4),(2,2),(4,1) mutually non-dominating; (3,3) dominated by (2,2).
         let objs = vec![(1.0, 4.0), (2.0, 2.0), (4.0, 1.0), (3.0, 3.0)];
         let ranks = fast_nondominated_sort(&objs);
         assert_eq!(ranks[0], 1);
@@ -228,7 +203,6 @@ mod tests {
         let objs = vec![(1.0, 4.0), (2.0, 2.0), (4.0, 1.0)];
         let ranks = fast_nondominated_sort(&objs);
         let crowd = crowding_distance(&objs, &ranks);
-        // Sorted by obj0: (1,4),(2,2),(4,1) → ends are 0 and 2.
         assert!(crowd[0].is_infinite());
         assert!(crowd[2].is_infinite());
         assert!(crowd[1].is_finite());
@@ -239,7 +213,6 @@ mod tests {
         let objs = vec![(1.0, 4.0), (2.0, 2.0), (4.0, 1.0), (3.0, 3.0)];
         let surv = environment_selection(&objs, 3);
         assert_eq!(surv.len(), 3);
-        // The three rank-1 members must all survive; the dominated (idx 3) drops.
         assert!(!surv.contains(&3));
         assert!(surv.contains(&0) && surv.contains(&1) && surv.contains(&2));
     }
@@ -257,7 +230,6 @@ mod tests {
         let ranks = vec![1usize, 2usize];
         let crowd = vec![0.0f64, 100.0f64];
         let mut r = rand::rng();
-        // Regardless of draw order, the rank-1 individual (idx 0) must win.
         for _ in 0..50 {
             assert_eq!(tournament(&ranks, &crowd, &mut r), 0);
         }
@@ -269,7 +241,6 @@ mod tests {
         let crowd = vec![5.0f64, 1.0f64];
         let mut r = rand::rng();
         for _ in 0..50 {
-            // Equal rank → higher crowding (idx 0) wins for either draw order.
             assert_eq!(tournament(&ranks, &crowd, &mut r), 0);
         }
     }
