@@ -1,13 +1,17 @@
-//! operators/objective.rs
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use crate::core::graph::{Graph, NodeId, Partition};
-use crate::core::operators::metrics::Metrics;
+use crate::core::metaheuristics::helpers::objectives::metrics::Metrics;
 use rayon::iter::*;
 use rustc_hash::FxHashMap as HashMap;
 
+/// Shi's decomposed-modularity objectives (Shi et al. 2012, Eqs. 3.5/3.6),
+/// both **minimized**:
+///   `intra = 1 − Σ_c l_c/m`   (Eq. 3.5; `l_c` = internal edges counted once)
+///   `inter = Σ_c (d_c/2m)^2`   (Eq. 3.6; `d_c` = Σ deg over c, each internal edge ×2)
+/// so that modularity `Q = 1 − intra − inter`.
 pub fn calculate_objectives(
     graph: &Graph,
     partition: &Partition,
@@ -19,7 +23,6 @@ pub fn calculate_objectives(
         return Metrics::default();
     }
 
-    // Build communities with HashSet for fast lookups
     let mut communities: HashMap<i32, Vec<NodeId>> = HashMap::default();
     for (&node, &comm) in partition.iter() {
         communities.entry(comm).or_default().push(node);
@@ -37,14 +40,11 @@ pub fn calculate_objectives(
         for &node in nodes {
             if let Some(neighbors) = graph.adjacency_list.get(&node) {
                 for &neighbor in neighbors {
-                    // Only count edges once (when source < target)
-                    if node < neighbor {
-                        if let Some(neighbor_comm) = partition.get(&neighbor) {
-                            if neighbor_comm == &partition[&node] {
+                    if node < neighbor
+                        && let Some(neighbor_comm) = partition.get(&neighbor)
+                            && neighbor_comm == &partition[&node] {
                                 community_edges += 1.0;
                             }
-                        }
-                    }
                 }
             }
         }

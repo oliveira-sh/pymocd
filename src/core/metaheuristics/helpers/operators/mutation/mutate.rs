@@ -1,5 +1,6 @@
-//! operators/mutation.rs
-//! Highly optimized mutation function for genetic algorithm
+//! Local-move mutation: a selected node adopts its neighbours' majority
+//! community. Dispatches to a sequential or rayon-parallel strategy by the
+//! number of nodes to mutate.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -53,7 +54,7 @@ fn sequential_mutate(partition: &mut Partition, graph: &Graph, nodes_to_mutate: 
 
         if let Some(neighbors) = graph.adjacency_list.get(&node) {
             let mut max_count = 0;
-            let mut best_community = partition[&node]; // Current community as fallback
+            let mut best_community = partition[&node];
 
             for &neighbor in neighbors {
                 if let Some(&community) = partition.get(&neighbor) {
