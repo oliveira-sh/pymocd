@@ -6,7 +6,7 @@ build-backend = "maturin"
 
 [project]
 name = "pymocd"
-version = "4.0.0"
+version = "5.0.0"
 description = "High-performance multi-objective community detection for complex networks, with a Rust backend."
 requires-python = ">=3.10"
 authors = [
