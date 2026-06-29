@@ -3,31 +3,24 @@
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-mod individual;
 mod utils;
 
 use crate::core::graph::{Graph, Partition};
+use crate::core::metaheuristics::helpers::individual::{Individual, TOURNAMENT_SIZE};
+use crate::core::metaheuristics::nsga2;
+use crate::core::metaheuristics::helpers::operators;
 use crate::core::utils::normalize_community_ids;
-use crate::core::operators;
-use crate::debug;
-use individual::{Individual, create_offspring};
-use utils::{calculate_crowding_distance, fast_non_dominated_sort, max_q_selection};
+use utils::max_q_selection;
 
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use rayon::prelude::*;
 use rustc_hash::FxBuildHasher;
-use std::cmp::Ordering;
 use std::collections::HashMap;
 
-const TOURNAMENT_SIZE: usize = 2;
-
-pub const DEFAULT_DEBUG_LEVEL: i8 = 0;
-pub const DEFAULT_POP_SIZE: usize = 100;
-pub const DEFAULT_NUM_GENS: usize = 100;
-pub const DEFAULT_CROSS_RATE: f64 = 0.7;
-pub const DEFAULT_MUT_RATE: f64 = 0.5;
+mod defaults;
+pub use defaults::*;
 
 /// NSGA-II multi-objective community detection.
 ///
@@ -59,7 +52,6 @@ pub struct HpMocd {
     on_generation: Option<Py<PyAny>>,
 }
 
-/* Private (Not exposed to py user) */
 impl HpMocd {
     fn evaluate_population(
         &self,
@@ -105,70 +97,43 @@ impl HpMocd {
         Ok(())
     }
 
-    fn update_population_sort_and_truncate(
-        &self,
-        individuals: &mut Vec<Individual>,
-        pop_size: usize,
-    ) {
-        fast_non_dominated_sort(individuals);
-        calculate_crowding_distance(individuals);
-        individuals.sort_unstable_by(|a, b| {
-            a.rank.cmp(&b.rank).then_with(|| {
-                b.crowding_distance
-                    .partial_cmp(&a.crowding_distance)
-                    .unwrap_or(Ordering::Equal)
-            })
-        });
-        individuals.truncate(pop_size);
-    }
-
     fn envolve(&self, py: Option<Python<'_>>) -> PyResult<Vec<Individual>> {
-        let degrees = &self.graph.precompute_degrees();
-        let mut individuals: Vec<Individual> =
-            operators::generate_population(&self.graph, self.pop_size)
-                .into_par_iter()
-                .map(Individual::new)
-                .collect();
-        self.evaluate_population(py, &mut individuals, &self.graph, degrees)?;
+        let degrees = self.graph.precompute_degrees();
 
-        for generation in 0..self.num_gens {
-            self.update_population_sort_and_truncate(&mut individuals, self.pop_size);
+        // Shared NSGA-II loop; HP-MOCD only supplies its objective evaluation
+        // (Rust intra/inter or Python callables) and its per-generation logging.
+        let individuals = nsga2::evolve(
+            &self.graph,
+            self.pop_size,
+            self.num_gens,
+            self.cross_rate,
+            self.mut_rate,
+            TOURNAMENT_SIZE,
+            |inds| self.evaluate_population(py, inds, &self.graph, degrees),
+            |generation, num_gens, pop| {
+                let first_front_size = pop.iter().filter(|ind| ind.rank == 1).count();
 
-            let mut offspring = create_offspring(
-                &individuals,
-                &self.graph,
-                self.cross_rate,
-                self.mut_rate,
-                TOURNAMENT_SIZE,
-            );
-            self.evaluate_population(py, &mut offspring, &self.graph, degrees)?;
-
-            individuals.extend(offspring);
-
-            let first_front_size = individuals.iter().filter(|ind| ind.rank == 1).count();
-
-            if self.debug_level >= 1 && (generation % 10 == 0 || generation == self.num_gens - 1) {
-                debug!(
-                    debug,
-                    "NSGA-II: Gen {} | 1st Front/Pop: {}/{}",
-                    generation,
-                    first_front_size,
-                    individuals.len()
-                );
-            }
-
-            if let Some(cb) = &self.on_generation {
-                if let Some(py) = py {
-                    cb.bind(py)
-                        .call1((generation, self.num_gens, first_front_size))?;
+                if self.debug_level >= 1 && (generation % 10 == 0 || generation == num_gens - 1) {
+                    debug!(
+                        debug,
+                        "NSGA-II: Gen {} | 1st Front/Pop: {}/{}",
+                        generation,
+                        first_front_size,
+                        pop.len()
+                    );
                 }
-            }
-        }
+
+                if let Some(cb) = &self.on_generation
+                    && let Some(py) = py {
+                        cb.bind(py).call1((generation, num_gens, first_front_size))?;
+                    }
+                Ok(())
+            },
+        )?;
 
         Ok(individuals
-            .iter()
+            .into_iter()
             .filter(|ind| ind.rank == 1)
-            .cloned()
             .collect())
     }
 }
@@ -202,13 +167,14 @@ impl HpMocd {
 impl HpMocd {
     #[new]
     #[pyo3(signature = (graph,
-        debug_level = 0,
-        pop_size = 100,
-        num_gens = 100,
-        cross_rate = 0.7,
-        mut_rate = 0.5,
+        debug_level = DEFAULT_DEBUG_LEVEL,
+        pop_size = DEFAULT_POP_SIZE,
+        num_gens = DEFAULT_NUM_GENS,
+        cross_rate = DEFAULT_CROSS_RATE,
+        mut_rate = DEFAULT_MUT_RATE,
         objectives = None
     ))]
+    #[allow(clippy::too_many_arguments)] // pyo3 constructor: one arg per Python kwarg
     pub fn new(
         _py: Python<'_>,
         graph: &Bound<'_, PyAny>,
@@ -265,7 +231,6 @@ impl HpMocd {
         Ok(())
     }
 
-    /// Configured number of generations.
     #[getter]
     pub fn num_gens(&self) -> usize {
         self.num_gens
