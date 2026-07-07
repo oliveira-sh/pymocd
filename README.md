@@ -1,3 +1,4 @@
+
 <div align="center">
   <img src="res/logo.png" alt="pymocd logo" width="50%">  
   
@@ -33,7 +34,7 @@ import networkx as nx
 import pymocd
 
 G = nx.karate_club_graph()          # any NetworkX / igraph graph, integer node ids
-communities = pymocd.ariadne(G)     # -> dict[node, community]
+communities = pymocd.scale(G)       # -> dict[node, community]
 ```
 
 > [!IMPORTANT]
@@ -44,13 +45,13 @@ Every detector returns a single crisp partition as `dict[node, community]`.
 
 ### Algorithms
 
-`pymocd` ships eight detectors. **Ariadne** and **HP-MOCD** are the library's
-own contributions; the remaining five are faithful re-implementations of
+`pymocd` ships eight detectors. **SCALE** and **HP-MOCD** are the library's
+own contributions; the remaining six are faithful re-implementations of
 published baselines (the original authors released no code).
 
 | API | Algorithm | Objectives & engine | Solution selection | Year |
 |---|---|---|---|---|
-| `ariadne` | **Ariadne** (Santos, in prep.) | bi-objective CPM, NSGA-II with per-graph auto-γ islands | label-free **SBM/MDL** description length | 2026 |
+| `scale` | **SCALE** (Santos, in prep.) | KKM / ratio-cut bi-objective, sparse macro–micro co-evolutionary NSGA-II (near-linear, no dense kernel) | label-free **degree-corrected SBM/MDL** description length | 2026 |
 | `hpmocd` | **HP-MOCD** ([Santos et al.](https://doi.org/10.1007/s13278-025-01519-7)) | decomposed modularity, parallel NSGA-II | max modularity *Q* | 2025 |
 | `mmcomo` | **MMCoMO** ([Zhang et al.](https://ieeexplore.ieee.org/document/10188453)) | kernel *k*-means + ratio cut, macro/micro co-evolutionary NSGA-II | max *Q* (front via `mmcomo_fronts`) | 2023 |
 | `ccm` | **CCM** ([Shaik et al.](https://doi.org/10.1007/s42979-020-00382-x)) | score + fitness + modularity, NSGA-III | max *Q* | 2021 |
@@ -59,20 +60,22 @@ published baselines (the original authors released no code).
 | `mocd_d` | **Shi-MOCD** ([Shi et al.](https://doi.org/10.1016/j.asoc.2011.10.005)) | decomposed modularity, PESA-II | max-min distance to random nets | 2012 |
 | `moga_net` | **MOGA-Net** ([Pizzuti](https://doi.org/10.1109/ICTAI.2009.58)) | community score + fitness, NSGA-II | max *Q* | 2009 |
 
-**Ariadne** is the recommended crisp detector: parameter-free and
-self-terminating. It probes graph density to bracket five resolution values
-(γ), evolves one NSGA-II island per γ, pools the rank-1 fronts, and returns the
-single partition of minimum [microcanonical SBM](https://doi.org/10.1103/PhysRevX.4.011047)
-description length, a label-free model-selection step that recovers the
-front's best partition without ground truth.
+**SCALE** is the recommended crisp detector: it co-evolves a macro population of
+medoid community centres with a micro population of per-node labels over the
+kernel *k*-means / ratio-cut bi-objective, bridged by a sparse similarity carried
+on the graph's edges rather than a dense *n*×*n* kernel — so memory is *O(n+m)*
+and it scales to graphs the dense macro–micro baseline cannot build. The merged
+rank-1 front is enriched by a union refinement, and one partition is returned with
+no ground truth by minimising a label-free degree-corrected
+[microcanonical SBM](https://doi.org/10.1103/PhysRevX.4.011047) description length.
 
 ### Usage
 
 ```python
 import pymocd
 
-# Parameter-free detectors
-part = pymocd.ariadne(G)          # Ariadne, auto-γ + SBM/MDL selection
+# Recommended detectors (defaults work out of the box)
+part = pymocd.scale(G)            # SCALE, sparse co-evolution + DC-SBM/MDL selection
 part = pymocd.hpmocd(G)           # HP-MOCD
 
 # Baselines (sensible defaults; pop_size / num_gens / rates are tunable kwargs)
@@ -81,32 +84,58 @@ part = pymocd.mocd_d(G)           # Shi-MOCD, max-min-distance selection
 part = pymocd.moga_net(G)         # MOGA-Net (Pizzuti)
 part = pymocd.ccm(G)              # NSGA-III CCM (Shaik et al.)
 part = pymocd.krm(G)              # NSGA-III KRM (Shaik et al.)
-part = pymocd.mmcomo(G)          # MMCoMO (Zhang et al.), macro/micro co-evolution
+part = pymocd.mmcomo(G)           # MMCoMO (Zhang et al.), macro/micro co-evolution
 
 # All return dict[node, community]; isolated nodes -> -1
 ```
 
-The frontier of some algorithms are exposed for inspection:
+`scale` accepts the same evolutionary kwargs as `mmcomo` (`pop_size=100`,
+`num_gens=50`, `cross_rate=0.1`, `mut_rate=0.1`, `gap=10`, `beta=0.05`) plus
+`adaptive_stop=False` / `conv_pval=0.1` — with `adaptive_stop=True` the search
+self-terminates once a Welch t-test detects a convergence plateau and
+`num_gens` becomes only a safety ceiling.
+
+The Pareto frontier of some algorithms is exposed for inspection:
 
 ```python
-fronts = pymocd.ariadne_fronts(G)   # list[dict[node, community]]
-fronts = pymocd.mmcomo_fronts(G)    # list[dict[node, community]]
+fronts = pymocd.scale_fronts(G)      # list[dict[node, community]]
+fronts = pymocd.mmcomo_fronts(G)     # list[dict[node, community]]
+raw    = pymocd.scale_fronts_raw(G)  # list[bytes]: little-endian i32 labels per
+                                     # member, aligned to G.nodes() order — decode
+                                     # with numpy.frombuffer(b, "<i4"); memory-lean
+                                     # on million-node graphs
 ```
 
-HP-MOCD is also available as a class when you want the full Pareto front or
-explicit control:
+HP-MOCD and Shi-MOCD are also available as classes when you want the full
+Pareto front with objective values or explicit control:
 
 ```python
-alg   = pymocd.HpMocd(G)
-part  = alg.run()                   # selected partition
-front = alg.generate_pareto_front()
+alg   = pymocd.HpMocd(G)            # kwargs: pop_size, num_gens, cross_rate,
+part  = alg.run()                   #         mut_rate, objectives, debug_level
+front = alg.generate_pareto_front() # [(partition, [obj1, obj2]), ...]
+
+alg   = pymocd.Mocd(G)              # Shi-MOCD PESA-II, same pattern
 ```
+
+`HpMocd` additionally supports custom objectives — a list of Python callables
+`(graph, partition) -> float` to minimise instead of the built-in intra/inter
+pair — and a per-generation callback via `set_on_generation`.
 
 Helpers:
 
 ```python
-q = pymocd.fitness(G, part)         # modularity Q (Shi 2012)
-pymocd.set_thread_count(8)          # set Rayon thread pool (first call wins)
+q = pymocd.fitness(G, part)          # modularity Q (Shi 2012)
+pymocd.set_thread_count(8)           # set Rayon thread pool (first call wins)
+
+# Label-free model-selection scores (LOWER is better) — the criteria SCALE's
+# selector uses, exposed for selection studies on any partition:
+pymocd.sbm_mdl(G, part)              # microcanonical Bernoulli-SBM MDL
+pymocd.dcsbm_mdl(G, part)            # degree-corrected SBM MDL
+pymocd.dcsbm_full_mdl(G, part)       # complete DC-SBM MDL (+ degree-sequence cost);
+                                     # what scale() deploys
+
+# Fast native clustering metrics (exact AMI, matches scikit-learn defaults):
+nmi, ami, ari = pymocd.gt_metrics(y_true, y_pred)
 ```
 
 ### Contributing
