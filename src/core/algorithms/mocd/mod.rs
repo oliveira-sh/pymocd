@@ -1,18 +1,40 @@
-//! Shi-MOCD (Shi, Yan, Cai, Wu 2012): the PESA-II multi-objective community
-//! detector over Shi's decomposed-modularity objectives, with both model
+//! Shi-MOCD (Shi, Yan, Cai, Wu 2012): a **self-contained** PESA-II
+//! multi-objective community detector over Shi's locus-based adjacency
+//! representation and decomposed-modularity objectives, with both model
 //! selectors — MOCD-Q (max modularity, Eq. 3.8) and MOCD-D (max-min distance to
 //! degree-preserving control fronts, Eqs. 3.9–3.11). Exposed via `mocd_q` /
 //! `mocd_d`; the `Mocd` class also offers `generate_pareto_front` / `run`.
+//!
+//! Paper features reproduced (Shi et al. 2012, §3): locus-based adjacency
+//! genome (`locus.rs`, Park & Song scheme, §3.1.3) decoded by connected
+//! components; per-gene uniform crossover ("uniform two-point crossover" per
+//! the paper's own functional description) + per-gene adjacency mutation;
+//! classic PESA-II (`pesa2.rs`, Corne et al. 2001) with an internal population
+//! (IP) and external archive (EP), hyper-grid niching, squeeze-factor binary
+//! tournament selection drawn from EP, and classic squeeze-factor archive
+//! truncation (not this repo's dominance-count/crowding blend).
+//!
+//! Borrowed machinery removed: the shared
+//! `core::metaheuristics::pesa2::{evolutionary_phase, hypergrid}` engine
+//! (generic label-map `Partition` crossover/mutation + 0.3/0.7-weighted
+//! truncation heuristic) and all `rayon` parallel population/fitness
+//! evaluation — this engine is single-threaded, generation by generation, as
+//! in the paper. The only piece still shared is the pure objective-formula
+//! function `core::metaheuristics::helpers::objectives::decomposed_modularity::
+//! calculate_objectives` (math over an already-decoded partition, not GA
+//! machinery).
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2024 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 mod defaults;
+mod locus;
 mod model_selection;
+mod pesa2;
 pub use defaults::*;
 
 use crate::core::graph::{Graph, Partition};
-use crate::core::metaheuristics::pesa2::{Solution, evolutionary_phase};
+use pesa2::{Solution, evolutionary_phase};
 
 use pyo3::{pyclass, pymethods};
 
@@ -140,9 +162,8 @@ impl Mocd {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::metaheuristics::pesa2::evolutionary_phase;
+    use super::pesa2::evolutionary_phase;
     use crate::core::graph::Graph;
-    use crate::core::metaheuristics::helpers::operators::get_modularity_from_partition;
     use rustc_hash::FxHashSet;
 
     // Triangle {0,1,2}, triangle {3,4,5}, single bridge edge (2,3).
@@ -158,7 +179,7 @@ mod tests {
     #[test]
     fn shi_mocd_max_q_is_two_community_split() {
         let g = two_triangles();
-        let archive = evolutionary_phase(&g, 0, 100, 100, 0.9, 0.1, g.precompute_degrees());
+        let archive = evolutionary_phase(&g, 0, 100, 100, 0.6, 0.4, g.precompute_degrees());
         assert!(!archive.is_empty(), "empty PESA-II archive");
         // MOCD-Q (Shi Eq. 3.8): argmin(intra + inter) = argmax Q.
         let best = archive
@@ -169,7 +190,8 @@ mod tests {
                     .unwrap()
             })
             .unwrap();
-        let q = get_modularity_from_partition(&best.partition, &g);
+        // Q = 1 - intra - inter (Shi Eq. 3.7); objectives = [intra, inter].
+        let q = 1.0 - best.objectives[0] - best.objectives[1];
         assert!(q > 0.0, "Q = {q}");
         assert_ne!(best.partition[&0], best.partition[&3], "triangles not split");
         let comms: FxHashSet<i32> = best.partition.values().copied().collect();

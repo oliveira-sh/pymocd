@@ -172,12 +172,7 @@ mod tests {
 
     fn toy_graph() -> Graph {
         // edges: 0-1, 1-2, 2-3
-        let adj = vec![
-            vec![1usize],
-            vec![0usize, 2],
-            vec![1usize, 3],
-            vec![2usize],
-        ];
+        let adj = vec![vec![1usize], vec![0usize, 2], vec![1usize, 3], vec![2usize]];
         let deg: Vec<f64> = adj.iter().map(|a| a.len() as f64).collect();
         let m2: f64 = deg.iter().sum();
         Graph { n: 4, adj, deg, m2 }
