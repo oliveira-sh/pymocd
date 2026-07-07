@@ -1,5 +1,4 @@
-//! lib.rs
-//! Implements the algorithm to be run as a PyPI python library
+//! Python module entry point for the pymocd library.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -7,8 +6,9 @@ use pyo3::prelude::*;
 mod api;
 pub mod core;
 use api::{
-    ccm_fn, hpmocd_fn, krm_fn, mmcomo_fn, mmcomo_fronts_fn, moga_net_fn, mocd_d_fn, mocd_q_fn,
-    dcsbm_full_mdl_fn, dcsbm_mdl_fn, gt_metrics_fn, scale_fn, scale_fronts_fn, scale_fronts_raw_fn, sbm_mdl_fn,
+    ccm_fn, dcsbm_full_mdl_fn, dcsbm_mdl_fn, gt_metrics_fn, hpmocd_fn, krm_fn, mmcomo_fn,
+    mmcomo_fronts_fn, mocd_d_fn, mocd_q_fn, moga_net_fn, sbm_mdl_fn, scale_fn, scale_fronts_fn,
+    scale_fronts_raw_fn,
 };
 use core::algorithms::hpmocd::HpMocd;
 use core::algorithms::mocd::Mocd;

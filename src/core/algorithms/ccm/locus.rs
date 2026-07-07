@@ -1,10 +1,7 @@
-//! Locus-based (Pizzuti GA-Net style) genome representation for NSGA-III-CCM.
-//! A genome is a `Vec<NodeId>` of length `n`, indexed by *position* in the
-//! stable node ordering `nodes` (= `graph.nodes_vec()`, sorted ascending). The
-//! cell at position `p` (representing node `nodes[p]`) holds a `NodeId` value
-//! that is always either `nodes[p]` itself or one of its neighbours — every
-//! genome the operators below can produce is therefore guaranteed valid by
-//! construction (no repair step is ever needed).
+//! Locus-based (Pizzuti GA-Net style) genome for NSGA-III-CCM: a `Vec<NodeId>`
+//! indexed by position in the stable node ordering `nodes`. Cell `p` always
+//! holds `nodes[p]` itself or one of its neighbours, so every genome the
+//! operators produce is valid by construction — no repair step needed.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -17,7 +14,11 @@ pub type Genome = Vec<NodeId>;
 
 /// `NodeId -> position` lookup for the stable ordering `nodes`.
 pub fn build_index(nodes: &[NodeId]) -> FxHashMap<NodeId, usize> {
-    nodes.iter().enumerate().map(|(p, &node)| (node, p)).collect()
+    nodes
+        .iter()
+        .enumerate()
+        .map(|(p, &node)| (node, p))
+        .collect()
 }
 
 /// Uniformly pick a value for `node`'s locus cell from `{node} ∪ neighbours(node)`.
@@ -28,23 +29,27 @@ fn pick_cell(graph: &Graph, node: NodeId, rng: &mut impl Rng) -> NodeId {
     if neighbors.is_empty() {
         node
     } else {
-        // neighbors.len() + 1 equally likely outcomes: each neighbour, or self.
         let k = rng.random_range(0..=neighbors.len());
-        if k == neighbors.len() { node } else { neighbors[k] }
+        if k == neighbors.len() {
+            node
+        } else {
+            neighbors[k]
+        }
     }
 }
 
 /// Random genome: every cell independently uniform over `{node} ∪ neighbours(node)`.
 pub fn random_genome(graph: &Graph, nodes: &[NodeId], rng: &mut impl Rng) -> Genome {
-    nodes.iter().map(|&node| pick_cell(graph, node, rng)).collect()
+    nodes
+        .iter()
+        .map(|&node| pick_cell(graph, node, rng))
+        .collect()
 }
 
 /// Decode a locus genome into a label `Partition` by union-find over
-/// *positions*: for each position `p` holding value `v`, union `p` with
-/// `index_of[v]`. Each resulting connected component is one community,
-/// labelled by its union-find root position (cast to `CommunityId`).
-/// Isolated nodes always decode to their own singleton component — no
-/// special-casing needed, `normalize_community_ids` forces them to `-1` later.
+/// *positions*; each connected component is one community, labelled by its
+/// union-find root position. Isolated nodes decode to singletons
+/// (`normalize_community_ids` forces them to `-1` later).
 pub fn decode(nodes: &[NodeId], index_of: &FxHashMap<NodeId, usize>, genome: &Genome) -> Partition {
     let n = nodes.len();
     let mut uf = UnionFind::new(n);
@@ -59,10 +64,8 @@ pub fn decode(nodes: &[NodeId], index_of: &FxHashMap<NodeId, usize>, genome: &Ge
         .collect()
 }
 
-/// Uniform locus-respecting crossover: gene `p` of the child is taken from
-/// parent `a` or parent `b` independently with 50/50 odds (this is the
-/// convention used when the paper's crossover fires; with probability
-/// `1 - cross_rate` the caller instead clones a single parent wholesale).
+/// Uniform locus-respecting crossover: each gene taken from parent `a` or `b`
+/// independently with 50/50 odds.
 pub fn uniform_crossover(a: &Genome, b: &Genome, rng: &mut impl Rng) -> Genome {
     a.iter()
         .zip(b.iter())
@@ -70,10 +73,15 @@ pub fn uniform_crossover(a: &Genome, b: &Genome, rng: &mut impl Rng) -> Genome {
         .collect()
 }
 
-/// Adjacency-constrained mutation: each gene is independently resampled (with
-/// probability `mut_rate`) from `{node} ∪ neighbours(node)` — this can never
-/// produce an invalid locus value.
-pub fn mutate(genome: &mut Genome, graph: &Graph, nodes: &[NodeId], mut_rate: f64, rng: &mut impl Rng) {
+/// Adjacency-constrained mutation: each gene independently resampled (with
+/// probability `mut_rate`) from `{node} ∪ neighbours(node)`.
+pub fn mutate(
+    genome: &mut Genome,
+    graph: &Graph,
+    nodes: &[NodeId],
+    mut_rate: f64,
+    rng: &mut impl Rng,
+) {
     for (p, gene) in genome.iter_mut().enumerate() {
         if rng.random_bool(mut_rate) {
             *gene = pick_cell(graph, nodes[p], rng);
@@ -81,8 +89,6 @@ pub fn mutate(genome: &mut Genome, graph: &Graph, nodes: &[NodeId], mut_rate: f6
     }
 }
 
-/// Minimal path-compressed, union-by-size disjoint-set structure over
-/// `0..n` positions.
 struct UnionFind {
     parent: Vec<usize>,
     size: Vec<usize>,
@@ -137,8 +143,7 @@ mod tests {
         let g = two_triangles();
         let nodes = g.nodes_vec().clone();
         let index_of = build_index(&nodes);
-        // Each cell points at the next node within its own triangle: a valid
-        // locus genome that should decode to exactly the two triangles.
+        // Each cell points at the next node within its own triangle.
         let genome: Genome = vec![1, 2, 0, 4, 5, 3];
         let part = decode(&nodes, &index_of, &genome);
         assert_eq!(part[&0], part[&1]);

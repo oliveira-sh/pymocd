@@ -1,10 +1,8 @@
-//! Locus-based adjacency representation (Park & Song; used independently by
-//! Shi et al. 2012 §3.1.3, Fig. 1 — the same scheme MOGA-Net's paper uses).
-//! Gene `g_i` holds one of node `i`'s neighbours ("including node i itself",
-//! which we use to make degree-0 nodes safe by construction). Decoding a
-//! genome identifies connected components of the implied directed graph
-//! `i -> g_i`; we do this with union-find, which is linear-time and produces
-//! the exact same components as the paper's backtracking scheme.
+//! Locus-based adjacency representation (Park & Song; Shi et al. 2012
+//! §3.1.3, Fig. 1). Gene `g_i` holds one of node `i`'s neighbours (or node
+//! `i` itself, which makes degree-0 nodes safe by construction). Decoding
+//! identifies connected components of the implied graph `i -> g_i` via
+//! union-find — same components as the paper's backtracking scheme.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -13,14 +11,12 @@ use crate::core::graph::{Graph, NodeId, Partition};
 use rand::RngExt;
 use rustc_hash::FxHashMap;
 
-/// Dense `[0, n)` index for a graph's NodeId set (NodeId is not guaranteed
-/// contiguous — built from `graph.nodes_vec()`), plus, per dense index, the
-/// list of dense-index alleles a locus gene may take (the node's neighbours,
-/// or `[self]` for isolated nodes).
+/// Dense `[0, n)` index for a graph's NodeId set (NodeIds are not guaranteed
+/// contiguous), plus per-index legal alleles (the node's neighbours, or
+/// `[self]` for isolated nodes).
 pub struct NodeIndex {
     pub index_to_node: Vec<NodeId>,
-    // Kept alongside `index_to_node` as the dense<->NodeId inverse; only used
-    // during `build` and by tests today, allowed dead in non-test builds.
+    // Only used during `build` and by tests; allowed dead in non-test builds.
     #[allow(dead_code)]
     pub node_to_index: FxHashMap<NodeId, usize>,
     pub neighbor_candidates: Vec<Vec<usize>>,
@@ -41,8 +37,7 @@ impl NodeIndex {
             .map(|(i, &node)| {
                 let neighbors = graph.neighbors(&node);
                 if neighbors.is_empty() {
-                    // Degree-0 node: "each gi can take one of the adjacent
-                    // nodes of node i (including node i itself)" — self-allele.
+                    // Degree-0 node: self-allele.
                     vec![i]
                 } else {
                     neighbors.iter().map(|n| node_to_index[n]).collect()
@@ -75,8 +70,6 @@ pub fn random_genome(idx: &NodeIndex, rng: &mut impl rand::Rng) -> Genome {
         .collect()
 }
 
-/// Union-find with path halving (linear-time, equivalent to the paper's
-/// backtracking component scheme).
 fn find(parent: &mut [usize], mut x: usize) -> usize {
     while parent[x] != x {
         parent[x] = parent[parent[x]];
@@ -107,12 +100,10 @@ pub fn decode(genome: &Genome, idx: &NodeIndex) -> Partition {
     partition
 }
 
-/// Shi's "uniform two-point crossover" — by the paper's own functional
-/// description ("unbiased w.r.t. the ordering of genes, able to generate any
-/// combination of alleles from the two parents") this is plain per-gene
-/// uniform crossover, not classic two-segment crossover. Always valid: each
-/// gene's allele is inherited verbatim from a parent, so it is always one of
-/// that gene's legal alleles.
+/// Shi's "uniform two-point crossover" — per the paper's own functional
+/// description this is plain per-gene uniform crossover, not classic
+/// two-segment crossover. Always valid: each allele is inherited verbatim
+/// from a parent at the same position.
 pub fn uniform_crossover(p1: &Genome, p2: &Genome, rng: &mut impl rand::Rng) -> Genome {
     p1.iter()
         .zip(p2.iter())
@@ -120,11 +111,9 @@ pub fn uniform_crossover(p1: &Genome, p2: &Genome, rng: &mut impl rand::Rng) -> 
         .collect()
 }
 
-/// "we randomly select some genes and assign them with other randomly
-/// selected adjacent nodes." Per-gene independent probability `p_m`; the
-/// paper does not say whether the resample may repeat the current allele —
-/// we allow it (uniform draw over the same candidate set used at init), the
-/// simplest reading and consistent with `random_genome`.
+/// Per-gene adjacency mutation with independent probability `p_m`; the
+/// resample may repeat the current allele (uniform draw over the same
+/// candidate set used at init).
 pub fn mutate(genome: &mut Genome, idx: &NodeIndex, p_m: f64, rng: &mut impl rand::Rng) {
     for i in 0..genome.len() {
         if rng.random_bool(p_m) {

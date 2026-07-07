@@ -91,8 +91,7 @@ pub fn welch_p(a: &[f64], b: &[f64]) -> f64 {
         return 1.0;
     }
     let t = (m1 - m2) / se2.sqrt();
-    let df = se2 * se2
-        / ((v1 / n1).powi(2) / (n1 - 1.0) + (v2 / n2).powi(2) / (n2 - 1.0));
+    let df = se2 * se2 / ((v1 / n1).powi(2) / (n1 - 1.0) + (v2 / n2).powi(2) / (n2 - 1.0));
     betai(0.5 * df, 0.5, df / (df + t * t))
 }
 

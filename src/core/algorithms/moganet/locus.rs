@@ -1,10 +1,8 @@
 //! Locus-based adjacency genome (Park & Song 1989, as used by Pizzuti's
-//! GA-Net / MOGA-Net): an individual is `N` genes `g_1..g_N`, one per node.
-//! "A value `j` assigned to the ith gene is interpreted as a link between
-//! nodes `i` and `j`" -- decoding unions every gene-edge and the connected
-//! components are the communities (linear-time union-find, no fixed
-//! community count). Own copy local to MOGA-Net (not shared with any other
-//! detector's locus module) so this engine is fully self-contained.
+//! GA-Net / MOGA-Net): gene `i` holding value `j` is a link between nodes
+//! `i` and `j`; decoding unions every gene-edge and the connected components
+//! are the communities (no fixed community count). Local copy so the engine
+//! is fully self-contained.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -15,12 +13,10 @@ use rustc_hash::FxHashMap;
 
 pub type Genome = Vec<NodeId>;
 
-/// Precomputed locus bookkeeping for one graph: a stable node ordering, the
-/// reverse `NodeId -> position` map (used by `decode`'s union-find), and
-/// per-position candidate lists (`{node itself} ∪ neighbours`) -- the "safe"
-/// allele set for gene `i` (Pizzuti 2009, Sec. 4: "the possible values an
-/// allele can assume are restricted to the neighbors of gene i"; a node with
-/// no neighbours can only take itself, which decodes to a singleton).
+/// Precomputed locus bookkeeping: stable node ordering, reverse
+/// `NodeId -> position` map, and per-position "safe" allele sets
+/// (`{node itself} ∪ neighbours`, Pizzuti 2009, Sec. 4; a degree-0 node can
+/// only take itself, decoding to a singleton).
 pub struct Locus {
     pub nodes: Vec<NodeId>,
     pub index_of: FxHashMap<NodeId, usize>,
@@ -41,7 +37,11 @@ impl Locus {
                 c
             })
             .collect();
-        Locus { nodes, index_of, candidates }
+        Locus {
+            nodes,
+            index_of,
+            candidates,
+        }
     }
 
     #[inline]
@@ -49,13 +49,9 @@ impl Locus {
         self.nodes.len()
     }
 
-    /// "Biased"/safe initialization (Pizzuti 2009, Sec. 4): generate gene `i`
-    /// directly as a uniformly random pick from `{i itself} ∪ neighbours(i)`.
-    /// This is equivalent in end distribution to "generate a fully random
-    /// individual, then repair any (i,j) that isn't a real edge by replacing
-    /// j with a random neighbour of i" -- every individual built this way is
-    /// safe by construction, so no separate repair pass is needed anywhere
-    /// else in the pipeline.
+    /// "Biased"/safe initialization (Pizzuti 2009, Sec. 4): gene `i` is a
+    /// uniform pick from `{i itself} ∪ neighbours(i)` -- safe by
+    /// construction, so no repair pass is needed anywhere in the pipeline.
     pub fn random_genome(&self, rng: &mut impl Rng) -> Genome {
         self.candidates
             .iter()

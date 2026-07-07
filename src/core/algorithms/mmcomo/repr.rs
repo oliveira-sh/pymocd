@@ -13,7 +13,9 @@ pub fn decode(g: &Graph, sm: &Sm, genome: &Genome) -> Labels {
     }
 
     // Eq. 3: central-node set CN (b_i = 1). Short genome → missing entries non-central.
-    let mut cn: Vec<usize> = (0..n).filter(|&i| genome.get(i).copied().unwrap_or(0) != 0).collect();
+    let mut cn: Vec<usize> = (0..n)
+        .filter(|&i| genome.get(i).copied().unwrap_or(0) != 0)
+        .collect();
 
     if cn.is_empty() {
         let mut best = 0usize;
@@ -111,7 +113,15 @@ mod tests {
 
     // Two triangles {0,1,2} and {3,4,5} joined by a single bridge edge (2,3).
     fn two_triangles() -> Graph {
-        let edges = [(0usize, 1usize), (1, 2), (0, 2), (3, 4), (4, 5), (3, 5), (2, 3)];
+        let edges = [
+            (0usize, 1usize),
+            (1, 2),
+            (0, 2),
+            (3, 4),
+            (4, 5),
+            (3, 5),
+            (2, 3),
+        ];
         let n = 6;
         let mut adj: Vec<Vec<usize>> = vec![Vec::new(); n];
         for &(a, b) in &edges {

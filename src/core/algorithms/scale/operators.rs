@@ -1,4 +1,4 @@
-//! Genetic operators for `scale`, ported to `CsrGraph`.
+//! Genetic operators for `scale`.
 
 use crate::core::graph::CsrGraph;
 use rand::rngs::StdRng;
@@ -45,8 +45,6 @@ pub fn macro_offspring(
         return Vec::new();
     }
     let n = parents[0].len();
-    // Each child is independent: parallelise over offspring slots, one
-    // deterministic per-slot RNG each (seeded reproducibility contract).
     (0..pop)
         .into_par_iter()
         .map(|k| {
@@ -89,7 +87,6 @@ pub fn micro_offspring(
     }
     let n = g.n;
     let p_mut = if n > 0 { 1.0 / n as f64 } else { 0.0 };
-    // Independent per child → parallelise, one deterministic per-slot RNG each.
     (0..pop)
         .into_par_iter()
         .map(|k| {
@@ -164,8 +161,8 @@ pub fn local_search(g: &CsrGraph, labels: &mut Labels) {
             }
 
             let mut best_c = ci;
-            let mut best_g = w.get(&ci).copied().unwrap_or(0.0)
-                - tot.get(&ci).copied().unwrap_or(0.0) * ki / m2;
+            let mut best_g =
+                w.get(&ci).copied().unwrap_or(0.0) - tot.get(&ci).copied().unwrap_or(0.0) * ki / m2;
 
             for (&c, &wc) in w.iter() {
                 if c == ci {

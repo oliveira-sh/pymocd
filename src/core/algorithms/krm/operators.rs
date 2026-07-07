@@ -30,14 +30,10 @@ pub fn binary_tournament(pop: &[Individual], rng: &mut impl Rng) -> usize {
     }
 }
 
-/// Uniform, locus-respecting crossover. The paper's text on this point is
-/// terse ("customized NSGA-III ... standard crossover"), so this is our exact
-/// reading: with probability `cross_rate` the child takes each gene
-/// independently from parent A or parent B (50/50 per gene -- classic uniform
-/// crossover); otherwise (probability `1 - cross_rate`) the child is a
-/// verbatim clone of one parent chosen uniformly at random. Both branches
-/// trivially respect the locus constraint, since every gene value is copied
-/// unmodified from a valid parent gene at the same position.
+/// Uniform, locus-respecting crossover: with probability `cross_rate` each
+/// gene comes from parent A or B (50/50 per gene); otherwise the child clones
+/// one parent chosen at random. Both branches respect the locus constraint,
+/// since every gene is copied from a valid parent gene at the same position.
 pub fn crossover(a: &Genome, b: &Genome, cross_rate: f64, rng: &mut impl Rng) -> Genome {
     if rng.random_bool(cross_rate) {
         a.iter()
@@ -52,8 +48,7 @@ pub fn crossover(a: &Genome, b: &Genome, cross_rate: f64, rng: &mut impl Rng) ->
 }
 
 /// Adjacency-constrained mutation: each gene independently, with probability
-/// `mut_rate`, is resampled uniformly from `{node itself} ∪ {its
-/// neighbours}` -- this can never produce an invalid locus value.
+/// `mut_rate`, is resampled uniformly from `{node itself} ∪ neighbours`.
 pub fn mutate(genome: &mut Genome, locus: &Locus, mut_rate: f64, rng: &mut impl Rng) {
     for (p, gene) in genome.iter_mut().enumerate() {
         if rng.random_bool(mut_rate) {

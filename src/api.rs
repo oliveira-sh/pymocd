@@ -1,4 +1,4 @@
-//! Implements some python-facing APIs
+//! Python-facing API functions.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -7,22 +7,24 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 use pyo3_stub_gen::derive::gen_stub_pyfunction;
 
-use crate::core::graph::CsrGraph;
-use crate::core::metaheuristics::helpers::objectives::sbm_mdl::{dl_dcsbm_full_score, dl_dcsbm_score, dl_sbm_score};
-use rustc_hash::FxHashMap;
+use crate::core::algorithms::ccm;
 use crate::core::algorithms::hpmocd::HpMocd;
 use crate::core::algorithms::hpmocd::{
     DEFAULT_CROSS_RATE as HPMOCD_DEFAULT_CROSS_RATE,
     DEFAULT_DEBUG_LEVEL as HPMOCD_DEFAULT_DEBUG_LEVEL, DEFAULT_MUT_RATE as HPMOCD_DEFAULT_MUT_RATE,
     DEFAULT_NUM_GENS as HPMOCD_DEFAULT_NUM_GENS, DEFAULT_POP_SIZE,
 };
-use crate::core::algorithms::ccm;
 use crate::core::algorithms::krm;
 use crate::core::algorithms::mmcomo;
 use crate::core::algorithms::mocd;
 use crate::core::algorithms::moganet;
 use crate::core::algorithms::scale;
+use crate::core::graph::CsrGraph;
 use crate::core::graph::{Graph, Partition, get_edges, get_nodes};
+use crate::core::metaheuristics::helpers::objectives::sbm_mdl::{
+    dl_dcsbm_full_score, dl_dcsbm_score, dl_sbm_score,
+};
+use rustc_hash::FxHashMap;
 
 /// Run HP-MOCD (NSGA-II) with defaults. For tuning, use the ``HpMocd`` class.
 ///
@@ -44,14 +46,12 @@ pub fn hpmocd_fn(py: Python<'_>, graph: &Bound<'_, PyAny>) -> PyResult<Partition
     instance.run(py)
 }
 
-/// Run Shi-MOCD (Shi, Yan, Cai, Wu 2012) — the PESA-II multi-objective detector
-/// over Shi's decomposed-modularity objectives (intra/inter; see
-/// ``core::operators::objective``). Returns the **max-modularity** member of the
-/// Pareto front (MOCD-Q selection, Shi Eq. 3.8), so it compares fairly against
-/// the single-solution detectors.
+/// Run Shi-MOCD (Shi, Yan, Cai, Wu 2012) — PESA-II over Shi's
+/// decomposed-modularity objectives (intra/inter). Returns the
+/// **max-modularity** member of the Pareto front (MOCD-Q selection, Shi Eq. 3.8).
 ///
-/// Defaults match the HP-MOCD benchmark budget (pop=100, gen=100, C_R=0.9,
-/// M_R=0.1); pass Shi's own (e.g. ``cross_rate=0.6, mut_rate=0.4``) via kwargs.
+/// Defaults: pop=100, gen=100, C_R=0.9, M_R=0.1; pass Shi's own
+/// (e.g. ``cross_rate=0.6, mut_rate=0.4``) via kwargs.
 ///
 /// Args:
 ///     graph: networkx.Graph or igraph.Graph (integer node ids).
@@ -89,10 +89,8 @@ pub fn mocd_q_fn(
 }
 
 /// Shi-MOCD with the **Max-Min Distance (MOCD-D)** model selector (Shi et al.
-/// 2012, Eqs. 3.9–3.11): the Pareto-front member that deviates most from
-/// ``rand_networks`` degree-preserving random control fronts (the partition whose
-/// (intra, inter) is farthest from what a structureless network of the same degree
-/// sequence produces). Often beats MOCD-Q on noisy / degree-heterogeneous graphs.
+/// 2012, Eqs. 3.9–3.11): returns the Pareto-front member whose (intra, inter)
+/// deviates most from ``rand_networks`` degree-preserving random control fronts.
 ///
 /// Returns:
 ///     ``dict[node, community]``. Isolated nodes get community ``-1``.
@@ -208,7 +206,9 @@ pub fn krm_fn(
     divisions: usize,
 ) -> PyResult<Partition> {
     let g = Graph::from_python(graph);
-    Ok(krm::krm(&g, pop_size, num_gens, cross_rate, mut_rate, divisions))
+    Ok(krm::krm(
+        &g, pop_size, num_gens, cross_rate, mut_rate, divisions,
+    ))
 }
 
 /// MMCoMO macro-micro co-evolutionary detector (Zhang et al.); returns the
@@ -229,7 +229,9 @@ pub fn mmcomo_fn(
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
-    let part = mmcomo::mmcomo(&nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, beta);
+    let part = mmcomo::mmcomo(
+        &nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, beta,
+    );
     let d = PyDict::new(py);
     for (node, comm) in part {
         d.set_item(node, comm)?;
@@ -237,8 +239,8 @@ pub fn mmcomo_fn(
     Ok(d.into_any().unbind())
 }
 
-/// MMCoMO's merged rank-1 front, the candidate set `mmcomo` selects from
-/// (exposed for the paper's Table IV best-NMI rule). Isolated nodes get -1.
+/// MMCoMO's merged rank-1 front, the candidate set `mmcomo` selects from.
+/// Isolated nodes get -1.
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(name = "mmcomo_fronts", signature = (graph, pop_size = mmcomo::DEFAULT_POP_SIZE, num_gens = mmcomo::DEFAULT_NUM_GENS, cross_rate = mmcomo::DEFAULT_CROSS_RATE, mut_rate = mmcomo::DEFAULT_MUT_RATE, gap = mmcomo::DEFAULT_GAP, beta = mmcomo::DEFAULT_BETA))]
@@ -256,8 +258,9 @@ pub fn mmcomo_fronts_fn(
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
-    let fronts =
-        mmcomo::mmcomo_fronts(&nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, beta);
+    let fronts = mmcomo::mmcomo_fronts(
+        &nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, beta,
+    );
     let out = PyList::empty(py);
     for part in fronts {
         let d = PyDict::new(py);
@@ -270,8 +273,8 @@ pub fn mmcomo_fronts_fn(
 }
 
 /// `scale` — optimized MMCoMO variant (sparse-CSR similarity, Rayon-parallel,
-/// union-refined Pareto front). Returns the winning label-free selector's member
-/// of the merged rank-1 front. Isolated nodes get -1.
+/// union-refined Pareto front). Returns the label-free-selected member of the
+/// merged rank-1 front. Isolated nodes get -1.
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(name = "scale", signature = (graph, pop_size = scale::DEFAULT_POP_SIZE, num_gens = scale::DEFAULT_NUM_GENS, cross_rate = scale::DEFAULT_CROSS_RATE, mut_rate = scale::DEFAULT_MUT_RATE, gap = scale::DEFAULT_GAP, beta = scale::DEFAULT_BETA, adaptive_stop = false, conv_pval = scale::CONV_PVAL))]
@@ -290,7 +293,18 @@ pub fn scale_fn(
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
-    let part = scale::scale(&nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, beta, adaptive_stop, conv_pval);
+    let part = scale::scale(
+        &nodes,
+        &edges,
+        pop_size,
+        num_gens,
+        cross_rate,
+        mut_rate,
+        gap,
+        beta,
+        adaptive_stop,
+        conv_pval,
+    );
     let d = PyDict::new(py);
     for (node, comm) in part {
         d.set_item(node, comm)?;
@@ -299,8 +313,7 @@ pub fn scale_fn(
 }
 
 /// `scale`'s merged rank-1 front (after union-refinement), the candidate set
-/// `scale` selects from. Exposed for the oracle-gap selector study. Isolated
-/// nodes get -1.
+/// `scale` selects from. Isolated nodes get -1.
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(name = "scale_fronts", signature = (graph, pop_size = scale::DEFAULT_POP_SIZE, num_gens = scale::DEFAULT_NUM_GENS, cross_rate = scale::DEFAULT_CROSS_RATE, mut_rate = scale::DEFAULT_MUT_RATE, gap = scale::DEFAULT_GAP, beta = scale::DEFAULT_BETA, adaptive_stop = false, conv_pval = scale::CONV_PVAL, refine = true, topo_mode = 0))]
@@ -322,8 +335,20 @@ pub fn scale_fronts_fn(
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
-    let fronts =
-        scale::scale_fronts(&nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, beta, adaptive_stop, conv_pval, refine, topo_mode);
+    let fronts = scale::scale_fronts(
+        &nodes,
+        &edges,
+        pop_size,
+        num_gens,
+        cross_rate,
+        mut_rate,
+        gap,
+        beta,
+        adaptive_stop,
+        conv_pval,
+        refine,
+        topo_mode,
+    );
     let out = PyList::empty(py);
     for part in fronts {
         let d = PyDict::new(py);
@@ -336,11 +361,9 @@ pub fn scale_fronts_fn(
 }
 
 /// Label-free microcanonical Bernoulli-SBM minimum-description-length score
-/// (`dl_sbm_score`, Peixoto-style; LOWER is better) of `partition` on `graph` —
-/// the exact scorer the SCALE selector minimises, exposed so the `scale` selector
-/// study evaluates the identical criterion it deploys. `partition` is a
-/// ``dict[node, community]`` (e.g. a `scale_fronts` member). Nodes absent from the
-/// dict are treated as community 0.
+/// (Peixoto-style; LOWER is better) of `partition` on `graph`. `partition` is a
+/// ``dict[node, community]`` (e.g. a `scale_fronts` member). Nodes absent from
+/// the dict are treated as community 0.
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(name = "sbm_mdl", signature = (graph, partition))]
@@ -358,11 +381,11 @@ pub fn sbm_mdl_fn(graph: &Bound<'_, PyAny>, partition: &Bound<'_, PyDict>) -> Py
     Ok(dl_sbm_score(&csr, &part))
 }
 
-/// Degree-corrected SBM minimum-description-length score (`dl_dcsbm_score`; LOWER
-/// is better) of `partition` on `graph` — the selector `scale` deploys. Unlike the
-/// plain Bernoulli `sbm_mdl`, the degree correction prevents collapse to a single
-/// block under degree-heterogeneous or high-mixing structure. `partition` is a
-/// ``dict[node, community]``; nodes absent from it are treated as community 0.
+/// Degree-corrected SBM minimum-description-length score (LOWER is better) of
+/// `partition` on `graph`. Unlike the plain Bernoulli `sbm_mdl`, the degree
+/// correction prevents collapse to a single block under degree-heterogeneous or
+/// high-mixing structure. `partition` is a ``dict[node, community]``; nodes
+/// absent from it are treated as community 0.
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(name = "dcsbm_mdl", signature = (graph, partition))]
@@ -382,7 +405,7 @@ pub fn dcsbm_mdl_fn(graph: &Bound<'_, PyAny>, partition: &Bound<'_, PyDict>) -> 
 
 /// Complete degree-corrected SBM description length (profile score plus the
 /// degree-sequence cost) of `partition` on `graph` — the criterion `scale`'s
-/// selector deploys. LOWER is better.
+/// selector minimises. LOWER is better.
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(name = "dcsbm_full_mdl", signature = (graph, partition))]
@@ -438,9 +461,20 @@ pub fn scale_fronts_raw_fn(
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
-    let fronts = scale::scale_fronts(&nodes, &edges, pop_size, num_gens, cross_rate,
-                                     mut_rate, gap, beta, adaptive_stop, conv_pval,
-                                     refine, topo_mode);
+    let fronts = scale::scale_fronts(
+        &nodes,
+        &edges,
+        pop_size,
+        num_gens,
+        cross_rate,
+        mut_rate,
+        gap,
+        beta,
+        adaptive_stop,
+        conv_pval,
+        refine,
+        topo_mode,
+    );
     // fronts are (node_id, community) pairs; realign to `nodes` order.
     let mut pos: FxHashMap<i32, usize> = FxHashMap::default();
     for (i, &v) in nodes.iter().enumerate() {
@@ -457,9 +491,8 @@ pub fn scale_fronts_raw_fn(
                 buf[i] = comm;
             }
         }
-        let bytes: &[u8] = unsafe {
-            std::slice::from_raw_parts(buf.as_ptr() as *const u8, buf.len() * 4)
-        };
+        let bytes: &[u8] =
+            unsafe { std::slice::from_raw_parts(buf.as_ptr() as *const u8, buf.len() * 4) };
         out.append(PyBytes::new(py, bytes))?;
     }
     Ok(out.into_any().unbind())

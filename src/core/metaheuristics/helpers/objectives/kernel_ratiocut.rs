@@ -92,11 +92,17 @@ mod tests {
         assert!((rc_split - 2.0 / 3.0).abs() < 1e-9, "RC={rc_split}");
 
         // KKM penalizes under-segmentation: the split beats the all-in-one blob.
-        assert!(kkm_split < kkm_one, "KKM split {kkm_split} !< one {kkm_one}");
+        assert!(
+            kkm_split < kkm_one,
+            "KKM split {kkm_split} !< one {kkm_one}"
+        );
         // RC penalizes over-segmentation: the split beats the singletons. (The
         // all-in-one blob has RC=0 — zero cut — so RC alone cannot rule it out;
         // that is exactly why KKM is the second, opposing objective.)
-        assert!(rc_split < rc_sing, "RC split {rc_split} !< singletons {rc_sing}");
+        assert!(
+            rc_split < rc_sing,
+            "RC split {rc_split} !< singletons {rc_sing}"
+        );
         assert_eq!(rc_one, 0.0, "all-in-one has no cut");
     }
 }

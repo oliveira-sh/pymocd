@@ -1,28 +1,11 @@
-//! Shi-MOCD (Shi, Yan, Cai, Wu 2012): a **self-contained** PESA-II
-//! multi-objective community detector over Shi's locus-based adjacency
-//! representation and decomposed-modularity objectives, with both model
-//! selectors — MOCD-Q (max modularity, Eq. 3.8) and MOCD-D (max-min distance to
-//! degree-preserving control fronts, Eqs. 3.9–3.11). Exposed via `mocd_q` /
-//! `mocd_d`; the `Mocd` class also offers `generate_pareto_front` / `run`.
-//!
-//! Paper features reproduced (Shi et al. 2012, §3): locus-based adjacency
-//! genome (`locus.rs`, Park & Song scheme, §3.1.3) decoded by connected
-//! components; per-gene uniform crossover ("uniform two-point crossover" per
-//! the paper's own functional description) + per-gene adjacency mutation;
-//! classic PESA-II (`pesa2.rs`, Corne et al. 2001) with an internal population
-//! (IP) and external archive (EP), hyper-grid niching, squeeze-factor binary
-//! tournament selection drawn from EP, and classic squeeze-factor archive
-//! truncation (not this repo's dominance-count/crowding blend).
-//!
-//! Borrowed machinery removed: the shared
-//! `core::metaheuristics::pesa2::{evolutionary_phase, hypergrid}` engine
-//! (generic label-map `Partition` crossover/mutation + 0.3/0.7-weighted
-//! truncation heuristic) and all `rayon` parallel population/fitness
-//! evaluation — this engine is single-threaded, generation by generation, as
-//! in the paper. The only piece still shared is the pure objective-formula
-//! function `core::metaheuristics::helpers::objectives::decomposed_modularity::
-//! calculate_objectives` (math over an already-decoded partition, not GA
-//! machinery).
+//! Shi-MOCD (Shi, Yan, Cai, Wu 2012): a self-contained, single-threaded
+//! PESA-II (Corne et al. 2001) community detector over Shi's locus-based
+//! adjacency genome (`locus.rs`, Park & Song scheme, §3.1.3) and
+//! decomposed-modularity objectives, with both model selectors — MOCD-Q (max
+//! modularity, Eq. 3.8) and MOCD-D (max-min distance to degree-preserving
+//! control fronts, Eqs. 3.9–3.11). Deliberately avoids the shared PESA-II
+//! engine and Rayon so cost tracks the paper; the only shared piece is the
+//! pure objective formula (`decomposed_modularity::calculate_objectives`).
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2024 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -132,13 +115,10 @@ impl Mocd {
                 .map(|random_graph| {
                     let random_degrees = random_graph.precompute_degrees();
 
-                    // FULL budget for the control fronts (Shi 2012, §3.2). A reduced
-                    // budget leaves the random front from reaching the high-intra
-                    // (fragmented) region, which made the real fragmented extreme
-                    // spuriously "most deviant" and selected. Fragmentation is
-                    // structure-independent, so a fully-evolved random front matches
-                    // it (small deviation) and the genuine community bulge — which a
-                    // structureless graph cannot reach — becomes the max-deviation pick.
+                    // Control fronts need the FULL budget (Shi 2012, §3.2): an
+                    // under-evolved random front misses the fragmented region,
+                    // making the real fragmented extreme spuriously "most
+                    // deviant" instead of the genuine community bulge.
                     evolutionary_phase(
                         random_graph,
                         self.debug_level,
@@ -193,7 +173,10 @@ mod tests {
         // Q = 1 - intra - inter (Shi Eq. 3.7); objectives = [intra, inter].
         let q = 1.0 - best.objectives[0] - best.objectives[1];
         assert!(q > 0.0, "Q = {q}");
-        assert_ne!(best.partition[&0], best.partition[&3], "triangles not split");
+        assert_ne!(
+            best.partition[&0], best.partition[&3],
+            "triangles not split"
+        );
         let comms: FxHashSet<i32> = best.partition.values().copied().collect();
         assert_eq!(comms.len(), 2, "communities = {comms:?}");
     }

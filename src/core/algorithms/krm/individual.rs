@@ -1,7 +1,6 @@
-//! Individual representation + Pareto dominance + fast non-dominated sort for
-//! the self-contained NSGA-III-KRM engine. The genome is locus-based (see
-//! `locus.rs`); objectives are stored all-minimized as `[KKM, RC, -Q]` so a
-//! single `dominates` rule works across the bi-min/uni-max objective mix.
+//! Individual + Pareto dominance + fast non-dominated sort for NSGA-III-KRM.
+//! Objectives are stored all-minimized as `[KKM, RC, -Q]` so a single
+//! `dominates` rule works across the bi-min/uni-max objective mix.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -34,10 +33,8 @@ impl Individual {
     }
 }
 
-/// Sequential fast non-dominated sort (Deb et al. 2002). Deliberately a plain
-/// `O(n^2)` scan with no data-parallel iterators or atomics -- single-threaded
-/// by construction, so this engine's cost reflects the paper's method rather
-/// than this repo's optimized (parallel) sort.
+/// Fast non-dominated sort (Deb et al. 2002); deliberately sequential so this
+/// engine's cost reflects the paper's method.
 pub fn fast_non_dominated_sort(pop: &mut [Individual]) {
     let n = pop.len();
     if n == 0 {

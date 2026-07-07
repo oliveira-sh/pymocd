@@ -1,19 +1,12 @@
-//! sim — sparse, near-linear replacement for MMCoMO's dense n×n diffusion-kernel
-//! similarity matrix.
-//!
-//! The dense baseline (`mmcomo`) materialises `SM = exp(beta·(A−D))` — an O(n²)
-//! matrix built by an O(n³) Jacobi eigendecomposition — and uses it for three
-//! things: decode (assign each node to its most-similar medoid centre), encode
-//! (pick each community's medoid by intra-similarity), and the influence-step SM
-//! update (Eq. 7). All three are reformulated here over the graph's edges so the
-//! space is O(n + m) and the time per call is O(rounds·m) / O(m).
+//! Sparse, near-linear replacement for MMCoMO's dense n×n diffusion-kernel
+//! similarity `SM = exp(beta·(A−D))`: its decode, encode, and influence-update
+//! (Eq. 7) roles are reformulated over the graph's edges — O(n + m) space.
 //!
 //! The similarity is carried as a per-directed-adjacency-slot edge weight
 //! `wadj` (length 2m, parallel to `CsrGraph::adj`), initialised to 1 and updated
-//! by the influence step's co-membership consensus (`super::influence`). Because
-//! `exp(beta·(A−D))` is, for the small beta the paper uses, a *local* kernel
-//! dominated by short paths, replacing its argmax/medoid roles with weighted
-//! graph propagation preserves the partitions it would have produced.
+//! by the influence step's co-membership consensus (`super::influence`). For the
+//! small beta the paper uses the dense kernel is local (short-path dominated),
+//! so weighted graph propagation preserves the partitions it would produce.
 
 use crate::core::graph::CsrGraph;
 use rayon::prelude::*;
@@ -38,14 +31,11 @@ fn max_degree_node(g: &CsrGraph) -> usize {
 /// Decode a medoid genome to a label vector — the sparse analogue of Eqs. 3-5.
 ///
 /// Centres `CN = {i : genome[i] = 1}` keep their own id as label; every other
-/// node is assigned to the centre it is most strongly connected to, via weighted
-/// multi-source label propagation seeded at the centres. Each sweep a node adopts
-/// the centre-label with the greatest summed incident edge weight among its
-/// already-assigned neighbours (the dense kernel's argmax_{c} SM[i][c] is
-/// dominated by exactly this short-path edge mass). Updates are applied in place
-/// (asynchronous), so the flood advances many hops per sweep and converges in a
-/// handful of sweeps without oscillating, while still — like the dense argmax
-/// decode — assigning every node reachable from a centre.
+/// node adopts, per sweep, the centre-label with the greatest summed incident
+/// edge weight among its already-assigned neighbours (weighted multi-source
+/// label propagation — the dense kernel's argmax_{c} SM[i][c] is dominated by
+/// exactly this short-path edge mass). Updates are asynchronous (in place), so
+/// the flood advances many hops per sweep and converges without oscillating.
 /// Connected components that contain no centre are each collapsed into a single
 /// community (their minimum node id), never per-node singletons.
 pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
@@ -76,12 +66,8 @@ pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
     let mut vote = vec![0.0f64; n];
     let mut touched: Vec<usize> = Vec::with_capacity(64);
 
-    // ASYNCHRONOUS label propagation: each node's new label is written in place,
-    // so later nodes in a sweep already see it — the centre flood advances many
-    // hops per sweep and (unlike synchronous LP) cannot two-cycle oscillate, so
-    // it converges in a handful of sweeps even on dense graphs. The `changed`
-    // break exits the moment the partition is stable; the `n` bound is only a
-    // runaway guard (a sweep visits the whole node order regardless of diameter).
+    // The `n` bound is only a runaway guard; the `changed` break exits as soon
+    // as the partition is stable.
     for _ in 0..n {
         let mut changed = false;
         for u in 0..n {
@@ -93,8 +79,6 @@ pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
             let end = g.xadj[u + 1] as usize;
             let mut best = lab[u];
             let mut best_w = if lab[u] != UNSET { 0.0 } else { -1.0 };
-            // Tally weighted votes over assigned neighbours (already-updated this
-            // sweep for v < u — that is the asynchronous flood).
             for p in start..end {
                 let v = g.adj[p] as usize;
                 let lv = lab[v];
@@ -211,7 +195,6 @@ pub fn encode(g: &CsrGraph, wadj: &[f64], labels: &Labels) -> Genome {
         }
     }
     for (c, (node, _)) in best_node {
-        // Singletons (size 1) trivially mark themselves; otherwise the medoid.
         let _ = c;
         genome[node] = 1;
     }
@@ -297,8 +280,7 @@ mod tests {
     #[test]
     fn decode_high_diameter_single_centre_no_singletons() {
         // 200-node path with one centre at node 0: every node must join the
-        // centre's community (1 community), not fragment into distance-singletons
-        // (regression for the removed 64-round cap).
+        // centre's community, not fragment into distance-singletons.
         let n = 200i32;
         let nodes: Vec<i32> = (0..n).collect();
         let edges: Vec<(i32, i32)> = (0..n - 1).map(|i| (i, i + 1)).collect();
@@ -311,7 +293,12 @@ mod tests {
         let mut uniq = lab.clone();
         uniq.sort_unstable();
         uniq.dedup();
-        assert_eq!(uniq.len(), 1, "high-diameter path fragmented into {} communities", uniq.len());
+        assert_eq!(
+            uniq.len(),
+            1,
+            "high-diameter path fragmented into {} communities",
+            uniq.len()
+        );
     }
 
     #[test]

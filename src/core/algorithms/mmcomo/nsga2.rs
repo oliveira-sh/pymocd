@@ -1,6 +1,6 @@
 use rand::RngExt; // rand 0.10: random_range/random_bool live on RngExt
 
-// Both objectives minimized, stored as (KKM, RC). NSGA-II domination.
+// Both objectives minimized, stored as (KKM, RC).
 #[inline]
 fn dominates(a: (f64, f64), b: (f64, f64)) -> bool {
     let le = a.0 <= b.0 && a.1 <= b.1;
@@ -78,16 +78,14 @@ pub fn crowding_distance(objs: &[(f64, f64)], ranks: &[usize]) -> Vec<f64> {
         }
 
         for obj in 0..2 {
-            let key = |idx: usize| -> f64 {
-                if obj == 0 {
-                    objs[idx].0
-                } else {
-                    objs[idx].1
-                }
-            };
+            let key = |idx: usize| -> f64 { if obj == 0 { objs[idx].0 } else { objs[idx].1 } };
 
             let mut order = group.clone();
-            order.sort_by(|&a, &b| key(a).partial_cmp(&key(b)).unwrap_or(std::cmp::Ordering::Equal));
+            order.sort_by(|&a, &b| {
+                key(a)
+                    .partial_cmp(&key(b))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
 
             let f_min = key(order[0]);
             let f_max = key(order[g - 1]);
