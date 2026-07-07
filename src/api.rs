@@ -7,8 +7,9 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 use pyo3_stub_gen::derive::gen_stub_pyfunction;
 
-use crate::core::algorithms::ariadne::Ariadne;
 use crate::core::graph::CsrGraph;
+use crate::core::metaheuristics::helpers::objectives::sbm_mdl::{dl_dcsbm_full_score, dl_dcsbm_score, dl_sbm_score};
+use rustc_hash::FxHashMap;
 use crate::core::algorithms::hpmocd::HpMocd;
 use crate::core::algorithms::hpmocd::{
     DEFAULT_CROSS_RATE as HPMOCD_DEFAULT_CROSS_RATE,
@@ -20,6 +21,7 @@ use crate::core::algorithms::krm;
 use crate::core::algorithms::mmcomo;
 use crate::core::algorithms::mocd;
 use crate::core::algorithms::moganet;
+use crate::core::algorithms::scale;
 use crate::core::graph::{Graph, Partition, get_edges, get_nodes};
 
 /// Run HP-MOCD (NSGA-II) with defaults. For tuning, use the ``HpMocd`` class.
@@ -40,79 +42,6 @@ pub fn hpmocd_fn(py: Python<'_>, graph: &Bound<'_, PyAny>) -> PyResult<Partition
         None,
     )?;
     instance.run(py)
-}
-
-/// Run Ariadne on ``graph`` and return a single crisp partition (Adaptive
-/// Resolution Inference via Agreement-guided, Density-aware NSGA-II Evolution;
-/// dense-CSR NSGA-II, CPM objective).
-///
-/// The CPM resolution is chosen per graph by the auto-γ heuristic
-/// (`gamma_pred`): a label-propagation pass estimates the graph's characteristic
-/// internal density and five γ are spread around it. One NSGA-II island per γ is
-/// evolved with elite ring migration coupling them, their rank-1 Pareto members
-/// are unioned, and a cohesion-guarded tiny-community merge of every member is
-/// added alongside the raw ones to form the frontier. A label-free SBM
-/// minimum-description-length selector then picks the single best member. There
-/// are no manual search parameters.
-///
-/// Ariadne is a crisp community detector: the returned partition assigns exactly
-/// one community per node.
-///
-/// Args:
-///     graph: networkx.Graph or igraph.Graph (integer node ids).
-///
-/// Returns:
-///     ``dict[node, community]`` — the selected partition. Isolated nodes get ``-1``.
-#[gen_stub_pyfunction]
-#[pyfunction]
-#[pyo3(name = "ariadne", signature = (graph))]
-pub fn ariadne_fn(graph: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-    let py = graph.py();
-    let nodes = get_nodes(graph)?;
-    let edges = get_edges(graph)?;
-    let csr = CsrGraph::from_edges(&nodes, &edges);
-    let labels = csr.labels.clone();
-    let alg = Ariadne::new(csr);
-    let part = alg.run_auto();
-
-    let d = PyDict::new(py);
-    for (i, &c) in part.iter().enumerate() {
-        d.set_item(labels[i], c)?;
-    }
-    Ok(d.into_any().unbind())
-}
-
-/// Return Ariadne's full **frontier** — the pooled rank-1 Pareto members across
-/// the predicted-γ islands plus the refined copies, deduplicated. This is the
-/// candidate set that ``ariadne`` selects a single partition *from* (via the
-/// label-free SBM minimum-description-length selector); exposed for studying the
-/// selection step.
-///
-/// Args:
-///     graph: networkx.Graph or igraph.Graph (integer node ids).
-///
-/// Returns:
-///     ``list[dict[node, community]]`` — one crisp partition per frontier member.
-#[gen_stub_pyfunction]
-#[pyfunction]
-#[pyo3(name = "ariadne_fronts", signature = (graph))]
-pub fn ariadne_fronts_fn(graph: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-    use pyo3::types::PyList;
-    let py = graph.py();
-    let nodes = get_nodes(graph)?;
-    let edges = get_edges(graph)?;
-    let csr = CsrGraph::from_edges(&nodes, &edges);
-    let labels = csr.labels.clone();
-    let alg = Ariadne::new(csr);
-    let out = PyList::empty(py);
-    for part in alg.run_auto_fronts() {
-        let d = PyDict::new(py);
-        for (i, &c) in part.iter().enumerate() {
-            d.set_item(labels[i], c)?;
-        }
-        out.append(d)?;
-    }
-    Ok(out.into_any().unbind())
 }
 
 /// Run Shi-MOCD (Shi, Yan, Cai, Wu 2012) — the PESA-II multi-objective detector
@@ -336,6 +265,202 @@ pub fn mmcomo_fronts_fn(
             d.set_item(node, comm)?;
         }
         out.append(d)?;
+    }
+    Ok(out.into_any().unbind())
+}
+
+/// `scale` — optimized MMCoMO variant (sparse-CSR similarity, Rayon-parallel,
+/// union-refined Pareto front). Returns the winning label-free selector's member
+/// of the merged rank-1 front. Isolated nodes get -1.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "scale", signature = (graph, pop_size = scale::DEFAULT_POP_SIZE, num_gens = scale::DEFAULT_NUM_GENS, cross_rate = scale::DEFAULT_CROSS_RATE, mut_rate = scale::DEFAULT_MUT_RATE, gap = scale::DEFAULT_GAP, beta = scale::DEFAULT_BETA, adaptive_stop = false, conv_pval = scale::CONV_PVAL))]
+#[allow(clippy::too_many_arguments)]
+pub fn scale_fn(
+    graph: &Bound<'_, PyAny>,
+    pop_size: usize,
+    num_gens: usize,
+    cross_rate: f64,
+    mut_rate: f64,
+    gap: usize,
+    beta: f64,
+    adaptive_stop: bool,
+    conv_pval: f64,
+) -> PyResult<Py<PyAny>> {
+    let py = graph.py();
+    let nodes = get_nodes(graph)?;
+    let edges = get_edges(graph)?;
+    let part = scale::scale(&nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, beta, adaptive_stop, conv_pval);
+    let d = PyDict::new(py);
+    for (node, comm) in part {
+        d.set_item(node, comm)?;
+    }
+    Ok(d.into_any().unbind())
+}
+
+/// `scale`'s merged rank-1 front (after union-refinement), the candidate set
+/// `scale` selects from. Exposed for the oracle-gap selector study. Isolated
+/// nodes get -1.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "scale_fronts", signature = (graph, pop_size = scale::DEFAULT_POP_SIZE, num_gens = scale::DEFAULT_NUM_GENS, cross_rate = scale::DEFAULT_CROSS_RATE, mut_rate = scale::DEFAULT_MUT_RATE, gap = scale::DEFAULT_GAP, beta = scale::DEFAULT_BETA, adaptive_stop = false, conv_pval = scale::CONV_PVAL, refine = true, topo_mode = 0))]
+#[allow(clippy::too_many_arguments)]
+pub fn scale_fronts_fn(
+    graph: &Bound<'_, PyAny>,
+    pop_size: usize,
+    num_gens: usize,
+    cross_rate: f64,
+    mut_rate: f64,
+    gap: usize,
+    beta: f64,
+    adaptive_stop: bool,
+    conv_pval: f64,
+    refine: bool,
+    topo_mode: u8,
+) -> PyResult<Py<PyAny>> {
+    use pyo3::types::PyList;
+    let py = graph.py();
+    let nodes = get_nodes(graph)?;
+    let edges = get_edges(graph)?;
+    let fronts =
+        scale::scale_fronts(&nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, beta, adaptive_stop, conv_pval, refine, topo_mode);
+    let out = PyList::empty(py);
+    for part in fronts {
+        let d = PyDict::new(py);
+        for (node, comm) in part {
+            d.set_item(node, comm)?;
+        }
+        out.append(d)?;
+    }
+    Ok(out.into_any().unbind())
+}
+
+/// Label-free microcanonical Bernoulli-SBM minimum-description-length score
+/// (`dl_sbm_score`, Peixoto-style; LOWER is better) of `partition` on `graph` —
+/// the exact scorer the SCALE selector minimises, exposed so the `scale` selector
+/// study evaluates the identical criterion it deploys. `partition` is a
+/// ``dict[node, community]`` (e.g. a `scale_fronts` member). Nodes absent from the
+/// dict are treated as community 0.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "sbm_mdl", signature = (graph, partition))]
+pub fn sbm_mdl_fn(graph: &Bound<'_, PyAny>, partition: &Bound<'_, PyDict>) -> PyResult<f64> {
+    let nodes = get_nodes(graph)?;
+    let edges = get_edges(graph)?;
+    let csr = CsrGraph::from_edges(&nodes, &edges);
+    let mut map: FxHashMap<i32, i32> = FxHashMap::default();
+    for (k, v) in partition.iter() {
+        map.insert(k.extract::<i32>()?, v.extract::<i32>()?);
+    }
+    let part: Vec<i32> = (0..csr.n)
+        .map(|i| map.get(&csr.labels[i]).copied().unwrap_or(0))
+        .collect();
+    Ok(dl_sbm_score(&csr, &part))
+}
+
+/// Degree-corrected SBM minimum-description-length score (`dl_dcsbm_score`; LOWER
+/// is better) of `partition` on `graph` — the selector `scale` deploys. Unlike the
+/// plain Bernoulli `sbm_mdl`, the degree correction prevents collapse to a single
+/// block under degree-heterogeneous or high-mixing structure. `partition` is a
+/// ``dict[node, community]``; nodes absent from it are treated as community 0.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "dcsbm_mdl", signature = (graph, partition))]
+pub fn dcsbm_mdl_fn(graph: &Bound<'_, PyAny>, partition: &Bound<'_, PyDict>) -> PyResult<f64> {
+    let nodes = get_nodes(graph)?;
+    let edges = get_edges(graph)?;
+    let csr = CsrGraph::from_edges(&nodes, &edges);
+    let mut map: FxHashMap<i32, i32> = FxHashMap::default();
+    for (k, v) in partition.iter() {
+        map.insert(k.extract::<i32>()?, v.extract::<i32>()?);
+    }
+    let part: Vec<i32> = (0..csr.n)
+        .map(|i| map.get(&csr.labels[i]).copied().unwrap_or(0))
+        .collect();
+    Ok(dl_dcsbm_score(&csr, &part))
+}
+
+/// Complete degree-corrected SBM description length (profile score plus the
+/// degree-sequence cost) of `partition` on `graph` — the criterion `scale`'s
+/// selector deploys. LOWER is better.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "dcsbm_full_mdl", signature = (graph, partition))]
+pub fn dcsbm_full_mdl_fn(graph: &Bound<'_, PyAny>, partition: &Bound<'_, PyDict>) -> PyResult<f64> {
+    let nodes = get_nodes(graph)?;
+    let edges = get_edges(graph)?;
+    let csr = CsrGraph::from_edges(&nodes, &edges);
+    let mut map: FxHashMap<i32, i32> = FxHashMap::default();
+    for (k, v) in partition.iter() {
+        map.insert(k.extract::<i32>()?, v.extract::<i32>()?);
+    }
+    let part: Vec<i32> = (0..csr.n)
+        .map(|i| map.get(&csr.labels[i]).copied().unwrap_or(0))
+        .collect();
+    Ok(dl_dcsbm_full_score(&csr, &part))
+}
+
+/// (NMI, AMI, ARI) between two equal-length label lists, computed natively
+/// (exact Vinh et al. AMI). Matches scikit-learn's defaults; much faster on
+/// large vectors with many clusters.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "gt_metrics", signature = (y_true, y_pred))]
+pub fn gt_metrics_fn(y_true: Vec<i64>, y_pred: Vec<i64>) -> PyResult<(f64, f64, f64)> {
+    if y_true.len() != y_pred.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err("length mismatch"));
+    }
+    Ok(crate::core::utils::metrics::gt_metrics(&y_true, &y_pred))
+}
+
+/// Memory-lean front accessor: returns each Pareto-front member as a raw
+/// little-endian i32 label buffer aligned to `graph.nodes()` order (4 bytes
+/// per node). Avoids materialising per-member Python dicts, which dominates
+/// memory on million-node graphs. Decode with `numpy.frombuffer(b, "<i4")`.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "scale_fronts_raw", signature = (graph, pop_size = scale::DEFAULT_POP_SIZE, num_gens = scale::DEFAULT_NUM_GENS, cross_rate = scale::DEFAULT_CROSS_RATE, mut_rate = scale::DEFAULT_MUT_RATE, gap = scale::DEFAULT_GAP, beta = scale::DEFAULT_BETA, adaptive_stop = false, conv_pval = scale::CONV_PVAL, refine = true, topo_mode = 0))]
+#[allow(clippy::too_many_arguments)]
+pub fn scale_fronts_raw_fn(
+    graph: &Bound<'_, PyAny>,
+    pop_size: usize,
+    num_gens: usize,
+    cross_rate: f64,
+    mut_rate: f64,
+    gap: usize,
+    beta: f64,
+    adaptive_stop: bool,
+    conv_pval: f64,
+    refine: bool,
+    topo_mode: u8,
+) -> PyResult<Py<PyAny>> {
+    use pyo3::types::{PyBytes, PyList};
+    let py = graph.py();
+    let nodes = get_nodes(graph)?;
+    let edges = get_edges(graph)?;
+    let fronts = scale::scale_fronts(&nodes, &edges, pop_size, num_gens, cross_rate,
+                                     mut_rate, gap, beta, adaptive_stop, conv_pval,
+                                     refine, topo_mode);
+    // fronts are (node_id, community) pairs; realign to `nodes` order.
+    let mut pos: FxHashMap<i32, usize> = FxHashMap::default();
+    for (i, &v) in nodes.iter().enumerate() {
+        pos.insert(v, i);
+    }
+    let out = PyList::empty(py);
+    let mut buf = vec![0i32; nodes.len()];
+    for part in fronts {
+        for x in buf.iter_mut() {
+            *x = -1;
+        }
+        for (node, comm) in part {
+            if let Some(&i) = pos.get(&node) {
+                buf[i] = comm;
+            }
+        }
+        let bytes: &[u8] = unsafe {
+            std::slice::from_raw_parts(buf.as_ptr() as *const u8, buf.len() * 4)
+        };
+        out.append(PyBytes::new(py, bytes))?;
     }
     Ok(out.into_any().unbind())
 }
