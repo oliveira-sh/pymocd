@@ -1,5 +1,5 @@
 //! special.rs — numeric special functions shared across subsystems
-//! (the Welch t-test tail in `ariadne::stats` and the SBM/MDL selector).
+//! (the SBM/MDL description-length selector).
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos.
 

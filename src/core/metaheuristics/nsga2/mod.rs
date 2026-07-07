@@ -3,7 +3,7 @@
 //! `fast_non_dominated_sort` and tournament offspring generation live in
 //! `helpers::individual` (shared with `nsga3`); only crowding distance and the
 //! crowding-based truncation are NSGA-II-specific and stay here.
-//! Ariadne keeps its own dense-CSR NSGA-II — that representation is the source
+//! SCALE keeps its own dense-CSR NSGA-II — that representation is the source
 //! of its speed and is intentionally NOT shared here.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this

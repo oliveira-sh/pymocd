@@ -225,7 +225,7 @@ mod test {
 
     // Minimal temp-file helper (no dev-dependency).
     fn tempfile() -> NamedTemp {
-        let path = std::env::temp_dir().join(format!("ariadne_test_{}.adj", std::process::id()));
+        let path = std::env::temp_dir().join(format!("pymocd_test_{}.adj", std::process::id()));
         let file = fs::File::create(&path).unwrap();
         NamedTemp { path, file }
     }
