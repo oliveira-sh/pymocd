@@ -1,17 +1,9 @@
 //! NSGA-III-KRM (Shaik, Ravi & Deb, SN Computer Science 2:13, 2021): a
-//! self-contained, faithful reimplementation of the paper's method, not a
-//! wrapper around this repo's optimized engine. Reproduced: the locus-based
-//! ("GA-Net"/Pizzuti) genome and union-find decode (`locus.rs`); a
-//! from-scratch, single-threaded NSGA-III loop (Deb & Jain 2014) with
-//! Das-Dennis reference points and niche-preserving environmental selection
-//! (`nsga3.rs`); the paper's two customizations -- the duplicate-permutation
-//! filter and the single-community exclusion; adjacency-constrained
-//! crossover/mutation (`operators.rs`); the paper's exact (KKM, RC, Q)
-//! objective formulas; and the max-modularity rank-1 decision rule. Removed:
-//! the shared `core::metaheuristics::nsga3` module's entry point, the shared
-//! label-map crossover/mutation operators, and data-parallel (Rayon-based)
-//! evaluation -- this detector now runs single-threaded so its cost reflects
-//! the published method, not this repo's optimizations.
+//! self-contained, single-threaded reimplementation of the paper's method —
+//! locus genome (`locus.rs`), from-scratch NSGA-III loop with paper
+//! customizations (`nsga3.rs`), (KKM, RC, Q) objectives, max-modularity
+//! rank-1 decision rule. Deliberately avoids the shared NSGA-III engine and
+//! Rayon so this baseline's cost tracks the published method.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -44,7 +36,9 @@ pub fn krm(
     divisions: usize,
 ) -> Partition {
     let locus = Locus::build(graph);
-    let mut pop = nsga3::run(graph, &locus, pop_size, num_gens, cross_rate, mut_rate, divisions);
+    let mut pop = nsga3::run(
+        graph, &locus, pop_size, num_gens, cross_rate, mut_rate, divisions,
+    );
 
     fast_non_dominated_sort(&mut pop);
     let best = pop

@@ -1,7 +1,6 @@
-//! Individual representation + Pareto dominance + fast non-dominated sort for
-//! the self-contained MOGA-Net engine. Genome is locus-based (see
-//! `locus.rs`); objectives are stored as `[-CS, -CF]` (both minimized) since
-//! Pizzuti's CS and CF are both maximized.
+//! Individual + Pareto dominance + fast non-dominated sort for MOGA-Net.
+//! Objectives are stored as `[-CS, -CF]` (both minimized) since Pizzuti's CS
+//! and CF are both maximized.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -35,9 +34,8 @@ impl Individual {
     }
 }
 
-/// Sequential fast non-dominated sort (Deb et al. 2002, NSGA-II). Plain
-/// `O(n^2)` scan, no data-parallel iterators -- single-threaded by
-/// construction.
+/// Fast non-dominated sort (Deb et al. 2002, NSGA-II); deliberately
+/// sequential.
 pub fn fast_non_dominated_sort(pop: &mut [Individual]) {
     let n = pop.len();
     if n == 0 {

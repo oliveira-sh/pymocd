@@ -1,8 +1,6 @@
-//! Self-contained PESA-II (Corne, Jerram, Knowles & Oates 2001), the engine
-//! Shi et al. 2012 §3 drive with the locus genome + decomposed-modularity
-//! objectives. Single-threaded, no shared engine: own internal population
-//! (IP), own external archive (EP), own hyper-grid niching / squeeze-factor
-//! selection, own classic squeeze-factor truncation.
+//! Self-contained, single-threaded PESA-II (Corne, Jerram, Knowles & Oates
+//! 2001) as driven by Shi et al. 2012 §3: internal population (IP), external
+//! archive (EP), hyper-grid niching, squeeze-factor selection/truncation.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -13,8 +11,8 @@ use crate::core::metaheuristics::helpers::objectives::decomposed_modularity::cal
 use rand::RngExt;
 use rustc_hash::FxHashMap;
 
-/// Hyper-grid resolution per objective axis (matches this repo's existing
-/// PESA-II convention, `core::metaheuristics::pesa2::hypergrid::GRID_DIVISIONS`).
+/// Hyper-grid resolution per objective axis (matches
+/// `core::metaheuristics::pesa2::hypergrid::GRID_DIVISIONS`).
 pub const GRID_DIVISIONS: usize = 8;
 
 #[derive(Clone, Debug)]
@@ -99,7 +97,11 @@ fn squeeze_tournament<'a>(
         std::cmp::Ordering::Less => &ep[i],
         std::cmp::Ordering::Greater => &ep[j],
         std::cmp::Ordering::Equal => {
-            if rng.random_bool(0.5) { &ep[i] } else { &ep[j] }
+            if rng.random_bool(0.5) {
+                &ep[i]
+            } else {
+                &ep[j]
+            }
         }
     }
 }
@@ -159,15 +161,9 @@ fn truncate(ep: &mut Vec<Member>, epsize: usize, rng: &mut impl rand::Rng) {
     }
 }
 
-/// Run self-contained PESA-II for `num_gens` generations and return the
-/// final external archive (EP) as the Pareto front.
-///
-/// `pop_size` maps to both `ipsize` (internal population) directly, and to
-/// `epsize` (external archive capacity) via `epsize = min(pop_size, 100)` —
-/// Shi 2012 Table 1 uses `epsize ∈ {50, 100}` for every tested network (34 to
-/// 8361 nodes), never growing it past 100 even as `ipsize` scales to 400; this
-/// repo's public `Mocd` API only exposes one `pop_size` knob, so `100` is the
-/// faithful cap given that frozen signature (not a literal per-network value).
+/// Run PESA-II for `num_gens` generations and return the final external
+/// archive (EP) as the Pareto front. `pop_size` maps to `ipsize` directly and
+/// to `epsize` via `min(pop_size, 100)` (Shi 2012 Table 1 caps epsize at 100).
 pub fn evolutionary_phase(
     graph: &Graph,
     debug_level: i8,
@@ -187,9 +183,8 @@ pub fn evolutionary_phase(
 
     let mut rng = rand::rng();
 
-    // Initialisation (PESA-II, Corne et al. 2001 §3): random IP, then seed EP
-    // with IP's non-dominated members. This is generation 0; the `num_gens`
-    // loop below runs that many further EP-driven generations on top of it.
+    // Generation 0 (Corne et al. 2001 §3): random IP, then seed EP with its
+    // non-dominated members.
     let initial_ip: Vec<Member> = (0..ipsize)
         .map(|_| evaluate(graph, &idx, degrees, locus::random_genome(&idx, &mut rng)))
         .collect();
@@ -207,11 +202,9 @@ pub fn evolutionary_phase(
             break;
         }
 
-        // Selection happens at the IP/EP interface: parents for the new IP
-        // are drawn from EP via squeeze-factor tournament.
+        // Parents for the new IP are drawn from EP via squeeze-factor tournament.
         let occ = assign_cells(&mut ep, GRID_DIVISIONS);
 
-        // a) build new IP of size ipsize.
         let mut new_ip: Vec<Genome> = Vec::with_capacity(ipsize);
         for _ in 0..ipsize {
             let mut child = if rng.random_bool(cross_rate) {
@@ -226,19 +219,15 @@ pub fn evolutionary_phase(
             new_ip.push(child);
         }
 
-        // b) evaluate the new IP.
         let evaluated: Vec<Member> = new_ip
             .into_iter()
             .map(|g| evaluate(graph, &idx, degrees, g))
             .collect();
 
-        // c) insert IP's non-dominated members into EP (grid is rebuilt
-        // lazily, on demand, by the next selection/truncation pass).
         for m in evaluated {
             insert_nondominated(&mut ep, m);
         }
 
-        // d) classic squeeze-factor truncation back down to epsize.
         if ep.len() > epsize {
             truncate(&mut ep, epsize, &mut rng);
         }

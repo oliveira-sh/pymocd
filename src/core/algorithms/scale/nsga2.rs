@@ -78,16 +78,14 @@ pub fn crowding_distance(objs: &[(f64, f64)], ranks: &[usize]) -> Vec<f64> {
         }
 
         for obj in 0..2 {
-            let key = |idx: usize| -> f64 {
-                if obj == 0 {
-                    objs[idx].0
-                } else {
-                    objs[idx].1
-                }
-            };
+            let key = |idx: usize| -> f64 { if obj == 0 { objs[idx].0 } else { objs[idx].1 } };
 
             let mut order = group.clone();
-            order.sort_by(|&a, &b| key(a).partial_cmp(&key(b)).unwrap_or(std::cmp::Ordering::Equal));
+            order.sort_by(|&a, &b| {
+                key(a)
+                    .partial_cmp(&key(b))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
 
             let f_min = key(order[0]);
             let f_max = key(order[g - 1]);

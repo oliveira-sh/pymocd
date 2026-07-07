@@ -1,35 +1,12 @@
-//! MOGA-Net (Pizzuti, IEEE ICTAI 2009 / IEEE TEC 16(3):418-430, 2012):
-//! a self-contained, single-threaded reimplementation of the paper's actual
-//! mechanism, not a wrapper around this repo's optimized engine.
-//!
-//! Reproduced from the paper:
-//!  - the locus-based adjacency genome (Park & Song 1989) + union-find decode
-//!    (`locus.rs`): gene `i` holds a node id `j`; `i` and `j` end up in the
-//!    same community; community count is never fixed in advance;
-//!  - "safe"/biased initialization (every gene starts as a real edge or, for
-//!    degree-0 nodes, the node itself);
-//!  - uniform crossover and *repaired* (neighbour-restricted) mutation
-//!    (`operators.rs`), which keep every individual safe by construction;
-//!  - the elitist + roulette-wheel **generational replacement** model from
-//!    MATLAB's GA/Direct Search Toolbox (`gamultiobj`) that the paper used:
-//!    rank + crowd the population, copy the top 10% unchanged ("elite
-//!    reproduction"), fill the rest by fitness-proportionate (roulette)
-//!    selection over the whole population -- *not* tournament-select +
-//!    combine-parents-and-offspring-then-truncate (`engine.rs`);
-//!  - the paper's exact (Community Score, Community Fitness) bi-objective
-//!    (reused unchanged from `helpers::objectives::community_score_fitness`,
-//!    a pure math function over an already-decoded partition -- not part of
-//!    the borrowed GA machinery);
-//!  - the paper's max-modularity decision rule over the final rank-1 front.
-//!
-//! Removed (the borrowed machinery this replaces): the shared
-//! `core::metaheuristics::nsga2` engine and its combine+truncate survivor
-//! selection, the shared label-map `Partition` genome with its two-point
-//! crossover / majority-vote mutation operators
-//! (`helpers::operators::{crossover,mutation,generator}`), and
-//! `rayon`-based parallel fitness evaluation -- this detector now runs
-//! single-threaded so its cost reflects the published method, not this
-//! repo's optimizations.
+//! MOGA-Net (Pizzuti, IEEE ICTAI 2009 / IEEE TEC 16(3):418-430, 2012): a
+//! self-contained, single-threaded reimplementation of the paper's mechanism —
+//! locus-based adjacency genome (Park & Song 1989) with safe initialization
+//! and repaired operators (`locus.rs`, `operators.rs`); the MATLAB
+//! `gamultiobj`-style elitist + roulette generational replacement the paper
+//! used, *not* combine-parents-and-offspring-then-truncate (`engine.rs`);
+//! (Community Score, Community Fitness) bi-objective; max-modularity rank-1
+//! decision rule. Deliberately avoids the shared NSGA-II engine and Rayon so
+//! this baseline's cost tracks the published method.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -69,7 +46,9 @@ pub fn moga_net(
     alpha: f64,
 ) -> Partition {
     let locus = Locus::build(graph);
-    let mut pop = engine::run(graph, &locus, pop_size, num_gens, cross_rate, mut_rate, r, alpha);
+    let mut pop = engine::run(
+        graph, &locus, pop_size, num_gens, cross_rate, mut_rate, r, alpha,
+    );
 
     fast_non_dominated_sort(&mut pop);
     let best = pop
@@ -120,10 +99,8 @@ mod tests {
         // v_S double-counts edges: each triangle has 3 internal edges → v_S=6,
         // M(S)=(2/3)^2, score=6·4/9, CS=2·(8/3).
         assert!((cs_split - 16.0 / 3.0).abs() < 1e-9, "CS={cs_split}");
-        // CF is MAXIMIZED (internal cohesion): singletons have no internal edges
-        // → CF=0 (the fragmented extreme), the coarse 'one' blob scores highest.
-        // CS and CF genuinely trade off — the split wins CS, 'one' wins CF, so
-        // neither dominates the other and both sit on the Pareto front.
+        // CF is MAXIMIZED (internal cohesion): singletons → CF=0, the coarse
+        // 'one' blob scores highest, so CS and CF genuinely trade off.
         assert_eq!(cf_sing, 0.0);
         assert!(cf_one > cf_split, "coarser partition must win the CF axis");
     }

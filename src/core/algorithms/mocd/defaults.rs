@@ -1,4 +1,3 @@
-//! algorithms/mocd/defaults.rs
 //! Default parameters for Shi-MOCD (PESA-II).
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos.
@@ -12,12 +11,8 @@ pub const DEFAULT_NUM_GENS: usize = 100;
 pub const DEFAULT_CROSS_RATE: f64 = 0.6;
 pub const DEFAULT_MUT_RATE: f64 = 0.4;
 
-// External-archive (EP) capacity cap for the self-contained PESA-II engine.
-// Shi 2012 Table 1 uses epsize ∈ {50, 100} for every tested network (34 to
-// 8361 nodes), never past 100 even as ipsize scales to 400; this repo's
-// `Mocd` API only exposes one `pop_size` knob (== ipsize), so epsize is
-// derived as `min(pop_size, EPSIZE_CAP)` — matches this repo's pre-existing
-// MAX_ARCHIVE_SIZE convention (100).
+// External-archive (EP) capacity cap: Shi 2012 Table 1 never grows epsize
+// past 100; epsize is derived as `min(pop_size, EPSIZE_CAP)`.
 pub const EPSIZE_CAP: usize = 100;
 
 // `mocd_q` / `mocd_d` wrapper defaults — the HP-MOCD benchmark budget, so the

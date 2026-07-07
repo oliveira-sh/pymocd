@@ -121,8 +121,14 @@ mod tests {
         let (kkm_split, rc_split) = kkm_rc(&g, &split);
         let (kkm_one, _) = kkm_rc(&g, &one);
         let (_, rc_sing) = kkm_rc(&g, &singletons);
-        assert!(kkm_split < kkm_one, "KKM split {kkm_split} !< one {kkm_one}");
-        assert!(rc_split < rc_sing, "RC split {rc_split} !< singletons {rc_sing}");
+        assert!(
+            kkm_split < kkm_one,
+            "KKM split {kkm_split} !< one {kkm_one}"
+        );
+        assert!(
+            rc_split < rc_sing,
+            "RC split {rc_split} !< singletons {rc_sing}"
+        );
     }
 
     #[test]
