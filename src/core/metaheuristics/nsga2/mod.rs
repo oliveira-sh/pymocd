@@ -1,8 +1,6 @@
 //! NSGA-II survivor selection + generational loop (Deb et al. 2002) over the
-//! shared `helpers::individual` core. The `Individual`, Pareto dominance,
-//! `fast_non_dominated_sort` and tournament offspring generation live in
-//! `helpers::individual` (shared with `nsga3`); only crowding distance and the
-//! crowding-based truncation are NSGA-II-specific and stay here.
+//! shared `helpers::individual` core; only crowding distance and the
+//! crowding-based truncation are NSGA-II-specific and live here.
 //! SCALE keeps its own dense-CSR NSGA-II — that representation is the source
 //! of its speed and is intentionally NOT shared here.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0

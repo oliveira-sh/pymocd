@@ -149,25 +149,27 @@ fn calculate_crowding_distance(solution: &Solution, neighbors: &[Solution]) -> f
         if let Some(pos) = sorted_neighbors
             .iter()
             .position(|s| s.objectives == solution.objectives)
-            && pos > 0 && pos < sorted_neighbors.len() - 1 {
-                let range = sorted_neighbors
-                    .iter()
-                    .map(|s| s.objectives[obj_index])
-                    .fold((f64::INFINITY, f64::NEG_INFINITY), |acc, val| {
-                        (acc.0.min(val), acc.1.max(val))
-                    });
+            && pos > 0
+            && pos < sorted_neighbors.len() - 1
+        {
+            let range = sorted_neighbors
+                .iter()
+                .map(|s| s.objectives[obj_index])
+                .fold((f64::INFINITY, f64::NEG_INFINITY), |acc, val| {
+                    (acc.0.min(val), acc.1.max(val))
+                });
 
-                let diff = if range.1 > range.0 {
-                    (sorted_neighbors[pos + 1].objectives[obj_index]
-                        - sorted_neighbors[pos - 1].objectives[obj_index])
-                        .abs()
-                        / (range.1 - range.0)
-                } else {
-                    0.0
-                };
+            let diff = if range.1 > range.0 {
+                (sorted_neighbors[pos + 1].objectives[obj_index]
+                    - sorted_neighbors[pos - 1].objectives[obj_index])
+                    .abs()
+                    / (range.1 - range.0)
+            } else {
+                0.0
+            };
 
-                distances.push(diff);
-            }
+            distances.push(diff);
+        }
     }
 
     if distances.is_empty() {

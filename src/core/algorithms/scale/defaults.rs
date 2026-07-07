@@ -9,9 +9,7 @@ pub const DEFAULT_GAP: usize = 10;
 // API parity with `mmcomo`.
 pub const DEFAULT_BETA: f64 = 0.05;
 
-// Adaptive (plateau) stopping: when enabled, the search runs until a Welch t-test
-// on the convergence-metric history no longer detects a significant gain between
-// the last two windows (then `num_gens` is only a safety ceiling).
+// Adaptive (plateau) stopping; when enabled, `num_gens` is only a safety ceiling.
 pub const MIN_GENS: usize = 10; // warm-up before the first plateau test
 pub const CHECK_EVERY: usize = 5; // window size for the Welch test
 pub const CONV_PVAL: f64 = 0.1; // stop once the gain is no longer significant at this level

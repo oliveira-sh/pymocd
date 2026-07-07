@@ -42,9 +42,10 @@ pub fn calculate_objectives(
                 for &neighbor in neighbors {
                     if node < neighbor
                         && let Some(neighbor_comm) = partition.get(&neighbor)
-                            && neighbor_comm == &partition[&node] {
-                                community_edges += 1.0;
-                            }
+                        && neighbor_comm == &partition[&node]
+                    {
+                        community_edges += 1.0;
+                    }
                 }
             }
         }

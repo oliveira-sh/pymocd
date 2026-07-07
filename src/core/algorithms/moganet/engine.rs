@@ -1,11 +1,8 @@
 //! Self-contained, single-threaded MOGA-Net generational loop (Pizzuti 2009,
 //! Sec. 3-5), reproducing MATLAB's `gamultiobj`-style elitist + roulette
 //! generational replacement -- *not* textbook tournament-select +
-//! combine-parents-and-offspring-then-truncate NSGA-II. Every generation:
-//! rank + crowd the current population, copy the top 10% ("elite
-//! reproduction") unchanged into the next generation, then fill the rest by
-//! roulette-wheel (fitness-proportionate) selection over the *whole* current
-//! population -- never a 2x-sized combined pool.
+//! combine-and-truncate NSGA-II. Population size stays exactly `pop_size`;
+//! never a 2x combined pool.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -19,9 +16,8 @@ use rand::rngs::ThreadRng;
 use rand::{RngExt, rng}; // rand 0.10: random_range/random_bool live on RngExt
 use std::cmp::Ordering;
 
-/// Decode + evaluate a freshly-built genome (single call -- no batch/parallel
-/// evaluation anywhere in this module). Objectives are `[-CS, -CF]` (both
-/// maximized in the paper, so both negated for a minimizing dominance rule).
+/// Decode + evaluate a genome. Objectives are `[-CS, -CF]` (both maximized in
+/// the paper, so both negated for a minimizing dominance rule).
 fn make_individual(graph: &Graph, locus: &Locus, genome: Genome, r: f64, alpha: f64) -> Individual {
     let partition = locus.decode(&genome);
     let (cs, cf) = community_objectives(graph, &partition, r, alpha);
@@ -36,8 +32,7 @@ fn make_individual(graph: &Graph, locus: &Locus, genome: Genome, r: f64, alpha: 
 
 /// Fitness-proportionate (roulette) pick over `order` (population indices
 /// sorted by (rank asc, crowding desc)) using precomputed per-position
-/// weights `fitness[pos] = 1/sqrt(pos+1)`. Linear scan, consistent with this
-/// repo's other roulette implementations.
+/// weights `fitness[pos] = 1/sqrt(pos+1)`.
 fn roulette_pick(order: &[usize], fitness: &[f64], total: f64, rng: &mut ThreadRng) -> usize {
     let mut x = rng.random::<f64>() * total;
     for (pos, &idx) in order.iter().enumerate() {
@@ -50,14 +45,9 @@ fn roulette_pick(order: &[usize], fitness: &[f64], total: f64, rng: &mut ThreadR
     *order.last().unwrap()
 }
 
-/// Generational loop: init (safe random genomes) -> evaluate, then for
-/// `num_gens` generations: rank + crowd -> sort by (rank, crowding) -> copy
-/// top `10%` as elites -> fill the rest via roulette-selected parents ->
-/// crossover (prob. `cross_rate`) or clone -> repaired mutation (prob.
-/// `mut_rate`, applied regardless of crossover/clone) -> evaluate -> replace
-/// the whole population (size stays exactly `pop_size`, never a 2N pool).
-/// Returns the final rank-assigned population; the caller applies the
-/// paper's max-modularity rank-1 decision rule.
+/// MOGA-Net generational loop. Mutation applies regardless of whether the
+/// child came from crossover or a clone. Returns the final rank-assigned
+/// population; the caller applies the max-modularity rank-1 decision rule.
 pub fn run(
     graph: &Graph,
     locus: &Locus,
@@ -75,7 +65,9 @@ pub fn run(
         .collect();
 
     // "elite reproduction 10% of the population size".
-    let elite_count = ((0.10 * pop_size as f64).round() as usize).max(1).min(pop_size);
+    let elite_count = ((0.10 * pop_size as f64).round() as usize)
+        .max(1)
+        .min(pop_size);
 
     for _gen in 0..num_gens {
         fast_non_dominated_sort(&mut pop);
@@ -92,10 +84,11 @@ pub fn run(
         });
 
         // Rank-based scalar fitness over the 1-based position in `order`
-        // (MATLAB gamultiobj-style rank fitness scaling; the paper itself
-        // only says "roulette selection function" without giving the exact
-        // internal formula).
-        let fitness: Vec<f64> = (0..order.len()).map(|pos| 1.0 / ((pos + 1) as f64).sqrt()).collect();
+        // (MATLAB gamultiobj-style rank fitness scaling; the paper only says
+        // "roulette selection function").
+        let fitness: Vec<f64> = (0..order.len())
+            .map(|pos| 1.0 / ((pos + 1) as f64).sqrt())
+            .collect();
         let total: f64 = fitness.iter().sum();
 
         let mut next_gen: Vec<Individual> = Vec::with_capacity(pop_size);

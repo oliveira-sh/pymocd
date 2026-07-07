@@ -1,10 +1,8 @@
-//! special.rs — numeric special functions shared across subsystems
-//! (the SBM/MDL description-length selector).
+//! Numeric special functions shared across subsystems.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos.
 
 /// ln of the binomial coefficient C(n, k) (real arguments), 0 outside 0<=k<=n.
-/// Used by the SBM/MDL frontier selector.
 pub fn ln_choose(n: f64, k: f64) -> f64 {
     if k < 0.0 || k > n || n < 0.0 {
         return 0.0;

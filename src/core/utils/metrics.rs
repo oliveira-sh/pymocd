@@ -27,7 +27,12 @@ fn contingency(a: &[i64], b: &[i64]) -> Contingency {
         *rows.entry(x).or_insert(0.0) += 1.0;
         *cols.entry(y).or_insert(0.0) += 1.0;
     }
-    Contingency { cells, rows, cols, n: a.len() as f64 }
+    Contingency {
+        cells,
+        rows,
+        cols,
+        n: a.len() as f64,
+    }
 }
 
 fn entropy(marg: &FxHashMap<i64, f64>, n: f64) -> f64 {
@@ -99,7 +104,11 @@ pub fn gt_metrics(a: &[i64], b: &[i64]) -> (f64, f64, f64) {
     } else {
         let emi = expected_mi(&ct);
         let denom = mean_h - emi;
-        if denom.abs() < 1e-15 { 0.0 } else { (mi - emi) / denom }
+        if denom.abs() < 1e-15 {
+            0.0
+        } else {
+            (mi - emi) / denom
+        }
     };
 
     let c2 = |x: f64| x * (x - 1.0) / 2.0;
@@ -109,7 +118,11 @@ pub fn gt_metrics(a: &[i64], b: &[i64]) -> (f64, f64, f64) {
     let m = c2(n);
     let exp = rb * cb / m;
     let max_idx = 0.5 * (rb + cb);
-    let ari = if (max_idx - exp).abs() < 1e-15 { 1.0 } else { (z - exp) / (max_idx - exp) };
+    let ari = if (max_idx - exp).abs() < 1e-15 {
+        1.0
+    } else {
+        (z - exp) / (max_idx - exp)
+    };
 
     (nmi, ami, ari)
 }

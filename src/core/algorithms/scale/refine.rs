@@ -1,8 +1,6 @@
-//! refine — union-based Pareto-front refinement. Refined copies only ADD
-//! candidates to the front; the union is then non-dominated-sorted back to its
-//! rank-1 set, so the result Pareto-dominates (is at least as good as) the input
-//! front — refinement can never make the front worse, only add better-or-equal
-//! options.
+//! Union-based Pareto-front refinement. Refined copies only ADD candidates;
+//! the union is non-dominated-sorted back to rank-1, so the result front can
+//! never be worse than the input.
 
 use crate::core::graph::CsrGraph;
 use rustc_hash::FxHashMap;
@@ -70,13 +68,9 @@ pub(crate) fn refine_tiny(g: &CsrGraph, part: &[i32], max_size: usize) -> Vec<i3
     p
 }
 
-/// Union-based refinement of `front`. Each member gets a tiny-community-merge
-/// refined copy (`refine_tiny`, max tiny size 2: singletons always merge into
-/// their strongest-connected neighbour community, size-2 groups merge only under
-/// the cohesion guard). Originals ∪ refined are deduplicated and
-/// non-dominated-sorted on the (KKM, RC) bi-objective; the rank-1 front is
-/// returned. Nothing is dropped before the sort, so the rank-1 set of the union
-/// dominates the rank-1 set of the original — the front can only improve.
+/// Each member gets a tiny-community-merge copy (`refine_tiny`, max tiny size 2);
+/// originals ∪ refined are deduplicated and non-dominated-sorted on (KKM, RC),
+/// and the rank-1 front is returned.
 pub fn refine_front(g: &CsrGraph, front: Vec<Labels>) -> Vec<Labels> {
     if front.len() <= 1 {
         // A single member still benefits from its refined alternative.
@@ -92,7 +86,6 @@ pub fn refine_front(g: &CsrGraph, front: Vec<Labels>) -> Vec<Labels> {
             all.push(refined);
         }
     }
-    // No new candidates → nothing to re-sort, return the original front as-is.
     if all.len() == front.len() {
         return front;
     }
@@ -115,7 +108,16 @@ mod tests {
     // refinable: refine_tiny merges 6 back into community 0.
     fn graph_with_pendant() -> CsrGraph {
         let nodes: Vec<i32> = (0..7).collect();
-        let edges = vec![(0, 1), (1, 2), (0, 2), (3, 4), (4, 5), (3, 5), (2, 3), (0, 6)];
+        let edges = vec![
+            (0, 1),
+            (1, 2),
+            (0, 2),
+            (3, 4),
+            (4, 5),
+            (3, 5),
+            (2, 3),
+            (0, 6),
+        ];
         CsrGraph::from_edges(&nodes, &edges)
     }
 
@@ -130,7 +132,10 @@ mod tests {
         // The union front must contain a member where node 6 is no longer a
         // singleton (it merged into community 0, its only neighbour's community).
         let absorbed = refined.iter().any(|p| p[6] == p[0]);
-        assert!(absorbed, "refinement did not absorb the singleton: {refined:?}");
+        assert!(
+            absorbed,
+            "refinement did not absorb the singleton: {refined:?}"
+        );
         // Every returned member is a full partition.
         assert!(refined.iter().all(|p| p.len() == 7));
     }

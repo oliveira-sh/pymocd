@@ -1,18 +1,14 @@
-//! SCALE — Sparse macro-micro Co-evolutionary multi-objective community detection.
-//! A scalable reformulation of the dense macro-micro co-evolutionary
-//! community detection (Zhang, Yang, Yang & Zhang, IEEE CIM), re-engineered for
-//! near-linear memory/time: sparse-CSR graph, the dense n×n diffusion-kernel
-//! similarity replaced by a sparse/approximate local similarity (`sim`). The EA structure (macro medoid
-//! population + micro label population co-evolving via guidance/influence over the
-//! KKM/RC bi-objective) is unchanged from `mmcomo`; only the O(n²) similarity
-//! machinery and the dense graph are replaced.
+//! SCALE — sparse macro-micro co-evolutionary multi-objective community
+//! detection (Zhang, Yang, Yang & Zhang, IEEE CIM), reformulated for
+//! near-linear memory/time: sparse-CSR graph plus a sparse local similarity
+//! (`sim`) in place of the dense n×n diffusion kernel.
 //!
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use rand::seq::SliceRandom;
 use rand::RngExt;
+use rand::seq::SliceRandom;
 use rayon::prelude::*;
 use rustc_hash::FxHashMap;
 use std::collections::HashSet;
@@ -33,8 +29,8 @@ pub use defaults::*;
 use nsga2::{crowding_distance, environment_selection, fast_nondominated_sort};
 use objectives::kkm_rc;
 use operators::{local_search, macro_offspring, micro_offspring, micro_offspring_topo};
-use stats::welch_p;
 use sim::{decode, encode, init_weights, update_weights};
+use stats::welch_p;
 
 pub type Labels = Vec<i32>; // micro vector representation
 pub type Genome = Vec<u8>; // macro medoid representation
@@ -137,7 +133,11 @@ fn init_macro(g: &CsrGraph, wadj: &[f64], pop: usize) -> Vec<Mac> {
             }
             let labels = decode(g, wadj, &genome);
             let obj = kkm_rc(g, &labels);
-            Mac { genome, labels, obj }
+            Mac {
+                genome,
+                labels,
+                obj,
+            }
         })
         .collect()
 }
@@ -213,7 +213,11 @@ fn influence(
             let genome = encode(g, wadj_ro, e);
             let labels = decode(g, wadj_ro, &genome);
             let obj = kkm_rc(g, &labels);
-            Mac { genome, labels, obj }
+            Mac {
+                genome,
+                labels,
+                obj,
+            }
         })
         .collect();
     pool.extend(macro_pop);
@@ -236,7 +240,7 @@ fn run_fronts(
     adaptive: bool, // adaptive (Welch-t-test plateau) stop; `num_gens` is then the ceiling
     conv_pval: f64, // stop once the window-to-window gain is no longer significant at this level
     do_refine: bool, // apply the union-based tiny-community refinement to the front
-    topo_mode: u8,   // bit0 = ensemble crossover, bit1 = neighbour-majority mutation
+    topo_mode: u8, // bit0 = ensemble crossover, bit1 = neighbour-majority mutation
 ) -> Vec<Labels> {
     if g.n == 0 {
         return vec![Vec::new()];
@@ -245,25 +249,32 @@ fn run_fronts(
     let mut wadj = init_weights(g);
     let mut micro = init_micro(g, pop);
     let mut macro_pop = init_macro(g, &wadj, pop);
-    // Convergence-metric history: the population mean of (KKM + RC), which is
-    // minimised and plateaus as the search converges. Used by the adaptive stop.
+    // Adaptive-stop history: population mean of (KKM + RC), minimised.
     let mut history: Vec<f64> = Vec::new();
 
     for t in 1..=num_gens {
         let (mr, mc) = ranks_and_crowd(&micro_objs(&micro));
         let mlabels: Vec<Labels> = micro.iter().map(|x| x.labels.clone()).collect();
         let micro_off: Vec<Mic> = if topo_mode != 0 {
-            micro_offspring_topo(g, &mlabels, &mr, &mc, p_c, 2 * t as u64,
-                                 topo_mode & 1 != 0, topo_mode & 2 != 0)
+            micro_offspring_topo(
+                g,
+                &mlabels,
+                &mr,
+                &mc,
+                p_c,
+                2 * t as u64,
+                topo_mode & 1 != 0,
+                topo_mode & 2 != 0,
+            )
         } else {
             micro_offspring(g, &mlabels, &mr, &mc, p_c, 2 * t as u64)
         }
-            .into_par_iter()
-            .map(|l| {
-                let obj = kkm_rc(g, &l);
-                Mic { labels: l, obj }
-            })
-            .collect();
+        .into_par_iter()
+        .map(|l| {
+            let obj = kkm_rc(g, &l);
+            Mic { labels: l, obj }
+        })
+        .collect();
 
         let (ar, ac) = ranks_and_crowd(&macro_objs(&macro_pop));
         let agen: Vec<Genome> = macro_pop.iter().map(|x| x.genome.clone()).collect();
@@ -272,7 +283,11 @@ fn run_fronts(
             .map(|gn| {
                 let labels = decode(g, &wadj, &gn);
                 let obj = kkm_rc(g, &labels);
-                Mac { genome: gn, labels, obj }
+                Mac {
+                    genome: gn,
+                    labels,
+                    obj,
+                }
             })
             .collect();
 
@@ -287,9 +302,7 @@ fn run_fronts(
             macro_pop = select_macro(macro_pop, pop);
         }
 
-        // Adaptive plateau stop: after a warm-up, stop once a Welch t-test no
-        // longer finds the last window of the convergence metric significantly
-        // better than the previous window.
+        // Stop once a Welch t-test finds no significant window-to-window gain.
         if adaptive {
             let sum: f64 = micro.iter().map(|m| m.obj.0 + m.obj.1).sum::<f64>()
                 + macro_pop.iter().map(|m| m.obj.0 + m.obj.1).sum::<f64>();
@@ -329,10 +342,11 @@ fn run_fronts(
         front
     };
 
-    // Union-based refinement: add a tiny-community-merge copy of
-    // every member, then non-dominated-sort the union back to rank-1. Refinement
-    // only adds candidates, so the returned front is at least as good.
-    if do_refine { refine::refine_front(g, front) } else { front }
+    if do_refine {
+        refine::refine_front(g, front)
+    } else {
+        front
+    }
 }
 
 /// Map index-space `labels` to `(node_id, community)`: isolated nodes (`deg == 0`)
@@ -357,7 +371,7 @@ fn to_output(g: &CsrGraph, labels: &Labels) -> Vec<(i32, i32)> {
 }
 
 /// Single selected partition from the merged (refined) rank-1 front, via the
-/// winning label-free selector (`select_best` = min SBM/MDL).
+/// label-free min-SBM/MDL selector (`select_best`).
 #[allow(clippy::too_many_arguments)]
 pub fn scale(
     nodes: &[i32],
@@ -375,7 +389,9 @@ pub fn scale(
     if g.n == 0 {
         return Vec::new();
     }
-    let front = run_fronts(&g, pop, num_gens, cross_rate, mut_rate, gap, beta, adaptive, conv_pval, true, 0);
+    let front = run_fronts(
+        &g, pop, num_gens, cross_rate, mut_rate, gap, beta, adaptive, conv_pval, true, 0,
+    );
     let best = select_best(&g, front);
     to_output(&g, &best)
 }
@@ -438,13 +454,7 @@ fn n_blocks(labels: &Labels) -> usize {
 ///    return the one with the fewest communities (ties: lower DL) — Occam's
 ///    razor over the credible set.
 ///
-/// All three ingredients are literature constants; nothing is fitted to any
-/// benchmark. Strictly label-free; deterministic.
-///
-/// Edge-holdout predictive likelihood was evaluated as the twin tie-break
-/// (min-B credible members): the twins' held-out LL difference is ~1 nat
-/// with sign flipping across mask seeds — no signal in expectation, so the
-/// deterministic DL tie stays.
+/// Strictly label-free; deterministic.
 fn select_best(g: &CsrGraph, front: Vec<Labels>) -> Labels {
     if front.is_empty() {
         return vec![0; g.n];
@@ -459,7 +469,10 @@ fn select_best(g: &CsrGraph, front: Vec<Labels>) -> Labels {
     let trivial = dl_sbm_score(g, &vec![0i32; g.n]);
     if !(dls[i] < trivial - 1e-9) {
         // MDL abstains: no significant structure — argmax surprise.
-        let sur: Vec<f64> = front.par_iter().map(|p| asymptotic_surprise(g, p)).collect();
+        let sur: Vec<f64> = front
+            .par_iter()
+            .map(|p| asymptotic_surprise(g, p))
+            .collect();
         let mut b = 0;
         for j in 1..front.len() {
             if sur[j] > sur[b] {
@@ -509,10 +522,12 @@ pub fn scale_fronts(
     if g.n == 0 {
         return Vec::new();
     }
-    run_fronts(&g, pop, num_gens, cross_rate, mut_rate, gap, beta, adaptive, conv_pval, refine, topo_mode)
-        .iter()
-        .map(|l| to_output(&g, l))
-        .collect()
+    run_fronts(
+        &g, pop, num_gens, cross_rate, mut_rate, gap, beta, adaptive, conv_pval, refine, topo_mode,
+    )
+    .iter()
+    .map(|l| to_output(&g, l))
+    .collect()
 }
 
 #[cfg(test)]

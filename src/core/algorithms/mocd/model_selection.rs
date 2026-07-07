@@ -1,4 +1,4 @@
-//! Implements the second phase of the algorithm (model selection)
+//! Model selection phase for Shi-MOCD (MOCD-D, Shi 2012 §3.2).
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2024 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -50,17 +50,11 @@ use crate::core::graph::{Graph, NodeId};
 use rand::{RngExt, rng};
 use rustc_hash::FxHashSet;
 
-/// Generates `num_networks` DEGREE-PRESERVING random networks (configuration
-/// model via double-edge swaps) used as MOCD-D control fronts (Shi 2012, §3.2).
-///
-/// The control front must coincide with the real front everywhere except in the
-/// genuine community region, so that the Max-Min-Distance selector picks the
-/// structured "bulge". This only holds when the null preserves each node's
-/// degree, because the `inter` objective Σ(d_c/2m)² is degree-dependent. A plain
-/// Erdős–Rényi null (uniform degree) shifts the whole front on degree-hetero-
-/// geneous graphs (e.g. karate's hubs), which made MOCD-D select the fragmented
-/// extreme. Degree-preserving randomisation is also the null model modularity
-/// itself uses.
+/// Generates `num_networks` DEGREE-PRESERVING random networks (double-edge
+/// swaps) as MOCD-D control fronts (Shi 2012, §3.2). Degree preservation is
+/// required: the `inter` objective Σ(d_c/2m)² is degree-dependent, so an
+/// Erdős–Rényi null shifts the whole control front on degree-heterogeneous
+/// graphs and breaks the max-min selector.
 pub fn generate_random_networks(original: &Graph, num_networks: usize) -> Vec<Graph> {
     let norm = |a: NodeId, b: NodeId| if a <= b { (a, b) } else { (b, a) };
     (0..num_networks)
@@ -70,8 +64,8 @@ pub fn generate_random_networks(original: &Graph, num_networks: usize) -> Vec<Gr
             let mut present: FxHashSet<(NodeId, NodeId)> =
                 edges.iter().map(|&(a, b)| norm(a, b)).collect();
             let mut r = rng();
-            // ~10 sweeps of attempted swaps thoroughly mixes the topology while
-            // keeping every node's degree exactly fixed.
+            // ~10 sweeps of attempted swaps mixes the topology while keeping
+            // every node's degree exactly fixed.
             if m >= 2 {
                 for _ in 0..(10 * m) {
                     let i = r.random_range(0..m);
@@ -99,11 +93,8 @@ pub fn generate_random_networks(original: &Graph, num_networks: usize) -> Vec<Gr
                 }
             }
 
-            // Build through the real constructor so every field (node_vec,
-            // degrees, adjacency_list, edge_lookup) is populated — building a
-            // partial `Graph { nodes, ..Default::default() }` leaves node_vec/
-            // degrees empty, which makes generate_population emit empty partitions
-            // and collapses every objective to (0,0) (the original bug).
+            // Build through the real constructor so every derived field
+            // (node_vec, degrees, adjacency_list, edge_lookup) is populated.
             let mut random_graph = Graph::new();
             for &(src, dst) in &edges {
                 random_graph.add_edge(src, dst);
