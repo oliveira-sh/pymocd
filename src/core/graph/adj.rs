@@ -1,11 +1,11 @@
-//! graph/adj.rs, hashmap adjacency-list graph + NetworkX/igraph ingestion.
+//! Hashmap adjacency-list graph + NetworkX/igraph ingestion.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use super::{NodeId, Partition};
+use super::NodeId;
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict};
+use pyo3::types::PyAny;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -20,7 +20,6 @@ pub struct Graph {
     pub max_degree: usize,
     pub total_degree: usize,
     pub edge_lookup: FxHashSet<(NodeId, NodeId)>,
-    pub labels: Vec<Py<PyAny>>,
 }
 
 impl Default for Graph {
@@ -103,94 +102,7 @@ impl Graph {
             max_degree: 0,
             total_degree: 0,
             edge_lookup: FxHashSet::default(),
-            labels: Vec::new(),
         }
-    }
-
-    /// Accepts any hashable Python node label (strings, negative ints, tuples).
-    /// Remaps labels to internal NodeIds `[0, n)` and stores the originals in
-    /// `self.labels` for reverse lookup via `py_partition`.
-    pub fn from_python_any(py: Python<'_>, pygraph: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let label_to_idx = PyDict::new(py);
-        let mut labels: Vec<Py<PyAny>> = Vec::new();
-
-        let mut intern = |obj: Bound<'_, PyAny>| -> PyResult<NodeId> {
-            if let Some(v) = label_to_idx.get_item(&obj)? {
-                return v.extract::<NodeId>();
-            }
-            let idx = labels.len() as NodeId;
-            label_to_idx.set_item(&obj, idx)?;
-            labels.push(obj.unbind());
-            Ok(idx)
-        };
-
-        let mut node_ids: Vec<NodeId> = Vec::new();
-        if let Ok(nx_nodes) = pygraph.call_method0("nodes") {
-            for obj in nx_nodes.try_iter()? {
-                node_ids.push(intern(obj?)?);
-            }
-        } else if let Ok(vs) = pygraph.getattr("vs") {
-            for vertex_obj in vs.try_iter()? {
-                let vertex = vertex_obj?;
-                node_ids.push(intern(vertex.getattr("index")?)?);
-            }
-        } else {
-            return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
-                "Unable to get node list from NetworkX or igraph",
-            ));
-        }
-
-        let edges_iter = if let Ok(nx_edges) = pygraph.call_method0("edges") {
-            nx_edges.call_method0("__iter__")?
-        } else if let Ok(ig_edges) = pygraph.call_method0("get_edgelist") {
-            ig_edges.call_method0("__iter__")?
-        } else {
-            return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
-                "neither NetworkX nor igraph graph methods are available",
-            ));
-        };
-
-        let mut edges: Vec<(NodeId, NodeId)> = Vec::new();
-        for edge_obj in edges_iter.try_iter()? {
-            let edge = edge_obj?;
-            let u = intern(edge.get_item(0)?)?;
-            let v = intern(edge.get_item(1)?)?;
-            edges.push((u, v));
-        }
-
-        let mut g = Graph::new();
-        g.labels = labels;
-        for &id in &node_ids {
-            g.nodes.insert(id);
-            g.adjacency_list.entry(id).or_default();
-        }
-        for (from, to) in edges {
-            g.add_edge(from, to);
-        }
-        g.finalize();
-        Ok(g)
-    }
-
-    /// Convert a Rust `Partition` back to a Python dict keyed by the original
-    /// labels. If the graph has no labels (built from native int ids), returns
-    /// a dict with integer NodeId keys — matching the legacy behavior.
-    pub fn py_partition(&self, py: Python<'_>, partition: &Partition) -> PyResult<Py<PyDict>> {
-        let out = PyDict::new(py);
-        if self.labels.is_empty() {
-            for (&node, &comm) in partition.iter() {
-                out.set_item(node, comm)?;
-            }
-        } else {
-            for (&node, &comm) in partition.iter() {
-                let label = self.labels.get(node as usize).ok_or_else(|| {
-                    PyErr::new::<pyo3::exceptions::PyIndexError, _>(
-                        "NodeId out of bounds for graph labels",
-                    )
-                })?;
-                out.set_item(label.bind(py), comm)?;
-            }
-        }
-        Ok(out.unbind())
     }
 
     pub fn from_python(pygraph: &Bound<'_, PyAny>) -> Self {
@@ -360,48 +272,6 @@ impl Graph {
     #[inline(always)]
     pub fn total_degree(&self) -> usize {
         self.total_degree
-    }
-
-    #[inline(always)]
-    pub fn avg_degree(&self) -> f64 {
-        if self.nodes.is_empty() {
-            0.0
-        } else {
-            self.total_degree as f64 / self.num_nodes() as f64
-        }
-    }
-
-    pub fn memory_stats(&self) -> GraphMemoryStats {
-        GraphMemoryStats {
-            nodes_memory: self.nodes.len() * std::mem::size_of::<NodeId>(),
-            edges_memory: self.edges.len() * std::mem::size_of::<(NodeId, NodeId)>(),
-            adjacency_memory: self
-                .adjacency_list
-                .values()
-                .map(|v| v.capacity() * std::mem::size_of::<NodeId>())
-                .sum(),
-            degrees_memory: self.degrees.len()
-                * (std::mem::size_of::<NodeId>() + std::mem::size_of::<usize>()),
-            edge_lookup_memory: self.edge_lookup.len() * std::mem::size_of::<(NodeId, NodeId)>(),
-        }
-    }
-}
-
-pub struct GraphMemoryStats {
-    pub nodes_memory: usize,
-    pub edges_memory: usize,
-    pub adjacency_memory: usize,
-    pub degrees_memory: usize,
-    pub edge_lookup_memory: usize,
-}
-
-impl GraphMemoryStats {
-    pub fn total(&self) -> usize {
-        self.nodes_memory
-            + self.edges_memory
-            + self.adjacency_memory
-            + self.degrees_memory
-            + self.edge_lookup_memory
     }
 }
 

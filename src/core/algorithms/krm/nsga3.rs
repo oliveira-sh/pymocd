@@ -1,14 +1,8 @@
 //! Self-contained, single-threaded NSGA-III generational loop (Deb & Jain,
 //! IEEE TEC 18(4):577-601, 2014) over the locus representation, plus the
-//! paper's two customizations: (a) the duplicate-permutation filter and
-//! (b) the single-community exclusion. The reference-point math (Das-Dennis
-//! generation, normalization, association, niche-preserving fill) follows
-//! the same published algorithm as this repo's shared `nsga3` engine -- that
-//! is the paper's method, not this repo's optimization -- but every line here
-//! is its own implementation: nothing in this file calls the shared
-//! `core::metaheuristics::nsga3` module's entry point, and nothing in this
-//! module's population/evaluation loop uses a data-parallel iterator crate
-//! (Rayon) or any other parallelism.
+//! paper's two customizations: duplicate-permutation filter and
+//! single-community exclusion. Deliberately independent of the shared
+//! `core::metaheuristics::nsga3` engine and Rayon so cost tracks the paper.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -24,23 +18,22 @@ use rand::{RngExt, rng}; // rand 0.10: random_range/random_bool live on RngExt
 use rustc_hash::FxHashSet;
 use std::cmp::Ordering;
 
-/// Decode + evaluate a freshly-built genome (single function call -- no
-/// batch/parallel evaluation anywhere in this module).
 fn make_individual(graph: &Graph, locus: &Locus, genome: Genome) -> Individual {
     let partition = locus.decode(&genome);
     let (kkm, rc) = kkm_ratiocut(graph, &partition);
     let q = get_modularity_from_partition(&partition, graph);
-    // KKM & RC are minimized (fed as-is); Q is maximized -> feed negated.
-    Individual { genome, partition, objectives: vec![kkm, rc, -q], rank: usize::MAX }
+    // KKM & RC minimized (fed as-is); Q maximized -> fed negated.
+    Individual {
+        genome,
+        partition,
+        objectives: vec![kkm, rc, -q],
+        rank: usize::MAX,
+    }
 }
 
-/// Paper customization (a): after environmental selection produces the new
-/// `pop_size` population, every individual after the first occurrence of a
-/// given canonical (permutation-relabeled) partition is replaced by a fresh
-/// random genome. Paper customization (b): any individual whose decoded
-/// partition is the single all-nodes community is also replaced. Both
-/// replacements are decoded + evaluated immediately (step (h): their
-/// objectives must be current before the next generation's mating).
+/// Paper customizations: (a) duplicate-permutation filter, (b)
+/// single-community exclusion. Replacements are decoded + evaluated
+/// immediately so their objectives are current before the next generation.
 fn apply_paper_customizations(
     graph: &Graph,
     locus: &Locus,
@@ -61,13 +54,8 @@ fn apply_paper_customizations(
     }
 }
 
-/// Generational loop: init -> evaluate -> rank, then for `num_gens`
-/// generations: binary-tournament mating -> locus-respecting crossover ->
-/// adjacency-constrained mutation -> evaluate offspring -> combine parents +
-/// offspring (size 2N) -> NSGA-III environmental selection down to
-/// `pop_size` -> the two paper customizations -> re-rank. Returns the final
-/// (rank-assigned) population; the caller applies the rank-1 max-modularity
-/// decision rule.
+/// NSGA-III generational loop. Returns the final (rank-assigned) population;
+/// the caller applies the rank-1 max-modularity decision rule.
 pub fn run(
     graph: &Graph,
     locus: &Locus,
@@ -92,12 +80,13 @@ pub fn run(
         for _ in 0..pop_size {
             let pa = binary_tournament(&pop, &mut rng);
             let pb = binary_tournament(&pop, &mut rng);
-            let mut child_genome = crossover(&pop[pa].genome, &pop[pb].genome, cross_rate, &mut rng);
+            let mut child_genome =
+                crossover(&pop[pa].genome, &pop[pb].genome, cross_rate, &mut rng);
             mutate(&mut child_genome, locus, mut_rate, &mut rng);
             offspring.push(make_individual(graph, locus, child_genome));
         }
 
-        let mut combined = std::mem::take(&mut pop); // R = P ∪ Q (size 2N)
+        let mut combined = std::mem::take(&mut pop);
         combined.extend(offspring);
 
         pop = environmental_selection(combined, pop_size, &ref_points);
@@ -127,7 +116,6 @@ fn environmental_selection(
 
     fast_non_dominated_sort(&mut combined);
 
-    // Bucket individual indices by (1-based) rank.
     let max_rank = combined.iter().map(|i| i.rank).max().unwrap_or(0);
     let mut fronts: Vec<Vec<usize>> = vec![Vec::new(); max_rank + 1];
     for (i, ind) in combined.iter().enumerate() {
@@ -152,7 +140,6 @@ fn environmental_selection(
     }
 
     if last_front.is_empty() {
-        // |St| == N exactly: F1..Fl fill the population.
         return gather(combined, &chosen);
     }
 
@@ -194,8 +181,8 @@ fn niche_select(
 ) -> Vec<usize> {
     let m = combined[st_indices[0]].objectives.len();
 
-    // --- Normalize (Alg. 2): translate by the ideal point, then scale by the
-    // hyperplane intercepts (with the documented fallbacks). ---
+    // Normalize (Alg. 2): translate by the ideal point, then scale by the
+    // hyperplane intercepts.
     let mut ideal = vec![f64::INFINITY; m];
     for &idx in st_indices {
         for (j, id) in ideal.iter_mut().enumerate() {
@@ -204,7 +191,11 @@ fn niche_select(
     }
     let translated: Vec<Vec<f64>> = st_indices
         .iter()
-        .map(|&idx| (0..m).map(|j| combined[idx].objectives[j] - ideal[j]).collect())
+        .map(|&idx| {
+            (0..m)
+                .map(|j| combined[idx].objectives[j] - ideal[j])
+                .collect()
+        })
         .collect();
 
     // Extreme point per axis: the St member minimizing the achievement
@@ -228,15 +219,22 @@ fn niche_select(
         .map(|t| {
             (0..m)
                 .map(|j| {
-                    let a = if intercepts[j].abs() < 1e-10 { 1.0 } else { intercepts[j] };
+                    let a = if intercepts[j].abs() < 1e-10 {
+                        1.0
+                    } else {
+                        intercepts[j]
+                    };
                     t[j] / a
                 })
                 .collect()
         })
         .collect();
 
-    // --- Associate each St member to its nearest reference line (Alg. 3). ---
-    let ref_norm2: Vec<f64> = ref_points.iter().map(|r| r.iter().map(|v| v * v).sum::<f64>()).collect();
+    // Associate each St member to its nearest reference line (Alg. 3).
+    let ref_norm2: Vec<f64> = ref_points
+        .iter()
+        .map(|r| r.iter().map(|v| v * v).sum::<f64>())
+        .collect();
     let assoc: Vec<(usize, f64)> = normalized
         .iter()
         .map(|pt| {
@@ -264,12 +262,11 @@ fn niche_select(
         members[a.0].push(pos);
     }
 
-    // --- Niche-preserving selection (Alg. 4). ---
+    // Niche-preserving selection (Alg. 4).
     let mut rng = rng();
     let mut picks = Vec::with_capacity(need);
     while picks.len() < need {
-        // j_min = argmin ρ over refs that still have an unselected Fl member
-        // (a ref with no remaining member is implicitly excluded, ρ=∞). Ties → random.
+        // argmin ρ over refs with an unselected Fl member; ties → random.
         let min_rho = match rho
             .iter()
             .enumerate()
@@ -290,7 +287,12 @@ fn niche_select(
             members[j]
                 .iter()
                 .enumerate()
-                .min_by(|a, b| assoc[*a.1].1.partial_cmp(&assoc[*b.1].1).unwrap_or(Ordering::Equal))
+                .min_by(|a, b| {
+                    assoc[*a.1]
+                        .1
+                        .partial_cmp(&assoc[*b.1].1)
+                        .unwrap_or(Ordering::Equal)
+                })
                 .map(|(idx, _)| idx)
                 .unwrap()
         } else {
@@ -319,7 +321,11 @@ fn intercepts(translated: &[Vec<f64>], extreme: &[usize], m: usize) -> Vec<f64> 
     match gaussian_solve(z, vec![1.0; m]) {
         Some(x) if x.iter().all(|&v| v.abs() > 1e-10) => {
             let a: Vec<f64> = x.iter().map(|&v| 1.0 / v).collect();
-            if a.iter().all(|&aj| aj > 1e-6) { a } else { fallback() }
+            if a.iter().all(|&aj| aj > 1e-6) {
+                a
+            } else {
+                fallback()
+            }
         }
         _ => fallback(),
     }
@@ -387,7 +393,14 @@ fn das_dennis(m: usize, divisions: usize) -> Vec<Vec<f64>> {
     }
     let div = divisions.max(1);
     let mut point = vec![0usize; m];
-    fn rec(idx: usize, left: usize, m: usize, div: usize, point: &mut [usize], out: &mut Vec<Vec<f64>>) {
+    fn rec(
+        idx: usize,
+        left: usize,
+        m: usize,
+        div: usize,
+        point: &mut [usize],
+        out: &mut Vec<Vec<f64>>,
+    ) {
         if idx == m - 1 {
             point[idx] = left;
             out.push(point.iter().map(|&v| v as f64 / div as f64).collect());
@@ -414,7 +427,6 @@ mod tests {
         for p in &pts {
             assert!((p.iter().sum::<f64>() - 1.0).abs() < 1e-9);
         }
-        // M=2, p=4 → 5 points.
         assert_eq!(das_dennis(2, 4).len(), 5);
     }
 
@@ -423,7 +435,6 @@ mod tests {
         let a = vec![vec![2.0, 0.0], vec![0.0, 4.0]];
         let x = gaussian_solve(a, vec![2.0, 4.0]).unwrap();
         assert!((x[0] - 1.0).abs() < 1e-9 && (x[1] - 1.0).abs() < 1e-9);
-        // Singular matrix → None.
         assert!(gaussian_solve(vec![vec![1.0, 1.0], vec![1.0, 1.0]], vec![1.0, 1.0]).is_none());
     }
 }

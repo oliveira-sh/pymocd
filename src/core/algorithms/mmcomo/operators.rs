@@ -145,8 +145,8 @@ pub fn local_search(g: &Graph, labels: &mut Labels) {
             }
 
             let mut best_c = ci;
-            let mut best_g = w.get(&ci).copied().unwrap_or(0.0)
-                - tot.get(&ci).copied().unwrap_or(0.0) * ki / m2;
+            let mut best_g =
+                w.get(&ci).copied().unwrap_or(0.0) - tot.get(&ci).copied().unwrap_or(0.0) * ki / m2;
 
             for (&c, &wc) in w.iter() {
                 if c == ci {

@@ -63,33 +63,6 @@ pub fn diffusion_kernel(g: &Graph, beta: f64) -> Sm {
 
     sm
 }
-
-/// Dense n x n matrix multiply C = A * B (row-major `Vec<Vec<f64>>`).
-#[allow(dead_code)]
-pub fn matmul(a: &[Vec<f64>], b: &[Vec<f64>]) -> Vec<Vec<f64>> {
-    let n = a.len();
-    if n == 0 {
-        return Vec::new();
-    }
-    let inner = b.len();
-    let cols = b[0].len();
-    let mut c = vec![vec![0.0f64; cols]; n];
-    for i in 0..n {
-        for k in 0..inner {
-            let aik = a[i][k];
-            if aik == 0.0 {
-                continue;
-            }
-            let brow = &b[k];
-            let crow = &mut c[i];
-            for j in 0..cols {
-                crow[j] += aik * brow[j];
-            }
-        }
-    }
-    c
-}
-
 /// Symmetric eigendecomposition via cyclic Jacobi rotations.
 ///
 /// `a` symmetric n x n (row-major) -> `(eigenvalues, eigenvectors)` with

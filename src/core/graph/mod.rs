@@ -12,5 +12,5 @@ pub type Partition = FxHashMap<NodeId, CommunityId>;
 mod adj;
 mod csr;
 
-pub use adj::{Graph, GraphMemoryStats, get_edges, get_nodes};
+pub use adj::{Graph, get_edges, get_nodes};
 pub use csr::CsrGraph;

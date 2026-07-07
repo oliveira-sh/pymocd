@@ -1,11 +1,7 @@
-//! Locus-based genome representation (Pizzuti GA-Net style, used by Shaik,
-//! Ravi & Deb's NSGA-III-KRM). A genome is a `Vec<NodeId>` of length `n`: the
-//! cell at position `p` (representing `nodes[p]`) holds a `NodeId` value that
-//! MUST be either that node itself or one of its neighbours. Decoding unions
-//! positions whose cell points at each other; each resulting connected
-//! component is one community. A single partition can be encoded by many
-//! distinct genomes (permutation-equivalent solutions) -- see
-//! `canonical_labels`, used by the duplicate-permutation filter.
+//! Locus-based genome (Pizzuti GA-Net style, used by Shaik, Ravi & Deb's
+//! NSGA-III-KRM): a `Vec<NodeId>` where cell `p` MUST hold `nodes[p]` itself
+//! or one of its neighbours; decoding unions positions into communities.
+//! Many distinct genomes can encode one partition -- see `canonical_labels`.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -16,10 +12,9 @@ use rustc_hash::FxHashMap;
 
 pub type Genome = Vec<NodeId>;
 
-/// Precomputed locus bookkeeping for one graph: the stable node ordering, the
-/// reverse `NodeId -> position` map (needed by `decode`'s union-find), and
-/// per-position candidate value lists (`{node itself} ∪ neighbours`) so
-/// genome init/mutation never has to touch the graph's adjacency lists.
+/// Precomputed locus bookkeeping for one graph: stable node ordering, reverse
+/// `NodeId -> position` map, and per-position candidate lists
+/// (`{node itself} ∪ neighbours`).
 pub struct Locus {
     pub nodes: Vec<NodeId>,
     pub index_of: FxHashMap<NodeId, usize>,
@@ -40,7 +35,11 @@ impl Locus {
                 c
             })
             .collect();
-        Locus { nodes, index_of, candidates }
+        Locus {
+            nodes,
+            index_of,
+            candidates,
+        }
     }
 
     #[inline]
@@ -48,8 +47,7 @@ impl Locus {
         self.nodes.len()
     }
 
-    /// Random genome: each cell independently uniform over `{node itself} ∪
-    /// {its neighbours}` (degree-0 nodes have a single candidate, themselves).
+    /// Random genome: each cell independently uniform over its candidates.
     pub fn random_genome(&self, rng: &mut impl Rng) -> Genome {
         self.candidates
             .iter()
@@ -90,10 +88,8 @@ impl Locus {
         partition
     }
 
-    /// Canonicalize a decoded partition into a permutation-invariant label
-    /// vector: communities are relabeled by first-seen order over `nodes`,
-    /// so any two permutation-equivalent partitions produce the same vector.
-    /// Used by the paper's duplicate-permutation filter.
+    /// Permutation-invariant label vector (communities relabeled by first-seen
+    /// order over `nodes`); used by the duplicate-permutation filter.
     pub fn canonical_labels(&self, partition: &Partition) -> Vec<i32> {
         let mut remap: FxHashMap<i32, i32> = FxHashMap::default();
         let mut next = 0i32;
@@ -110,8 +106,7 @@ impl Locus {
             .collect()
     }
 
-    /// True iff `partition` puts every node into a single community (the
-    /// solution the paper's second customization excludes).
+    /// True iff `partition` puts every node into a single community.
     pub fn is_single_community(&self, partition: &Partition) -> bool {
         let mut first: Option<i32> = None;
         for node in &self.nodes {

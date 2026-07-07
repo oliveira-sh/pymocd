@@ -7,8 +7,8 @@ mod utils;
 
 use crate::core::graph::{Graph, Partition};
 use crate::core::metaheuristics::helpers::individual::{Individual, TOURNAMENT_SIZE};
-use crate::core::metaheuristics::nsga2;
 use crate::core::metaheuristics::helpers::operators;
+use crate::core::metaheuristics::nsga2;
 use crate::core::utils::normalize_community_ids;
 use utils::max_q_selection;
 
@@ -100,8 +100,6 @@ impl HpMocd {
     fn envolve(&self, py: Option<Python<'_>>) -> PyResult<Vec<Individual>> {
         let degrees = self.graph.precompute_degrees();
 
-        // Shared NSGA-II loop; HP-MOCD only supplies its objective evaluation
-        // (Rust intra/inter or Python callables) and its per-generation logging.
         let individuals = nsga2::evolve(
             &self.graph,
             self.pop_size,
@@ -124,9 +122,11 @@ impl HpMocd {
                 }
 
                 if let Some(cb) = &self.on_generation
-                    && let Some(py) = py {
-                        cb.bind(py).call1((generation, num_gens, first_front_size))?;
-                    }
+                    && let Some(py) = py
+                {
+                    cb.bind(py)
+                        .call1((generation, num_gens, first_front_size))?;
+                }
                 Ok(())
             },
         )?;
@@ -135,30 +135,6 @@ impl HpMocd {
             .into_iter()
             .filter(|ind| ind.rank == 1)
             .collect())
-    }
-}
-
-/// To be used when running directly (no Python objectives)
-impl HpMocd {
-    pub fn _new(graph: Graph) -> Self {
-        HpMocd {
-            graph,
-            debug_level: 10,
-            pop_size: 100,
-            num_gens: 100,
-            cross_rate: 0.8,
-            mut_rate: 0.2,
-            py_graph: None,
-            py_objectives: vec![],
-            on_generation: None,
-        }
-    }
-
-    pub fn _run(&self) -> Partition {
-        let first_front = self.envolve(None).expect("envolve failed");
-        let best_solution = max_q_selection(&first_front);
-
-        normalize_community_ids(&self.graph, best_solution.partition.clone())
     }
 }
 
@@ -239,10 +215,7 @@ impl HpMocd {
     /// Return all non-dominated solutions as ``[(partition, objectives), ...]``.
     /// Objective order matches the configured objectives (or intra/inter).
     #[pyo3(signature = ())]
-    pub fn generate_pareto_front(
-        &self,
-        py: Python<'_>,
-    ) -> PyResult<Vec<(Partition, Vec<f64>)>> {
+    pub fn generate_pareto_front(&self, py: Python<'_>) -> PyResult<Vec<(Partition, Vec<f64>)>> {
         let first_front = self.envolve(Some(py))?;
 
         Ok(first_front

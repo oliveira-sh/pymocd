@@ -156,7 +156,11 @@ fn init_macro(g: &Graph, sm: &Sm, pop: usize) -> Vec<Mac> {
             }
             let labels = decode(g, sm, &genome);
             let obj = kkm_rc(g, &labels);
-            Mac { genome, labels, obj }
+            Mac {
+                genome,
+                labels,
+                obj,
+            }
         })
         .collect()
 }
@@ -247,7 +251,11 @@ fn influence(
         let genome = encode(g, sm, &e.labels);
         let labels = decode(g, sm, &genome);
         let obj = kkm_rc(g, &labels);
-        pool.push(Mac { genome, labels, obj });
+        pool.push(Mac {
+            genome,
+            labels,
+            obj,
+        });
     }
     pool.extend(macro_pop);
     pool.extend(macro_off);
@@ -291,7 +299,11 @@ fn run_fronts(
             .map(|gn| {
                 let labels = decode(g, &sm, &gn);
                 let obj = kkm_rc(g, &labels);
-                Mac { genome: gn, labels, obj }
+                Mac {
+                    genome: gn,
+                    labels,
+                    obj,
+                }
             })
             .collect();
 
@@ -344,10 +356,7 @@ fn build(nodes: &[i32], edges: &[(i32, i32)]) -> (Graph, Vec<i32>, Vec<bool>) {
     ids.sort_unstable();
     ids.dedup();
     let index: HashMap<i32, usize> = ids.iter().enumerate().map(|(i, &x)| (x, i)).collect();
-    let eidx: Vec<(usize, usize)> = edges
-        .iter()
-        .map(|&(u, v)| (index[&u], index[&v]))
-        .collect();
+    let eidx: Vec<(usize, usize)> = edges.iter().map(|&(u, v)| (index[&u], index[&v])).collect();
     let g = Graph::from_indexed(ids.len(), &eidx);
     let isolated: Vec<bool> = g.deg.iter().map(|&d| d == 0.0).collect();
     (g, ids, isolated)

@@ -1,4 +1,4 @@
-//! Objectives for `scale`, ported to `CsrGraph` (flat CSR, FxHashMap by label).
+//! Objectives for `scale` over `CsrGraph`.
 
 use crate::core::graph::CsrGraph;
 use rustc_hash::FxHashMap;
@@ -48,8 +48,7 @@ pub fn kkm_rc(g: &CsrGraph, labels: &Labels) -> (f64, f64) {
     (2.0 * (n - k) - kkm_internal, rc)
 }
 
-/// Newman modularity Q (maximized). The max-Q selector alternative (runner-up to
-/// SBM/MDL in the Phase 4 oracle-gap study); retained for reference and tests.
+/// Newman modularity Q (maximized). Retained for reference and tests.
 #[allow(dead_code)]
 pub fn modularity(g: &CsrGraph, labels: &Labels) -> f64 {
     let m2 = (2 * g.m) as f64;

@@ -1,5 +1,5 @@
-//! sbm_mdl.rs — microcanonical Bernoulli-SBM description length (Peixoto-style),
-//! the label-free criterion the SCALE frontier selector minimises.
+//! Microcanonical Bernoulli-SBM description length (Peixoto-style), the
+//! label-free criterion the SCALE frontier selector minimises.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos.
 
@@ -58,11 +58,9 @@ pub fn dl_sbm_score(g: &CsrGraph, part: &[i32]) -> f64 {
 
 /// Degree-corrected SBM description length: the Karrer–Newman degree-corrected
 /// profile log-likelihood as the data term, plus the same partition + block-edge
-/// model cost as [`dl_sbm_score`]. LOWER is better. Because the degree sequence is
-/// modelled separately, this does NOT collapse to a single block under degree
-/// heterogeneity or weak structure, where the plain Bernoulli `dl_sbm_score`
-/// does; in a label-free selector bake-off it roughly halved the mean NMI gap to
-/// the front oracle (0.154 → 0.084) and removed every high-mixing collapse.
+/// model cost as [`dl_sbm_score`]. LOWER is better. Because the degree sequence
+/// is modelled separately, this does NOT collapse to a single block under degree
+/// heterogeneity or weak structure, where the plain Bernoulli `dl_sbm_score` does.
 pub fn dl_dcsbm_score(g: &CsrGraph, part: &[i32]) -> f64 {
     let n = g.n as f64;
     let m = g.m as f64;

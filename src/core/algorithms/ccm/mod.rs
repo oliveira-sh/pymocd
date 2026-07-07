@@ -1,17 +1,10 @@
 //! NSGA-III-CCM (Shaik, Ravi & Deb, SN Computer Science 2:13, 2021): a
-//! self-contained reimplementation of the paper's method, not a thin wrapper
-//! over this repo's optimized engine. Reproduced: the locus-based (Pizzuti
-//! GA-Net style) genome with decode-by-union-find (`locus.rs`); CCM's own
-//! single-threaded NSGA-III loop with Das–Dennis reference points and
-//! niche-preserving environmental selection (`engine.rs`); both paper
-//! customizations (the duplicate-permutation filter and the single-community
-//! exclusion); adjacency-constrained crossover/mutation; the paper's exact
-//! (Community Score, Community Fitness, Modularity) objectives; and the
-//! max-modularity rank-1 decision rule. Removed, deliberately: the shared
-//! NSGA-III engine (`core::metaheuristics::nsga3`, i.e. its `evolve` entry
-//! point), the shared label-map operators, and data-parallel (Rayon-based)
-//! evaluation — this baseline's cost and behaviour must track the paper, not
-//! this repo's optimizations.
+//! self-contained, single-threaded reimplementation of the paper's method —
+//! locus genome (`locus.rs`), CCM's own NSGA-III loop with paper
+//! customizations (`engine.rs`), (Community Score, Community Fitness,
+//! Modularity) objectives, max-modularity rank-1 decision rule. Deliberately
+//! avoids the shared NSGA-III engine and Rayon so this baseline's cost and
+//! behaviour track the paper.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
