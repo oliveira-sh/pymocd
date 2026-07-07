@@ -20,11 +20,11 @@ debug = 1
 rand = "0.10.0"
 rayon = "1.11.0"                                                # data parallelism and multi-threading support.
 rustc-hash = { version = "2.1.1", default-features = true }     # a fast hash map implementation.
-pyo3 = { version = "0.28.2", features = [] }                    # Python compatibility (extension-module feature gated)
+pyo3 = { version = "0.29.0", features = [] }                    # Python compatibility (extension-module feature gated)
 dashmap = "6.1.0"                                               # For concurrent HashMap
 rand_chacha = "0.10.0"                                          # ChaCha random number generator
 ndarray = "0.17.2"
-pyo3-stub-gen = "0.22"
+pyo3-stub-gen = "0.23"
 
 [[bin]]
 name = "stub_gen"
