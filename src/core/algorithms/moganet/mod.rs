@@ -1,33 +1,60 @@
-//! MOGA-Net (Pizzuti, IEEE TEC 16(3):418–430, 2012): NSGA-II with the
-//! (Community Score, Community Fitness) bi-objective. Only the objective is new —
-//! the encoding (label-map `Partition`), the neighbour-safe operators
-//! (`core::operators`) and the NSGA-II machinery (`core::nsga2`) are reused
-//! unchanged.
+//! MOGA-Net (Pizzuti, IEEE ICTAI 2009 / IEEE TEC 16(3):418-430, 2012):
+//! a self-contained, single-threaded reimplementation of the paper's actual
+//! mechanism, not a wrapper around this repo's optimized engine.
+//!
+//! Reproduced from the paper:
+//!  - the locus-based adjacency genome (Park & Song 1989) + union-find decode
+//!    (`locus.rs`): gene `i` holds a node id `j`; `i` and `j` end up in the
+//!    same community; community count is never fixed in advance;
+//!  - "safe"/biased initialization (every gene starts as a real edge or, for
+//!    degree-0 nodes, the node itself);
+//!  - uniform crossover and *repaired* (neighbour-restricted) mutation
+//!    (`operators.rs`), which keep every individual safe by construction;
+//!  - the elitist + roulette-wheel **generational replacement** model from
+//!    MATLAB's GA/Direct Search Toolbox (`gamultiobj`) that the paper used:
+//!    rank + crowd the population, copy the top 10% unchanged ("elite
+//!    reproduction"), fill the rest by fitness-proportionate (roulette)
+//!    selection over the whole population -- *not* tournament-select +
+//!    combine-parents-and-offspring-then-truncate (`engine.rs`);
+//!  - the paper's exact (Community Score, Community Fitness) bi-objective
+//!    (reused unchanged from `helpers::objectives::community_score_fitness`,
+//!    a pure math function over an already-decoded partition -- not part of
+//!    the borrowed GA machinery);
+//!  - the paper's max-modularity decision rule over the final rank-1 front.
+//!
+//! Removed (the borrowed machinery this replaces): the shared
+//! `core::metaheuristics::nsga2` engine and its combine+truncate survivor
+//! selection, the shared label-map `Partition` genome with its two-point
+//! crossover / majority-vote mutation operators
+//! (`helpers::operators::{crossover,mutation,generator}`), and
+//! `rayon`-based parallel fitness evaluation -- this detector now runs
+//! single-threaded so its cost reflects the published method, not this
+//! repo's optimizations.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use crate::core::graph::{Graph, Partition};
-use crate::core::metaheuristics::helpers::objectives::community_score_fitness::community_objectives;
-use crate::core::metaheuristics::helpers::operators::get_modularity_from_partition;
-use crate::core::metaheuristics::helpers::individual::{
-    Individual, TOURNAMENT_SIZE, fast_non_dominated_sort,
-};
-use crate::core::metaheuristics::nsga2;
+use crate::core::metaheuristics::helpers::objectives::decomposed_modularity::calculate_objectives;
 use crate::core::utils::normalize_community_ids;
-
-use rayon::prelude::*;
 use std::cmp::Ordering;
-use std::convert::Infallible;
 
 mod defaults;
+mod engine;
+mod individual;
+mod locus;
+mod operators;
+
 pub use defaults::*;
 
-fn evaluate(graph: &Graph, pop: &mut [Individual], r: f64, alpha: f64) {
-    pop.par_iter_mut().for_each(|ind| {
-        let (cs, cf) = community_objectives(graph, &ind.partition, r, alpha);
-        ind.objectives = vec![-cs, -cf];
-    });
+use individual::fast_non_dominated_sort;
+use locus::Locus;
+
+/// Q = 1 - intra - inter (Shi et al. 2012 decomposed modularity, mathematically
+/// the standard Newman-Girvan modularity); single-threaded (`parallel = false`).
+fn modularity(graph: &Graph, partition: &Partition) -> f64 {
+    let m = calculate_objectives(graph, partition, graph.precompute_degrees(), false);
+    1.0 - m.intra - m.inter
 }
 
 /// Run MOGA-Net and return the **max-modularity** member of the rank-1 Pareto
@@ -41,27 +68,14 @@ pub fn moga_net(
     r: f64,
     alpha: f64,
 ) -> Partition {
-    // MOGA-Net supplies its (−CS, −CF) objective to the shared NSGA-II loop.
-    let mut pop = nsga2::evolve(
-        graph,
-        pop_size,
-        num_gens,
-        cross_rate,
-        mut_rate,
-        TOURNAMENT_SIZE,
-        |inds| {
-            evaluate(graph, inds, r, alpha);
-            Ok::<(), Infallible>(())
-        },
-        |_, _, _| Ok(()),
-    )
-    .expect("nsga2::evolve is infallible for MOGA-Net");
+    let locus = Locus::build(graph);
+    let mut pop = engine::run(graph, &locus, pop_size, num_gens, cross_rate, mut_rate, r, alpha);
 
     fast_non_dominated_sort(&mut pop);
     let best = pop
         .iter()
         .filter(|ind| ind.rank == 1)
-        .map(|ind| (get_modularity_from_partition(&ind.partition, graph), ind))
+        .map(|ind| (modularity(graph, &ind.partition), ind))
         .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal))
         .expect("empty Pareto front")
         .1;
@@ -73,6 +87,7 @@ pub fn moga_net(
 mod tests {
     use super::*;
     use crate::core::graph::{CommunityId, NodeId};
+    use crate::core::metaheuristics::helpers::objectives::community_score_fitness::community_objectives;
 
     // Triangle {0,1,2}, triangle {3,4,5}, single bridge edge (2,3).
     fn two_triangles() -> Graph {
