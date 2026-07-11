@@ -3,13 +3,15 @@
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
+mod individual;
+mod nsga2;
+mod objectives;
+mod operators;
 mod utils;
 
 use crate::core::graph::{Graph, Partition};
-use crate::core::metaheuristics::helpers::individual::{Individual, TOURNAMENT_SIZE};
-use crate::core::metaheuristics::helpers::operators;
-use crate::core::metaheuristics::nsga2;
-use crate::core::utils::normalize_community_ids;
+use individual::{Individual, TOURNAMENT_SIZE};
+use crate::core::graph::normalize_community_ids;
 use utils::max_q_selection;
 
 use pyo3::prelude::*;

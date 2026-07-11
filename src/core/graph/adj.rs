@@ -7,8 +7,6 @@ use super::NodeId;
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::fs::File;
-use std::io::{BufRead, BufReader};
 
 #[derive(Debug)]
 pub struct Graph {
@@ -197,32 +195,6 @@ impl Graph {
         }
     }
 
-    pub fn from_adj_list(file_path: &str) -> Self {
-        let mut graph = Graph::new();
-        let file = File::open(file_path).expect("Unable to open file");
-        let reader = BufReader::new(file);
-
-        for line in reader.lines() {
-            let line = line.expect("Could not read line");
-            let parts: Vec<&str> = line.split_whitespace().collect();
-
-            if line.trim().starts_with('#') || parts.is_empty() {
-                continue;
-            }
-
-            let node: NodeId = parts[0].parse().expect("First item should be node ID");
-            for neighbor_str in &parts[1..] {
-                let neighbor: NodeId = neighbor_str
-                    .parse()
-                    .expect("Neighbor should be a valid node ID");
-                graph.add_edge(node, neighbor);
-            }
-        }
-
-        graph.finalize();
-        graph
-    }
-
     #[inline(always)]
     pub fn neighbors(&self, node: &NodeId) -> &[NodeId] {
         self.adjacency_list.get(node).map_or(&[], |x| x)
@@ -231,17 +203,6 @@ impl Graph {
     #[inline(always)]
     pub fn degree(&self, node: &NodeId) -> usize {
         *self.degrees.get(node).unwrap_or(&0)
-    }
-
-    #[inline(always)]
-    pub fn has_edge(&self, from: NodeId, to: NodeId) -> bool {
-        let edge_key = if from < to { (from, to) } else { (to, from) };
-        self.edge_lookup.contains(&edge_key)
-    }
-
-    #[inline(always)]
-    pub fn nodes_iter(&self) -> impl Iterator<Item = &NodeId> {
-        self.node_vec.iter()
     }
 
     #[inline(always)]
@@ -263,16 +224,6 @@ impl Graph {
     pub fn precompute_degrees(&self) -> &FxHashMap<NodeId, usize> {
         &self.degrees
     }
-
-    #[inline(always)]
-    pub fn max_degree(&self) -> usize {
-        self.max_degree
-    }
-
-    #[inline(always)]
-    pub fn total_degree(&self) -> usize {
-        self.total_degree
-    }
 }
 
 #[cfg(test)]
@@ -288,8 +239,8 @@ mod test {
         graph.finalize();
 
         assert_eq!(graph.num_nodes(), 4);
-        assert_eq!(graph.max_degree(), 3);
-        assert_eq!(graph.total_degree(), 6);
+        assert_eq!(graph.max_degree, 3);
+        assert_eq!(graph.total_degree, 6);
     }
 
     #[test]
@@ -320,19 +271,6 @@ mod test {
     }
 
     #[test]
-    fn test_has_edge() {
-        let mut graph: Graph = Graph::new();
-        graph.add_edge(0, 1);
-        graph.add_edge(0, 2);
-        graph.finalize();
-
-        assert!(graph.has_edge(0, 1));
-        assert!(graph.has_edge(1, 0));
-        assert!(graph.has_edge(0, 2));
-        assert!(!graph.has_edge(1, 2));
-    }
-
-    #[test]
     fn test_duplicate_edge_prevention() {
         let mut graph: Graph = Graph::new();
         graph.add_edge(0, 1);
@@ -352,7 +290,7 @@ mod test {
         graph.add_edge(2, 3);
         graph.finalize();
 
-        let mut nodes: Vec<NodeId> = graph.nodes_iter().copied().collect();
+        let mut nodes: Vec<NodeId> = graph.nodes_vec().clone();
         nodes.sort();
         assert_eq!(nodes, [0, 1, 2, 3]);
     }

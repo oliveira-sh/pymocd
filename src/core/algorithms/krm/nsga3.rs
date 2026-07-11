@@ -1,8 +1,8 @@
 //! Self-contained, single-threaded NSGA-III generational loop (Deb & Jain,
 //! IEEE TEC 18(4):577-601, 2014) over the locus representation, plus the
 //! paper's two customizations: duplicate-permutation filter and
-//! single-community exclusion. Deliberately independent of the shared
-//! `core::metaheuristics::nsga3` engine and Rayon so cost tracks the paper.
+//! single-community exclusion. Deliberately single-threaded (no Rayon) so
+//! cost tracks the paper.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -11,8 +11,8 @@ use super::individual::{Individual, fast_non_dominated_sort};
 use super::locus::{Genome, Locus};
 use super::operators::{binary_tournament, crossover, mutate};
 use crate::core::graph::Graph;
-use crate::core::metaheuristics::helpers::objectives::kernel_ratiocut::kkm_ratiocut;
-use crate::core::metaheuristics::helpers::operators::get_modularity_from_partition;
+use super::objectives::kkm_ratiocut;
+use crate::core::metrics::modularity::modularity;
 use rand::rngs::ThreadRng;
 use rand::{RngExt, rng}; // rand 0.10: random_range/random_bool live on RngExt
 use rustc_hash::FxHashSet;
@@ -21,7 +21,7 @@ use std::cmp::Ordering;
 fn make_individual(graph: &Graph, locus: &Locus, genome: Genome) -> Individual {
     let partition = locus.decode(&genome);
     let (kkm, rc) = kkm_ratiocut(graph, &partition);
-    let q = get_modularity_from_partition(&partition, graph);
+    let q = modularity(graph, &partition);
     // KKM & RC minimized (fed as-is); Q maximized -> fed negated.
     Individual {
         genome,

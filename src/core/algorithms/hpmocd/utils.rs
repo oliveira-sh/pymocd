@@ -4,7 +4,7 @@
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use crate::core::metaheuristics::helpers::individual::Individual;
+use super::individual::Individual;
 use std::cmp::Ordering;
 
 #[inline(always)]
