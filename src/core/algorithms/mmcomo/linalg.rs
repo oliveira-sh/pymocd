@@ -4,6 +4,10 @@
 //! Computed via symmetric Jacobi eigendecomposition (self-contained, no deps).
 //! beta is NEVER specified in the paper; the caller supplies it.
 
+// Dense matrix kernels: indexed loops over multiple matrices read clearer
+// than iterator chains here.
+#![allow(clippy::needless_range_loop)]
+
 use super::*;
 
 /// Diffusion-kernel similarity matrix SM = exp(beta * (A - D)).

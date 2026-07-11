@@ -117,8 +117,8 @@ pub fn local_search(g: &Graph, labels: &mut Labels) {
     }
 
     let mut tot: HashMap<i32, f64> = HashMap::new();
-    for i in 0..n {
-        *tot.entry(labels[i]).or_insert(0.0) += g.deg[i];
+    for (&lab, &d) in labels.iter().zip(&g.deg) {
+        *tot.entry(lab).or_insert(0.0) += d;
     }
 
     let mut improved = true;
