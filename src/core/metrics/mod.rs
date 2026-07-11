@@ -8,6 +8,7 @@ pub mod ari;
 pub mod contingency;
 pub mod f1;
 pub mod mi;
+pub mod modularity;
 pub mod nmi;
 
 pub use contingency::{Contingency, contingency, entropy};
