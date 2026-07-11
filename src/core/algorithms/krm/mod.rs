@@ -9,13 +9,14 @@
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use crate::core::graph::{Graph, Partition};
-use crate::core::metaheuristics::helpers::operators::get_modularity_from_partition;
+use crate::core::metrics::modularity::modularity;
 use crate::core::graph::normalize_community_ids;
 use std::cmp::Ordering;
 
 mod defaults;
 mod individual;
 mod locus;
+mod objectives;
 mod nsga3;
 mod operators;
 
@@ -44,7 +45,7 @@ pub fn krm(
     let best = pop
         .iter()
         .filter(|ind| ind.rank == 1)
-        .map(|ind| (get_modularity_from_partition(&ind.partition, graph), ind))
+        .map(|ind| (modularity(graph, &ind.partition), ind))
         .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal))
         .expect("empty Pareto front")
         .1;
