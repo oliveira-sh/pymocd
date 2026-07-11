@@ -7,12 +7,11 @@
 
 use super::locus::{self, Genome, NodeIndex};
 use crate::core::graph::{Graph, NodeId, Partition};
-use crate::core::metaheuristics::helpers::objectives::decomposed_modularity::calculate_objectives;
+use super::objectives::calculate_objectives;
 use rand::RngExt;
 use rustc_hash::FxHashMap;
 
-/// Hyper-grid resolution per objective axis (matches
-/// `core::metaheuristics::pesa2::hypergrid::GRID_DIVISIONS`).
+/// Hyper-grid resolution per objective axis (Corne et al. 2001).
 pub const GRID_DIVISIONS: usize = 8;
 
 #[derive(Clone, Debug)]
@@ -179,7 +178,7 @@ pub fn evolutionary_phase(
 
     let idx = NodeIndex::build(graph);
     let ipsize = pop_size.max(1);
-    let epsize = pop_size.min(super::EPSIZE_CAP).max(1);
+    let epsize = pop_size.clamp(1, super::EPSIZE_CAP);
 
     let mut rng = rand::rng();
 

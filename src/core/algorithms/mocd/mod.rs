@@ -12,6 +12,7 @@
 
 mod defaults;
 mod locus;
+mod objectives;
 mod model_selection;
 mod pesa2;
 pub use defaults::*;
