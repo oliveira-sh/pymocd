@@ -10,14 +10,15 @@
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use crate::core::graph::{Graph, Partition};
-use crate::core::metaheuristics::helpers::objectives::community_score_fitness::community_objectives;
-use crate::core::metaheuristics::helpers::operators::get_modularity_from_partition;
+use crate::core::metrics::modularity::modularity;
+use objectives::community_objectives;
 use crate::core::graph::normalize_community_ids;
 
 use std::cmp::Ordering;
 
 mod defaults;
 mod engine;
+mod objectives;
 mod locus;
 
 pub use defaults::*;
@@ -27,7 +28,7 @@ pub use defaults::*;
 /// objective vector fed to it is `(-CS, -CF, -Q)`.
 fn evaluate(graph: &Graph, partition: &Partition, r: f64, alpha: f64) -> Vec<f64> {
     let (cs, cf) = community_objectives(graph, partition, r, alpha);
-    let q = get_modularity_from_partition(partition, graph);
+    let q = modularity(graph, partition);
     vec![-cs, -cf, -q]
 }
 
@@ -64,7 +65,7 @@ pub fn ccm(
     let best = pop
         .iter()
         .filter(|ind| ind.rank == 1)
-        .map(|ind| (get_modularity_from_partition(&ind.partition, graph), ind))
+        .map(|ind| (modularity(graph, &ind.partition), ind))
         .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal))
         .expect("empty Pareto front")
         .1;
