@@ -13,53 +13,6 @@ mod crossover;
 mod generator;
 mod mutation;
 
-#[derive(Debug)]
-pub struct ConvergenceCriteria {
-    current_best_fitness: f64,
-    generations_unchanged: usize,
-    max_stagnant_generations: usize,
-    tolerance: f64,
-}
-
-impl Default for ConvergenceCriteria {
-    fn default() -> Self {
-        ConvergenceCriteria {
-            current_best_fitness: f64::MIN,
-            generations_unchanged: 0,
-            max_stagnant_generations: 100,
-            tolerance: 1e-6,
-        }
-    }
-}
-
-impl ConvergenceCriteria {
-    /// Returns true once fitness has stagnated for `max_stagnant_generations`.
-    pub fn has_converged(&mut self, new_fitness: f64) -> bool {
-        let has_improved = (new_fitness - self.current_best_fitness).abs() > self.tolerance;
-
-        if has_improved {
-            self.current_best_fitness = new_fitness;
-            self.generations_unchanged = 0;
-            return false;
-        }
-
-        self.generations_unchanged += 1;
-        if self.generations_unchanged >= self.max_stagnant_generations {
-            return true;
-        }
-
-        false
-    }
-
-    pub fn get_best_fitness(&self) -> f64 {
-        self.current_best_fitness
-    }
-}
-
-pub fn crossover(parent1: &Partition, parent2: &Partition, crossover_rate: f64) -> Partition {
-    crossover::two_point_crossover(parent1, parent2, crossover_rate)
-}
-
 pub fn mutation(partition: &mut Partition, graph: &Graph, mutation_rate: f64) {
     mutation::mutate(partition, graph, mutation_rate);
 }

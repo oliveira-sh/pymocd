@@ -12,7 +12,7 @@
 use crate::core::graph::{Graph, Partition};
 use crate::core::metaheuristics::helpers::objectives::community_score_fitness::community_objectives;
 use crate::core::metaheuristics::helpers::operators::get_modularity_from_partition;
-use crate::core::utils::normalize_community_ids;
+use crate::core::graph::normalize_community_ids;
 
 use std::cmp::Ordering;
 

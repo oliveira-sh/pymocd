@@ -13,7 +13,7 @@
 
 use crate::core::graph::{Graph, Partition};
 use crate::core::metaheuristics::helpers::objectives::decomposed_modularity::calculate_objectives;
-use crate::core::utils::normalize_community_ids;
+use crate::core::graph::normalize_community_ids;
 use std::cmp::Ordering;
 
 mod defaults;

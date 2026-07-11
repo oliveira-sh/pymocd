@@ -9,7 +9,7 @@ use crate::core::graph::{Graph, Partition};
 use crate::core::metaheuristics::helpers::individual::{Individual, TOURNAMENT_SIZE};
 use crate::core::metaheuristics::helpers::operators;
 use crate::core::metaheuristics::nsga2;
-use crate::core::utils::normalize_community_ids;
+use crate::core::graph::normalize_community_ids;
 use utils::max_q_selection;
 
 use pyo3::prelude::*;
