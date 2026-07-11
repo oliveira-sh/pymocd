@@ -9,7 +9,7 @@
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use crate::core::graph::{Graph, Partition};
-use crate::core::metaheuristics::helpers::operators;
+use super::operators;
 use rand::distr::Bernoulli;
 use rand::{prelude::*, rng};
 use rayon::prelude::*;
