@@ -70,8 +70,7 @@ pub fn encode(g: &Graph, sm: &Sm, labels: &Labels) -> Genome {
     let mut order: Vec<i32> = Vec::new();
     let mut groups: Vec<Vec<usize>> = Vec::new();
     let mut pos: std::collections::HashMap<i32, usize> = std::collections::HashMap::new();
-    for i in 0..n {
-        let lab = labels[i];
+    for (i, &lab) in labels.iter().enumerate() {
         match pos.get(&lab) {
             Some(&p) => groups[p].push(i),
             None => {

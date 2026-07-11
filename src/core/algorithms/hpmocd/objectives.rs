@@ -1,9 +1,9 @@
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
-//! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+//! Shi's decomposed-modularity objectives and their value type.
 
 use crate::core::graph::{Graph, NodeId, Partition};
-use crate::core::metaheuristics::helpers::objectives::metrics::Metrics;
 use rayon::iter::*;
 use rustc_hash::FxHashMap as HashMap;
 
@@ -67,4 +67,10 @@ pub fn calculate_objectives(
     let intra = 1.0 - (intra_sum / total_edges);
 
     Metrics { intra, inter }
+}
+
+#[derive(Debug, Default, PartialEq)]
+pub struct Metrics {
+    pub intra: f64,
+    pub inter: f64,
 }

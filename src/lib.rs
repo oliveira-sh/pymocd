@@ -2,25 +2,25 @@
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+
 use pyo3::prelude::*;
 mod api;
-pub mod core;
-use api::{
-    ccm_fn, dcsbm_full_mdl_fn, dcsbm_mdl_fn, gt_metrics_fn, hpmocd_fn, krm_fn, mmcomo_fn,
-    mmcomo_fronts_fn, mocd_d_fn, mocd_q_fn, moga_net_fn, sbm_mdl_fn, scale_fn, scale_fronts_fn,
-    scale_fronts_raw_fn,
-};
-use core::algorithms::hpmocd::HpMocd;
-use core::algorithms::mocd::Mocd;
-use core::xfeats::{fitness, set_thread_count};
+mod core;
+use api::detectors::*;
+use api::max_cores;
+use api::metrics::*;
 
-/// pymocd is a Python library, powered by a Rust backend, for performing efficient community
-/// detection in complex networks.
+/// Python Multi-objective Community Detection (pymocd) is a Python library, powered by
+/// a Rust backend, for performing efficient community detection in complex networks.
+/// Get your graph, call a method, and we'll offer you a community.
+/// Recommended Methods: `scale` or `hpmocd`.
 #[pymodule]
 #[pyo3(name = "pymocd")]
 fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(set_thread_count, m)?)?;
-    m.add_function(wrap_pyfunction!(fitness, m)?)?;
+    // utils
+    m.add_function(wrap_pyfunction!(max_cores, m)?)?;
+
+    // detectors -> partition
     m.add_function(wrap_pyfunction!(hpmocd_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mocd_q_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mocd_d_fn, m)?)?;
@@ -28,16 +28,20 @@ fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(ccm_fn, m)?)?;
     m.add_function(wrap_pyfunction!(krm_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mmcomo_fn, m)?)?;
-    m.add_function(wrap_pyfunction!(mmcomo_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(scale_fn, m)?)?;
+
+    // detectors -> pareto frontier
+    m.add_function(wrap_pyfunction!(mmcomo_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(scale_fronts_fn, m)?)?;
-    m.add_function(wrap_pyfunction!(scale_fronts_raw_fn, m)?)?;
-    m.add_function(wrap_pyfunction!(sbm_mdl_fn, m)?)?;
-    m.add_function(wrap_pyfunction!(dcsbm_mdl_fn, m)?)?;
-    m.add_function(wrap_pyfunction!(dcsbm_full_mdl_fn, m)?)?;
+
+    // evaluation metrics
     m.add_function(wrap_pyfunction!(gt_metrics_fn, m)?)?;
-    m.add_class::<HpMocd>()?;
-    m.add_class::<Mocd>()?;
+    m.add_function(wrap_pyfunction!(nmi_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(ami_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(ari_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(f1_fn, m)?)?;
+
+    // -- finished --
     Ok(())
 }
 

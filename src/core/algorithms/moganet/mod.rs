@@ -12,12 +12,13 @@
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use crate::core::graph::{Graph, Partition};
-use crate::core::metaheuristics::helpers::objectives::decomposed_modularity::calculate_objectives;
-use crate::core::utils::normalize_community_ids;
+use crate::core::metrics::modularity::modularity;
+use crate::core::graph::normalize_community_ids;
 use std::cmp::Ordering;
 
 mod defaults;
 mod engine;
+mod objectives;
 mod individual;
 mod locus;
 mod operators;
@@ -26,13 +27,6 @@ pub use defaults::*;
 
 use individual::fast_non_dominated_sort;
 use locus::Locus;
-
-/// Q = 1 - intra - inter (Shi et al. 2012 decomposed modularity, mathematically
-/// the standard Newman-Girvan modularity); single-threaded (`parallel = false`).
-fn modularity(graph: &Graph, partition: &Partition) -> f64 {
-    let m = calculate_objectives(graph, partition, graph.precompute_degrees(), false);
-    1.0 - m.intra - m.inter
-}
 
 /// Run MOGA-Net and return the **max-modularity** member of the rank-1 Pareto
 /// front (Pizzuti 2012, Sec. V-E), normalized (isolated nodes → community `-1`).
@@ -66,7 +60,7 @@ pub fn moga_net(
 mod tests {
     use super::*;
     use crate::core::graph::{CommunityId, NodeId};
-    use crate::core::metaheuristics::helpers::objectives::community_score_fitness::community_objectives;
+    use super::objectives::community_objectives;
 
     // Triangle {0,1,2}, triangle {3,4,5}, single bridge edge (2,3).
     fn two_triangles() -> Graph {

@@ -133,8 +133,8 @@ pub fn local_search(g: &CsrGraph, labels: &mut Labels) {
     }
 
     let mut tot: FxHashMap<i32, f64> = FxHashMap::default();
-    for i in 0..n {
-        *tot.entry(labels[i]).or_insert(0.0) += g.deg[i] as f64;
+    for (&lab, &d) in labels.iter().zip(&g.deg) {
+        *tot.entry(lab).or_insert(0.0) += f64::from(d);
     }
 
     let mut improved = true;
@@ -189,6 +189,7 @@ pub fn local_search(g: &CsrGraph, labels: &mut Labels) {
 // across three tournament parents (else the baseline one-way community
 // graft); `topo_mut` = neighbour-majority mutation (else the baseline
 // random-neighbour label copy).
+#[allow(clippy::too_many_arguments)]
 pub fn micro_offspring_topo(
     g: &CsrGraph,
     parents: &[Labels],

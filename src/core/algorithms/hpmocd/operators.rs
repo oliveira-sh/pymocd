@@ -1,14 +1,32 @@
-//! Local-move mutation: a selected node adopts its neighbours' majority
-//! community. Dispatches to a sequential or rayon-parallel strategy by the
-//! number of nodes to mutate.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
-//! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+//! Genetic operators for the label-map encoding: local-move mutation,
+//! per-node majority-vote (consensus) crossover, and random initial population.
 
+use super::objectives::{Metrics, calculate_objectives};
 use crate::core::graph::{CommunityId, Graph, NodeId, Partition};
-use rand::{distr::Bernoulli, prelude::Distribution};
+use rand::{Rng, RngExt, distr::Bernoulli, prelude::*, rng, rngs::ThreadRng, seq::IndexedRandom};
 use rayon::prelude::*;
 use rustc_hash::{FxBuildHasher, FxHashMap};
+use std::collections::HashMap;
+
+pub fn get_fitness(
+    graph: &Graph,
+    partition: &Partition,
+    degrees: &HashMap<i32, usize, FxBuildHasher>,
+    parallel: bool,
+) -> Metrics {
+    calculate_objectives(graph, partition, degrees, parallel)
+}
+
+pub fn mutation(partition: &mut Partition, graph: &Graph, mutation_rate: f64) {
+    mutate(partition, graph, mutation_rate);
+}
+
+pub fn generate_population(graph: &Graph, population_size: usize) -> Vec<Partition> {
+    generate_initial_population(graph, population_size)
+}
 
 pub fn mutate(partition: &mut Partition, graph: &Graph, mutation_rate: f64) {
     if mutation_rate == 0.0 || partition.is_empty() {
@@ -114,4 +132,80 @@ fn parallel_mutate(partition: &mut Partition, graph: &Graph, nodes_to_mutate: &[
     for (node, community) in updates {
         partition.insert(node, community);
     }
+}
+
+pub fn ensemble_crossover(parents: &[&Partition], rng: &mut ThreadRng) -> Partition {
+    if parents.is_empty() {
+        return FxHashMap::default();
+    }
+
+    let keys: Vec<NodeId> = parents[0].keys().copied().collect();
+    let mut child = FxHashMap::with_capacity_and_hasher(keys.len(), FxBuildHasher);
+
+    let mut community_counts = FxHashMap::with_capacity_and_hasher(parents.len(), FxBuildHasher);
+    let mut candidates = Vec::with_capacity(parents.len());
+
+    for &node in &keys {
+        community_counts.clear();
+
+        let majority_threshold = parents.len().div_ceil(2);
+        let mut max_count = 0;
+        let mut best_community = parents[0][&node];
+
+        for parent in parents {
+            if let Some(&community) = parent.get(&node) {
+                let count = community_counts.entry(community).or_insert(0);
+                *count += 1;
+
+                if *count > max_count {
+                    max_count = *count;
+                    best_community = community;
+                    if *count >= majority_threshold {
+                        break;
+                    }
+                }
+            }
+        }
+
+        let tie_count = community_counts
+            .values()
+            .filter(|&&count| count == max_count)
+            .count();
+
+        if tie_count > 1 {
+            candidates.clear();
+            candidates.extend(
+                community_counts
+                    .iter()
+                    .filter(|(_, count)| **count == max_count)
+                    .map(|(&comm, _)| comm),
+            );
+
+            best_community = *candidates.choose(rng).unwrap();
+        }
+
+        child.insert(node, best_community);
+    }
+
+    child
+}
+
+fn random_partition(node_ids: &[NodeId], num_communities: usize, rng: &mut impl Rng) -> Partition {
+    node_ids
+        .iter()
+        .map(|&node_id| {
+            let community = rng.random_range(0..num_communities) as CommunityId;
+            (node_id, community)
+        })
+        .collect()
+}
+
+pub fn generate_initial_population(graph: &Graph, population_size: usize) -> Vec<Partition> {
+    let mut rng = rng();
+
+    let node_ids: Vec<NodeId> = graph.nodes.iter().copied().collect();
+    let num_communities = node_ids.len();
+    (0..population_size)
+        .map(|_| random_partition(&node_ids, num_communities, &mut rng))
+        .collect()
 }

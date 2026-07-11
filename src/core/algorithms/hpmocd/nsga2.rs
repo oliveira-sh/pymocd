@@ -8,10 +8,10 @@
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use crate::core::graph::Graph;
-use crate::core::metaheuristics::helpers::individual::{
+use super::individual::{
     Individual, create_offspring, fast_non_dominated_sort,
 };
-use crate::core::metaheuristics::helpers::operators;
+use super::operators;
 use rustc_hash::FxHashMap as HashMap;
 use std::cmp::Ordering;
 

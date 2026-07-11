@@ -14,13 +14,14 @@ use rustc_hash::FxHashMap;
 use std::collections::HashSet;
 
 use crate::core::graph::CsrGraph;
-use crate::core::metaheuristics::helpers::objectives::sbm_mdl::dl_sbm_score;
+use sbm_mdl::dl_sbm_score;
 
 mod defaults;
 mod nsga2;
 mod objectives;
 mod operators;
 mod refine;
+mod sbm_mdl;
 mod sim;
 mod stats;
 
@@ -228,7 +229,6 @@ fn influence(
 /// Algorithm 1. Returns the rank-1 front of the merged populations, then adds the
 /// union-based refinement (`refine::refine_front`).
 #[allow(clippy::too_many_arguments)]
-#[allow(clippy::too_many_arguments)]
 fn run_fronts(
     g: &CsrGraph,
     pop: usize,
@@ -355,8 +355,8 @@ fn to_output(g: &CsrGraph, labels: &Labels) -> Vec<(i32, i32)> {
     let mut remap: FxHashMap<i32, i32> = FxHashMap::default();
     let mut next = 0i32;
     let mut out = Vec::with_capacity(g.n);
-    for i in 0..g.n {
-        let comm = if g.deg[i] == 0 {
+    for (i, &d) in g.deg.iter().enumerate() {
+        let comm = if d == 0 {
             -1
         } else {
             *remap.entry(labels[i]).or_insert_with(|| {
@@ -405,8 +405,8 @@ fn asymptotic_surprise(g: &CsrGraph, labels: &Labels) -> f64 {
         return 0.0;
     }
     let mut nc: FxHashMap<i32, f64> = FxHashMap::default();
-    for u in 0..g.n {
-        *nc.entry(labels[u]).or_insert(0.0) += 1.0;
+    for &lab in labels {
+        *nc.entry(lab).or_insert(0.0) += 1.0;
     }
     let mut intra = 0.0f64;
     for &(u, v) in &g.edges {
@@ -467,7 +467,7 @@ fn select_best(g: &CsrGraph, front: Vec<Labels>) -> Labels {
         }
     }
     let trivial = dl_sbm_score(g, &vec![0i32; g.n]);
-    if !(dls[i] < trivial - 1e-9) {
+    if dls[i] >= trivial - 1e-9 {
         // MDL abstains: no significant structure — argmax surprise.
         let sur: Vec<f64> = front
             .par_iter()

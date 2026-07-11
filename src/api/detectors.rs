@@ -1,11 +1,7 @@
-//! Python-facing API functions.
+//! Community-detection algorithm entry points.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
-//! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
-
-use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict};
-use pyo3_stub_gen::derive::gen_stub_pyfunction;
 
 use crate::core::algorithms::ccm;
 use crate::core::algorithms::hpmocd::HpMocd;
@@ -19,12 +15,10 @@ use crate::core::algorithms::mmcomo;
 use crate::core::algorithms::mocd;
 use crate::core::algorithms::moganet;
 use crate::core::algorithms::scale;
-use crate::core::graph::CsrGraph;
 use crate::core::graph::{Graph, Partition, get_edges, get_nodes};
-use crate::core::metaheuristics::helpers::objectives::sbm_mdl::{
-    dl_dcsbm_full_score, dl_dcsbm_score, dl_sbm_score,
-};
-use rustc_hash::FxHashMap;
+use pyo3::prelude::*;
+use pyo3::types::{PyAny, PyDict, PyList};
+use pyo3_stub_gen::derive::gen_stub_pyfunction;
 
 /// Run HP-MOCD (NSGA-II) with defaults. For tuning, use the ``HpMocd`` class.
 ///
@@ -254,7 +248,6 @@ pub fn mmcomo_fronts_fn(
     gap: usize,
     beta: f64,
 ) -> PyResult<Py<PyAny>> {
-    use pyo3::types::PyList;
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
@@ -331,7 +324,6 @@ pub fn scale_fronts_fn(
     refine: bool,
     topo_mode: u8,
 ) -> PyResult<Py<PyAny>> {
-    use pyo3::types::PyList;
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
@@ -356,144 +348,6 @@ pub fn scale_fronts_fn(
             d.set_item(node, comm)?;
         }
         out.append(d)?;
-    }
-    Ok(out.into_any().unbind())
-}
-
-/// Label-free microcanonical Bernoulli-SBM minimum-description-length score
-/// (Peixoto-style; LOWER is better) of `partition` on `graph`. `partition` is a
-/// ``dict[node, community]`` (e.g. a `scale_fronts` member). Nodes absent from
-/// the dict are treated as community 0.
-#[gen_stub_pyfunction]
-#[pyfunction]
-#[pyo3(name = "sbm_mdl", signature = (graph, partition))]
-pub fn sbm_mdl_fn(graph: &Bound<'_, PyAny>, partition: &Bound<'_, PyDict>) -> PyResult<f64> {
-    let nodes = get_nodes(graph)?;
-    let edges = get_edges(graph)?;
-    let csr = CsrGraph::from_edges(&nodes, &edges);
-    let mut map: FxHashMap<i32, i32> = FxHashMap::default();
-    for (k, v) in partition.iter() {
-        map.insert(k.extract::<i32>()?, v.extract::<i32>()?);
-    }
-    let part: Vec<i32> = (0..csr.n)
-        .map(|i| map.get(&csr.labels[i]).copied().unwrap_or(0))
-        .collect();
-    Ok(dl_sbm_score(&csr, &part))
-}
-
-/// Degree-corrected SBM minimum-description-length score (LOWER is better) of
-/// `partition` on `graph`. Unlike the plain Bernoulli `sbm_mdl`, the degree
-/// correction prevents collapse to a single block under degree-heterogeneous or
-/// high-mixing structure. `partition` is a ``dict[node, community]``; nodes
-/// absent from it are treated as community 0.
-#[gen_stub_pyfunction]
-#[pyfunction]
-#[pyo3(name = "dcsbm_mdl", signature = (graph, partition))]
-pub fn dcsbm_mdl_fn(graph: &Bound<'_, PyAny>, partition: &Bound<'_, PyDict>) -> PyResult<f64> {
-    let nodes = get_nodes(graph)?;
-    let edges = get_edges(graph)?;
-    let csr = CsrGraph::from_edges(&nodes, &edges);
-    let mut map: FxHashMap<i32, i32> = FxHashMap::default();
-    for (k, v) in partition.iter() {
-        map.insert(k.extract::<i32>()?, v.extract::<i32>()?);
-    }
-    let part: Vec<i32> = (0..csr.n)
-        .map(|i| map.get(&csr.labels[i]).copied().unwrap_or(0))
-        .collect();
-    Ok(dl_dcsbm_score(&csr, &part))
-}
-
-/// Complete degree-corrected SBM description length (profile score plus the
-/// degree-sequence cost) of `partition` on `graph` — the criterion `scale`'s
-/// selector minimises. LOWER is better.
-#[gen_stub_pyfunction]
-#[pyfunction]
-#[pyo3(name = "dcsbm_full_mdl", signature = (graph, partition))]
-pub fn dcsbm_full_mdl_fn(graph: &Bound<'_, PyAny>, partition: &Bound<'_, PyDict>) -> PyResult<f64> {
-    let nodes = get_nodes(graph)?;
-    let edges = get_edges(graph)?;
-    let csr = CsrGraph::from_edges(&nodes, &edges);
-    let mut map: FxHashMap<i32, i32> = FxHashMap::default();
-    for (k, v) in partition.iter() {
-        map.insert(k.extract::<i32>()?, v.extract::<i32>()?);
-    }
-    let part: Vec<i32> = (0..csr.n)
-        .map(|i| map.get(&csr.labels[i]).copied().unwrap_or(0))
-        .collect();
-    Ok(dl_dcsbm_full_score(&csr, &part))
-}
-
-/// (NMI, AMI, ARI) between two equal-length label lists, computed natively
-/// (exact Vinh et al. AMI). Matches scikit-learn's defaults; much faster on
-/// large vectors with many clusters.
-#[gen_stub_pyfunction]
-#[pyfunction]
-#[pyo3(name = "gt_metrics", signature = (y_true, y_pred))]
-pub fn gt_metrics_fn(y_true: Vec<i64>, y_pred: Vec<i64>) -> PyResult<(f64, f64, f64)> {
-    if y_true.len() != y_pred.len() {
-        return Err(pyo3::exceptions::PyValueError::new_err("length mismatch"));
-    }
-    Ok(crate::core::utils::metrics::gt_metrics(&y_true, &y_pred))
-}
-
-/// Memory-lean front accessor: returns each Pareto-front member as a raw
-/// little-endian i32 label buffer aligned to `graph.nodes()` order (4 bytes
-/// per node). Avoids materialising per-member Python dicts, which dominates
-/// memory on million-node graphs. Decode with `numpy.frombuffer(b, "<i4")`.
-#[gen_stub_pyfunction]
-#[pyfunction]
-#[pyo3(name = "scale_fronts_raw", signature = (graph, pop_size = scale::DEFAULT_POP_SIZE, num_gens = scale::DEFAULT_NUM_GENS, cross_rate = scale::DEFAULT_CROSS_RATE, mut_rate = scale::DEFAULT_MUT_RATE, gap = scale::DEFAULT_GAP, beta = scale::DEFAULT_BETA, adaptive_stop = false, conv_pval = scale::CONV_PVAL, refine = true, topo_mode = 0))]
-#[allow(clippy::too_many_arguments)]
-pub fn scale_fronts_raw_fn(
-    graph: &Bound<'_, PyAny>,
-    pop_size: usize,
-    num_gens: usize,
-    cross_rate: f64,
-    mut_rate: f64,
-    gap: usize,
-    beta: f64,
-    adaptive_stop: bool,
-    conv_pval: f64,
-    refine: bool,
-    topo_mode: u8,
-) -> PyResult<Py<PyAny>> {
-    use pyo3::types::{PyBytes, PyList};
-    let py = graph.py();
-    let nodes = get_nodes(graph)?;
-    let edges = get_edges(graph)?;
-    let fronts = scale::scale_fronts(
-        &nodes,
-        &edges,
-        pop_size,
-        num_gens,
-        cross_rate,
-        mut_rate,
-        gap,
-        beta,
-        adaptive_stop,
-        conv_pval,
-        refine,
-        topo_mode,
-    );
-    // fronts are (node_id, community) pairs; realign to `nodes` order.
-    let mut pos: FxHashMap<i32, usize> = FxHashMap::default();
-    for (i, &v) in nodes.iter().enumerate() {
-        pos.insert(v, i);
-    }
-    let out = PyList::empty(py);
-    let mut buf = vec![0i32; nodes.len()];
-    for part in fronts {
-        for x in buf.iter_mut() {
-            *x = -1;
-        }
-        for (node, comm) in part {
-            if let Some(&i) = pos.get(&node) {
-                buf[i] = comm;
-            }
-        }
-        let bytes: &[u8] =
-            unsafe { std::slice::from_raw_parts(buf.as_ptr() as *const u8, buf.len() * 4) };
-        out.append(PyBytes::new(py, bytes))?;
     }
     Ok(out.into_any().unbind())
 }

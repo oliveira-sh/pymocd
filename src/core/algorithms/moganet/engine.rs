@@ -11,7 +11,7 @@ use super::individual::{Individual, calculate_crowding_distance, fast_non_domina
 use super::locus::{Genome, Locus};
 use super::operators::{crossover, mutate};
 use crate::core::graph::Graph;
-use crate::core::metaheuristics::helpers::objectives::community_score_fitness::community_objectives;
+use super::objectives::community_objectives;
 use rand::rngs::ThreadRng;
 use rand::{RngExt, rng}; // rand 0.10: random_range/random_bool live on RngExt
 use std::cmp::Ordering;
@@ -48,6 +48,7 @@ fn roulette_pick(order: &[usize], fitness: &[f64], total: f64, rng: &mut ThreadR
 /// MOGA-Net generational loop. Mutation applies regardless of whether the
 /// child came from crossover or a clone. Returns the final rank-assigned
 /// population; the caller applies the max-modularity rank-1 decision rule.
+#[allow(clippy::too_many_arguments)]
 pub fn run(
     graph: &Graph,
     locus: &Locus,
