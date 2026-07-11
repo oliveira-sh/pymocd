@@ -46,9 +46,9 @@ pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
 
     let mut is_center = vec![false; n];
     let mut any = false;
-    for i in 0..n {
-        if genome.get(i).copied().unwrap_or(0) != 0 {
-            is_center[i] = true;
+    for (flag, &gene) in is_center.iter_mut().zip(genome) {
+        if gene != 0 {
+            *flag = true;
             any = true;
         }
     }
@@ -79,9 +79,8 @@ pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
             let end = g.xadj[u + 1] as usize;
             let mut best = lab[u];
             let mut best_w = if lab[u] != UNSET { 0.0 } else { -1.0 };
-            for p in start..end {
-                let v = g.adj[p] as usize;
-                let lv = lab[v];
+            for (&v, &w) in g.adj[start..end].iter().zip(&wadj[start..end]) {
+                let lv = lab[v as usize];
                 if lv == UNSET {
                     continue;
                 }
@@ -89,7 +88,7 @@ pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
                 if vote[li] == 0.0 {
                     touched.push(li);
                 }
-                vote[li] += wadj[p];
+                vote[li] += w;
             }
             // Keep current label on ties (stability); otherwise strict argmax.
             if best != UNSET {
@@ -119,7 +118,7 @@ pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
     // have reached it). Collapse each such component into ONE community — its
     // minimum node id — via an in-place min-id flood, restricted to the leftover
     // nodes so reached nodes keep their centre label.
-    if lab.iter().any(|&l| l == UNSET) {
+    if lab.contains(&UNSET) {
         let leftover: Vec<bool> = lab.iter().map(|&l| l == UNSET).collect();
         for u in 0..n {
             if leftover[u] {
@@ -174,10 +173,9 @@ pub fn encode(g: &CsrGraph, wadj: &[f64], labels: &Labels) -> Genome {
         let end = g.xadj[u + 1] as usize;
         let cu = labels[u];
         let mut acc = 0.0;
-        for p in start..end {
-            let v = g.adj[p] as usize;
-            if labels[v] == cu {
-                acc += wadj[p];
+        for (&v, &w) in g.adj[start..end].iter().zip(&wadj[start..end]) {
+            if labels[v as usize] == cu {
+                acc += w;
             }
         }
         internal[u] = acc;
@@ -368,10 +366,9 @@ mod tests {
         for u in 0..g.n {
             let start = g.xadj[u] as usize;
             let end = g.xadj[u + 1] as usize;
-            for p in start..end {
-                let v = g.adj[p] as usize;
-                let same = (u < 3) == (v < 3);
-                assert!((w[p] - if same { 1.0 } else { 0.0 }).abs() < 1e-9);
+            for (&v, &wp) in g.adj[start..end].iter().zip(&w[start..end]) {
+                let same = (u < 3) == ((v as usize) < 3);
+                assert!((wp - if same { 1.0 } else { 0.0 }).abs() < 1e-9);
             }
         }
     }
