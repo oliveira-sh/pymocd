@@ -115,10 +115,9 @@ pub fn uniform_crossover(p1: &Genome, p2: &Genome, rng: &mut impl rand::Rng) -> 
 /// resample may repeat the current allele (uniform draw over the same
 /// candidate set used at init).
 pub fn mutate(genome: &mut Genome, idx: &NodeIndex, p_m: f64, rng: &mut impl rand::Rng) {
-    for i in 0..genome.len() {
+    for (gene, cands) in genome.iter_mut().zip(&idx.neighbor_candidates) {
         if rng.random_bool(p_m) {
-            let cands = &idx.neighbor_candidates[i];
-            genome[i] = cands[rng.random_range(0..cands.len())];
+            *gene = cands[rng.random_range(0..cands.len())];
         }
     }
 }
