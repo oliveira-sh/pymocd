@@ -19,7 +19,7 @@ from utils.plotting import (  # noqa: E402
     theme_context,
 )
 
-pymocd.set_thread_count(2)
+pymocd.max_cores(2)
 
 GENERATIONS = [10, 30, 50, 80, 100, 110]
 

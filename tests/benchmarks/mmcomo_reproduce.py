@@ -89,7 +89,11 @@ def score_front(G, gt, fronts):
     y_true = [gt[n] for n in order]
     best_q, best_nmi = -1.0, -1.0
     for part in fronts:
-        q = pymocd.fitness(G, part)
+        comms = {}
+        for n, c in part.items():
+            if c != -1:
+                comms.setdefault(c, set()).add(n)
+        q = nx.community.modularity(G, comms.values(), weight=None)
         y_pred = [part.get(n, -1) for n in order]
         nmi = nmi_score(y_true, y_pred)
         best_q = max(best_q, q)
