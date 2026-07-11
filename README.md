@@ -51,7 +51,7 @@ published baselines (the original authors released no code).
 
 | API | Algorithm | Objectives & engine | Solution selection | Year |
 |---|---|---|---|---|
-| `scale` | **SCALE** (Santos, in prep.) | KKM / ratio-cut bi-objective, sparse macro–micro co-evolutionary NSGA-II (near-linear, no dense kernel) | label-free **degree-corrected SBM/MDL** description length | 2026 |
+| `scale` | **SCALE** (Santos, in prep.) | KKM / ratio-cut bi-objective, sparse macro–micro co-evolutionary NSGA-II (near-linear, no dense kernel) | label-free **SBM/MDL** description length | 2026 |
 | `hpmocd` | **HP-MOCD** ([Santos et al.](https://doi.org/10.1007/s13278-025-01519-7)) | decomposed modularity, parallel NSGA-II | max modularity *Q* | 2025 |
 | `mmcomo` | **MMCoMO** ([Zhang et al.](https://ieeexplore.ieee.org/document/10188453)) | kernel *k*-means + ratio cut, macro/micro co-evolutionary NSGA-II | max *Q* (front via `mmcomo_fronts`) | 2023 |
 | `ccm` | **CCM** ([Shaik et al.](https://doi.org/10.1007/s42979-020-00382-x)) | score + fitness + modularity, NSGA-III | max *Q* | 2021 |
@@ -66,7 +66,7 @@ kernel *k*-means / ratio-cut bi-objective, bridged by a sparse similarity carrie
 on the graph's edges rather than a dense *n*×*n* kernel — so memory is *O(n+m)*
 and it scales to graphs the dense macro–micro baseline cannot build. The merged
 rank-1 front is enriched by a union refinement, and one partition is returned with
-no ground truth by minimising a label-free degree-corrected
+no ground truth by minimising a label-free
 [microcanonical SBM](https://doi.org/10.1103/PhysRevX.4.011047) description length.
 
 ### Usage
@@ -75,7 +75,7 @@ no ground truth by minimising a label-free degree-corrected
 import pymocd
 
 # Recommended detectors (defaults work out of the box)
-part = pymocd.scale(G)            # SCALE, sparse co-evolution + DC-SBM/MDL selection
+part = pymocd.scale(G)            # SCALE, sparse co-evolution + SBM/MDL selection
 part = pymocd.hpmocd(G)           # HP-MOCD
 
 # Baselines (sensible defaults; pop_size / num_gens / rates are tunable kwargs)
@@ -100,42 +100,20 @@ The Pareto frontier of some algorithms is exposed for inspection:
 ```python
 fronts = pymocd.scale_fronts(G)      # list[dict[node, community]]
 fronts = pymocd.mmcomo_fronts(G)     # list[dict[node, community]]
-raw    = pymocd.scale_fronts_raw(G)  # list[bytes]: little-endian i32 labels per
-                                     # member, aligned to G.nodes() order — decode
-                                     # with numpy.frombuffer(b, "<i4"); memory-lean
-                                     # on million-node graphs
 ```
-
-HP-MOCD and Shi-MOCD are also available as classes when you want the full
-Pareto front with objective values or explicit control:
-
-```python
-alg   = pymocd.HpMocd(G)            # kwargs: pop_size, num_gens, cross_rate,
-part  = alg.run()                   #         mut_rate, objectives, debug_level
-front = alg.generate_pareto_front() # [(partition, [obj1, obj2]), ...]
-
-alg   = pymocd.Mocd(G)              # Shi-MOCD PESA-II, same pattern
-```
-
-`HpMocd` additionally supports custom objectives — a list of Python callables
-`(graph, partition) -> float` to minimise instead of the built-in intra/inter
-pair — and a per-generation callback via `set_on_generation`.
 
 Helpers:
 
 ```python
-q = pymocd.fitness(G, part)          # modularity Q (Shi 2012)
-pymocd.set_thread_count(8)           # set Rayon thread pool (first call wins)
+pymocd.max_cores(8)                  # set Rayon thread pool (first call wins)
 
-# Label-free model-selection scores (LOWER is better) — the criteria SCALE's
-# selector uses, exposed for selection studies on any partition:
-pymocd.sbm_mdl(G, part)              # microcanonical Bernoulli-SBM MDL
-pymocd.dcsbm_mdl(G, part)            # degree-corrected SBM MDL
-pymocd.dcsbm_full_mdl(G, part)       # complete DC-SBM MDL (+ degree-sequence cost);
-                                     # what scale() deploys
-
-# Fast native clustering metrics (exact AMI, matches scikit-learn defaults):
-nmi, ami, ari = pymocd.gt_metrics(y_true, y_pred)
+# Fast native ground-truth agreement metrics between two {node: community}
+# dicts, computed over their shared nodes (exact AMI, matches scikit-learn):
+nmi, ami, ari, f1 = pymocd.gt_metrics(partition, gt)
+pymocd.nmi(partition, gt)            # or each metric individually
+pymocd.ami(partition, gt)
+pymocd.ari(partition, gt)
+pymocd.f1(partition, gt)             # pairwise F1
 ```
 
 ### Contributing
