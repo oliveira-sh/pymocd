@@ -128,8 +128,7 @@ pub fn environment_selection(objs: &[(f64, f64)], keep: usize) -> Vec<usize> {
     }
 
     let mut survivors: Vec<usize> = Vec::with_capacity(target);
-    for r in 1..=max_rank {
-        let front = &groups[r];
+    for front in &groups[1..=max_rank] {
         if front.is_empty() {
             continue;
         }
