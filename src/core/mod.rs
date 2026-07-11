@@ -6,5 +6,5 @@ pub mod macros;
 pub mod algorithms;
 pub mod graph;
 pub mod metaheuristics;
+pub mod metrics;
 pub mod utils;
-pub mod xfeats;

@@ -21,7 +21,7 @@ use pesa2::{Solution, evolutionary_phase};
 
 use pyo3::{pyclass, pymethods};
 
-use crate::core::utils::normalize_community_ids;
+use crate::core::graph::normalize_community_ids;
 
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
