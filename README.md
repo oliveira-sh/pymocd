@@ -1,6 +1,6 @@
 
 <div align="center">
-  <img src="res/logo.png" alt="pymocd logo" width="50%">  
+  <img src="res/logo.svg" alt="pymocd logo" width="50%">  
   
   <strong>Multi-Objective Community Detection Algorithms</strong>  
 
