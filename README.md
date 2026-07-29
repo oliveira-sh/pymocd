@@ -1,15 +1,14 @@
 
 <div align="center">
-  <img src="res/logo.svg" alt="pymocd logo" width="50%">  
+  <img src="res/logo.svg" alt="pymocd logo" width="100%">  
   
   <strong>Multi-Objective Community Detection Algorithms</strong>  
 
-[![PyPI Publish](https://github.com/oliveira-sh/pymocd/actions/workflows/release.yml/badge.svg)](https://github.com/oliveira-sh/pymocd/actions/workflows/release.yml)
-![Rust Compilation](https://img.shields.io/github/actions/workflow/status/oliveira-sh/pymocd/rust.yml)
+</div>
+
+[![PyPI Publish](https://github.com/oliveira-sh/pymocd/actions/workflows/release.yml/badge.svg)](https://github.com/oliveira-sh/pymocd/actions/workflows/release.yml)![Rust Compilation](https://img.shields.io/github/actions/workflow/status/oliveira-sh/pymocd/rust.yml)
 ![PyPI - Version](https://img.shields.io/pypi/v/pymocd)
 ![PyPI - License](https://img.shields.io/pypi/l/pymocd)
-
-</div>
 
 **pymocd** is a Python library, powered by a Rust backend, for multi-objective
 evolutionary community detection in complex networks. The evolutionary core is
