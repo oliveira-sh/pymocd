@@ -1,6 +1,6 @@
 site_name: pymocd
 site_description: Multi-objective evolutionary community detection, powered by Rust
-site_url: https://oliveira-sh.github.io/pymocd/
+site_url: https://pymocd.guiolvr.com/
 repo_url: https://github.com/oliveira-sh/pymocd
 repo_name: oliveira-sh/pymocd
 theme:
