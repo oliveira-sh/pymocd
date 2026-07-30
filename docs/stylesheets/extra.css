@@ -1,0 +1,98 @@
+:root {
+  --md-primary-fg-color: #0F3D75;
+  --md-primary-fg-color--light: #0B4DA2;
+  --md-primary-fg-color--dark: #0A2C55;
+  --md-accent-fg-color: #009B3A;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #0B4DA2;
+  --md-primary-fg-color--light: #2F6FC4;
+  --md-primary-fg-color--dark: #0A2C55;
+  --md-accent-fg-color: #00C24A;
+  --md-typeset-a-color: #4D94E8;
+}
+
+.md-header__button.md-logo {
+  padding: 0;
+}
+
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+  height: 2rem;
+  width: auto;
+}
+
+.md-header__topic {
+  font-size: 1rem;
+}
+
+.md-footer-meta {
+  display: none;
+}
+
+.md-nav__button.md-logo img,
+.md-nav__button.md-logo svg {
+  height: 2rem;
+  width: auto;
+}
+
+.pymocd-sr-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.pymocd-hero {
+  max-width: 46rem;
+  margin: 1.75rem auto 2.5rem;
+  text-align: center;
+}
+
+.pymocd-hero-logo {
+  display: block;
+  width: min(100%, 34rem);
+  margin: 0 auto 1.25rem;
+}
+
+.pymocd-hero > p {
+  color: var(--md-default-fg-color--light);
+  margin-top: 0;
+}
+
+.pymocd-hero .md-button {
+  margin: 0.4rem 0.3rem 0;
+  padding: 0.7em 2.2em;
+  font-size: 0.85rem;
+}
+
+.pymocd-highlights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 1.25rem 0 1.75rem;
+}
+
+.pymocd-highlights > div {
+  flex: 1 1 10rem;
+  border: 0.05rem solid var(--md-default-fg-color--lightest);
+  border-radius: 0.4rem;
+  padding: 0.7rem 0.9rem;
+  text-align: center;
+}
+
+.pymocd-highlights strong {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--md-default-fg-color);
+}
+
+.pymocd-highlights span {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.64rem;
+  color: var(--md-default-fg-color--light);
+}
