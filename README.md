@@ -1,14 +1,14 @@
+<div align="center">
+  <img src="res/logo.svg" alt="pymocd logo" width="75%">  
+</div>
 
 <div align="center">
-  <img src="res/logo.svg" alt="pymocd logo" width="100%">  
-  
-  <strong>Multi-Objective Community Detection Algorithms</strong>  
-
-</div>
 
 [![PyPI Publish](https://github.com/oliveira-sh/pymocd/actions/workflows/release.yml/badge.svg)](https://github.com/oliveira-sh/pymocd/actions/workflows/release.yml)![Rust Compilation](https://img.shields.io/github/actions/workflow/status/oliveira-sh/pymocd/rust.yml)
 ![PyPI - Version](https://img.shields.io/pypi/v/pymocd)
 ![PyPI - License](https://img.shields.io/pypi/l/pymocd)
+
+</div>
 
 **pymocd** is a Python library, powered by a Rust backend, for multi-objective
 evolutionary community detection in complex networks. The evolutionary core is
@@ -17,7 +17,7 @@ speed advantage over pure-Python implementations while staying a drop-in for
 the **NetworkX** / **igraph** ecosystem, making it well-suited to large-scale
 graphs.
 
-**Read the [Documentation](https://oliveira-sh.github.io/dpymocd/) for detailed
+**Read the [Documentation](https://oliveira-sh.github.io/pymocd/) for detailed
 guidance and usage instructions.**
 
 ---
@@ -59,22 +59,13 @@ published baselines (the original authors released no code).
 | `mocd_d` | **Shi-MOCD** ([Shi et al.](https://doi.org/10.1016/j.asoc.2011.10.005)) | decomposed modularity, PESA-II | max-min distance to random nets | 2012 |
 | `moga_net` | **MOGA-Net** ([Pizzuti](https://doi.org/10.1109/ICTAI.2009.58)) | community score + fitness, NSGA-II | max *Q* | 2009 |
 
-**SCALE** is the recommended crisp detector: it co-evolves a macro population of
-medoid community centres with a micro population of per-node labels over the
-kernel *k*-means / ratio-cut bi-objective, bridged by a sparse similarity carried
-on the graph's edges rather than a dense *n*×*n* kernel — so memory is *O(n+m)*
-and it scales to graphs the dense macro–micro baseline cannot build. The merged
-rank-1 front is enriched by a union refinement, and one partition is returned with
-no ground truth by minimising a label-free
-[microcanonical SBM](https://doi.org/10.1103/PhysRevX.4.011047) description length.
-
 ### Usage
 
 ```python
 import pymocd
 
 # Recommended detectors (defaults work out of the box)
-part = pymocd.scale(G)            # SCALE, sparse co-evolution + SBM/MDL selection
+part = pymocd.scale(G)            # SCALE
 part = pymocd.hpmocd(G)           # HP-MOCD
 
 # Baselines (sensible defaults; pop_size / num_gens / rates are tunable kwargs)
@@ -87,12 +78,6 @@ part = pymocd.mmcomo(G)           # MMCoMO (Zhang et al.), macro/micro co-evolut
 
 # All return dict[node, community]; isolated nodes -> -1
 ```
-
-`scale` accepts the same evolutionary kwargs as `mmcomo` (`pop_size=100`,
-`num_gens=50`, `cross_rate=0.1`, `mut_rate=0.1`, `gap=10`, `beta=0.05`) plus
-`adaptive_stop=False` / `conv_pval=0.1` — with `adaptive_stop=True` the search
-self-terminates once a Welch t-test detects a convergence plateau and
-`num_gens` becomes only a safety ceiling.
 
 The Pareto frontier of some algorithms is exposed for inspection:
 
@@ -107,7 +92,7 @@ Helpers:
 pymocd.max_cores(8)                  # set Rayon thread pool (first call wins)
 
 # Fast native ground-truth agreement metrics between two {node: community}
-# dicts, computed over their shared nodes (exact AMI, matches scikit-learn):
+# dicts, computed over their shared nodes
 nmi, ami, ari, f1 = pymocd.gt_metrics(partition, gt)
 pymocd.nmi(partition, gt)            # or each metric individually
 pymocd.ami(partition, gt)

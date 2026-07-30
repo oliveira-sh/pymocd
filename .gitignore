@@ -419,3 +419,7 @@ site/
 
 # Generated pyo3 type stub (built into the wheel via pyproject, not tracked)
 pymocd.pyi
+
+# mkdocstrings stub shadow copy (docs/hooks.py)
+.docs-stub/
+docs/assets/
