@@ -17,7 +17,7 @@ speed advantage over pure-Python implementations while staying a drop-in for
 the **NetworkX** / **igraph** ecosystem, making it well-suited to large-scale
 graphs.
 
-**Read the [Documentation](https://oliveira-sh.github.io/pymocd/) for detailed
+**Read the [Documentation](https://pymocd.guiolvr.com/) for detailed
 guidance and usage instructions.**
 
 ---
