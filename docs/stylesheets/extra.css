@@ -17,7 +17,8 @@
   padding: 0;
 }
 
-.md-header__button.md-logo img {
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
   height: 2rem;
   width: auto;
 }
@@ -30,7 +31,8 @@
   display: none;
 }
 
-.md-nav__button.md-logo img {
+.md-nav__button.md-logo img,
+.md-nav__button.md-logo svg {
   height: 2rem;
   width: auto;
 }
