@@ -41,58 +41,15 @@
 }
 
 .pymocd-hero {
-  position: relative;
   max-width: 46rem;
   margin: 1.75rem auto 2.5rem;
-  padding: 2.25rem 1rem 1.75rem;
   text-align: center;
-}
-
-.pymocd-hero::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: 1rem;
-  background:
-    radial-gradient(ellipse at 50% 0%, rgba(11, 77, 162, 0.10), transparent 65%),
-    radial-gradient(ellipse at 85% 100%, rgba(0, 155, 58, 0.08), transparent 60%);
-}
-
-[data-md-color-scheme="slate"] .pymocd-hero::before {
-  background:
-    radial-gradient(ellipse at 50% 0%, rgba(77, 148, 232, 0.16), transparent 65%),
-    radial-gradient(ellipse at 85% 100%, rgba(0, 194, 74, 0.10), transparent 60%);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .pymocd-hero {
-    animation: pymocd-fade 0.6s ease-out both;
-  }
-}
-
-@keyframes pymocd-fade {
-  from {
-    opacity: 0;
-    transform: translateY(0.4rem);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
 }
 
 .pymocd-hero-logo {
   display: block;
   width: min(100%, 34rem);
   margin: 0 auto 1.25rem;
-}
-
-[data-md-color-scheme="slate"] .pymocd-hero-logo {
-  background: rgba(255, 255, 255, 0.92);
-  border-radius: 0.6rem;
-  padding: 0.9rem 1.4rem;
-  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.35);
 }
 
 .pymocd-hero > p {
