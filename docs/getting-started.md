@@ -1,0 +1,110 @@
+# Getting started
+
+## Installation
+
+pymocd requires Python **3.10 or newer**. Prebuilt wheels are published for Linux, macOS, and Windows:
+
+```bash
+pip install pymocd
+```
+
+To build from source you need a Rust toolchain and [maturin](https://www.maturin.rs/):
+
+```bash
+git clone https://github.com/oliveira-sh/pymocd
+cd pymocd
+make build
+```
+
+## First detection
+
+`pymocd.scale` is the recommended entry point. Give it a NetworkX graph and get back a partition:
+
+```python
+import networkx as nx
+import pymocd
+
+G = nx.karate_club_graph()
+communities = pymocd.scale(G)
+
+print(communities)
+# {0: 0, 1: 0, 2: 0, 3: 0, ..., 32: 1, 33: 1}
+```
+
+The result is a plain `dict` mapping every node id to an integer community label.
+
+!!! important "Graph format"
+    Every detector accepts a **NetworkX** or **igraph** graph with **integer node ids** and returns a crisp `dict[node, community]`. Isolated nodes are always assigned community `-1`.
+
+## Tuning
+
+`scale` and `mmcomo` share the same evolutionary knobs:
+
+```python
+communities = pymocd.scale(
+    G,
+    pop_size=100,     # population size
+    num_gens=50,      # generations
+    cross_rate=0.1,   # crossover probability
+    mut_rate=0.1,     # mutation probability
+    gap=10,           # macro/micro co-evolution interval
+    beta=0.05,        # micro-stage perturbation strength
+)
+```
+
+`scale` additionally supports an adaptive stopping rule:
+
+```python
+communities = pymocd.scale(G, adaptive_stop=True, conv_pval=0.1)
+```
+
+With `adaptive_stop=True`, a Welch t-test detects when the front has plateaued and stops early; `num_gens` then acts as a safety ceiling rather than a fixed budget.
+
+For tuned HP-MOCD runs, use the `HpMocd` class — it exposes custom objectives, a per-generation callback, and the raw Pareto front:
+
+```python
+alg = pymocd.HpMocd(G, pop_size=100, num_gens=100, cross_rate=0.7, mut_rate=0.5)
+alg.set_on_generation(lambda gen, total, front_size: print(gen, total, front_size))
+
+best = alg.run()                       # max-Q partition from the front
+front = alg.generate_pareto_front()    # [(partition, objectives), ...]
+```
+
+Custom objectives are callables `(graph, partition) -> float` to minimize, passed via `objectives=` or `set_objectives`; an empty list reverts to the built-in intra/inter pair.
+
+See [Algorithms](algorithms.md) for what each detector optimizes, and the [detector API reference](api/detectors.md) for every signature.
+
+## Threads
+
+All detectors run on a shared Rayon thread pool. Cap it before the first detection:
+
+```python
+pymocd.max_cores(4)
+```
+
+!!! note
+    The Rayon pool is global and initialized once, so call `max_cores` before the first detection; repeat calls are ignored.
+
+## Evaluating results
+
+When you have ground-truth labels, `gt_metrics` computes four scores at once over the shared nodes of two `{node: community}` dicts:
+
+```python
+gt = {node: (0 if G.nodes[node]["club"] == "Mr. Hi" else 1) for node in G}
+
+nmi, ami, ari, f1 = pymocd.gt_metrics(communities, gt)
+```
+
+Each metric is also available on its own: `pymocd.nmi`, `pymocd.ami`, `pymocd.ari`, and `pymocd.f1`, all with the same `(partition, gt)` signature. Details in the [metrics API reference](api/metrics.md).
+
+## Inspecting Pareto fronts
+
+`scale` and `mmcomo` each pick one partition from a Pareto front of candidates. To see the whole candidate set, use `scale_fronts` / `mmcomo_fronts`, which accept the same evolutionary kwargs (`scale_fronts` adds `refine` and `topo_mode`) and return a `list[dict[node, community]]`:
+
+```python
+front = pymocd.scale_fronts(G)
+print(len(front))          # number of non-dominated partitions
+best = max(front, key=lambda p: pymocd.ari(p, gt))
+```
+
+See the [fronts API reference](api/fronts.md) for details.
