@@ -1,0 +1,567 @@
+from __future__ import annotations
+
+import itertools
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Dict, Iterable, Mapping, Sequence, Union
+
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.ticker import AutoMinorLocator, FuncFormatter, FormatStrFormatter
+
+from .config import (
+    EXPORT_FORMATS,
+    SAVE_PATH,
+    THEME,
+    algorithm_colors,
+)
+
+METRIC_METADATA = {
+    "nmi": {"label": "NMI", "direction": "higher"},
+    "ami": {"label": "AMI", "direction": "higher"},
+    "modularity": {"label": "Modularity (Q)", "direction": "higher"},
+    "time": {"label": "Runtime (s)", "direction": "lower"},
+}
+MARKERS = ("o", "s", "^", "D", "P", "X", "v", "<", ">", "h", "*", "p")
+SUMMARY_METRICS = ("nmi", "ami", "modularity", "time")
+
+
+def _rc_params() -> dict[str, object]:
+    return {
+        "figure.facecolor": THEME.figure_face,
+        "savefig.facecolor": THEME.figure_face,
+        "savefig.edgecolor": THEME.figure_face,
+        "axes.facecolor": THEME.axes_face,
+        "axes.edgecolor": THEME.spine,
+        "axes.labelcolor": THEME.text,
+        "axes.titlecolor": THEME.text,
+        "text.color": THEME.text,
+        "xtick.color": THEME.muted_text,
+        "ytick.color": THEME.muted_text,
+        "grid.color": THEME.grid_major,
+        "grid.alpha": 1.0,
+        "font.family": "DejaVu Sans",
+        "mathtext.fontset": "dejavusans",
+        "font.size": 10.5,
+        "axes.titlesize": 14,
+        "axes.labelsize": 11,
+        "xtick.labelsize": 9.5,
+        "ytick.labelsize": 9.5,
+        "legend.fontsize": 9.5,
+        "figure.titlesize": 16,
+        "axes.linewidth": 1.0,
+        "grid.linewidth": 0.8,
+        "lines.linewidth": 2.2,
+        "lines.markersize": 6.0,
+        "patch.linewidth": 0.8,
+        "xtick.major.width": 0.9,
+        "ytick.major.width": 0.9,
+        "xtick.major.size": 5.0,
+        "ytick.major.size": 5.0,
+        "xtick.minor.width": 0.6,
+        "ytick.minor.width": 0.6,
+        "xtick.minor.size": 3.0,
+        "ytick.minor.size": 3.0,
+        "savefig.dpi": 320,
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
+        "svg.fonttype": "none",
+    }
+
+
+@contextmanager
+def theme_context():
+    with plt.rc_context(_rc_params()):
+        yield
+
+
+def export_figure(
+    fig: plt.Figure,
+    save_path: str | Path,
+    name: str,
+) -> None:
+    output_dir = Path(save_path)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for fmt in EXPORT_FORMATS:
+        fig.savefig(
+            output_dir / f"{name}.{fmt}",
+            format=fmt,
+            bbox_inches="tight",
+            pad_inches=0.12,
+            facecolor=THEME.figure_face,
+        )
+    plt.close(fig)
+
+
+def add_panel_tag(ax: plt.Axes, tag: str) -> None:
+    ax.text(
+        -0.06,
+        1.14,
+        tag,
+        transform=ax.transAxes,
+        ha="left",
+        va="center",
+        fontsize=9.0,
+        fontweight="bold",
+        color=THEME.muted_text,
+        bbox={
+            "boxstyle": "round,pad=0.22,rounding_size=0.18",
+            "facecolor": THEME.annotation_face,
+            "edgecolor": THEME.annotation_edge,
+            "linewidth": 0.8,
+        },
+        clip_on=False,
+    )
+
+
+def _x_label(x_var: str) -> str:
+    return "Mixing parameter (μ)" if x_var == "mu" else "Number of nodes"
+
+
+def _facet_label(var: str, value: float) -> str:
+    if var == "mu":
+        return f"μ = {float(value):.2f}"
+    return f"n = {_format_nodes_tick(float(value), 0)}"
+
+
+def _format_nodes_tick(value: float, _position: int) -> str:
+    if abs(value) >= 1000:
+        return f"{value / 1000:.0f}k"
+    return f"{int(value)}"
+
+
+def _ordered_algorithms(algorithms: Iterable[str]) -> list[str]:
+    return list(dict.fromkeys(algorithms))
+
+
+def build_algorithm_styles(
+    algorithms: Iterable[str],
+) -> Dict[str, tuple[str, str]]:
+    ordered = _ordered_algorithms(algorithms)
+    colors = algorithm_colors(ordered)
+    markers = itertools.cycle(MARKERS)
+    return {name: (colors[name], next(markers)) for name in ordered}
+
+
+def _prepare_results_frame(results: Union[Dict, pd.DataFrame]) -> pd.DataFrame:
+    df = pd.DataFrame(results).copy() if isinstance(results, dict) else results.copy()
+    rename_map = {
+        "modularity_mean": "modularity",
+        "nmi_mean": "nmi",
+        "ami_mean": "ami",
+        "time_mean": "time",
+    }
+    return df.rename(columns=rename_map)
+
+
+def infer_x_var(df: pd.DataFrame) -> str:
+    if "mu" in df.columns:
+        return "mu"
+    if "nodes" in df.columns:
+        return "nodes"
+    raise ValueError("Neither 'mu' nor 'nodes' found in benchmark results")
+
+
+def _legend_frame(legend: plt.Legend) -> None:
+    frame = legend.get_frame()
+    frame.set_facecolor(THEME.legend_face)
+    frame.set_edgecolor(THEME.legend_edge)
+    frame.set_linewidth(0.8)
+    frame.set_alpha(1.0)
+
+
+def style_axis(
+    ax: plt.Axes,
+    *,
+    x_label: str,
+    y_label: str,
+    x_var: str | None = None,
+    x_values: Sequence[float] | None = None,
+    log_scale: str | None = None,
+) -> None:
+    ax.set_xlabel(x_label, labelpad=10)
+    ax.set_ylabel(y_label, labelpad=10)
+    if log_scale == "y":
+        ax.set_yscale("log")
+    elif log_scale == "x":
+        ax.set_xscale("log")
+    elif log_scale == "both":
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+
+    if x_var == "mu":
+        ax.xaxis.set_major_formatter(FormatStrFormatter("%.1f"))
+    elif x_var == "nodes":
+        ax.xaxis.set_major_formatter(FuncFormatter(_format_nodes_tick))
+
+    if x_values is not None and len(x_values) <= 10:
+        ax.set_xticks(sorted({float(value) for value in x_values}))
+
+    ax.set_axisbelow(True)
+    ax.grid(axis="y", which="major", linewidth=0.9, color=THEME.grid_major)
+    ax.grid(axis="x", which="major", linewidth=0.7, color=THEME.grid_minor)
+
+    if log_scale == "y":
+        ax.grid(axis="y", which="minor", linewidth=0.5, color=THEME.grid_minor)
+    else:
+        ax.yaxis.set_minor_locator(AutoMinorLocator(2))
+        ax.grid(axis="y", which="minor", linewidth=0.5, color=THEME.grid_minor)
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_color(THEME.spine)
+    ax.spines["bottom"].set_color(THEME.spine)
+    ax.tick_params(axis="both", which="both", pad=4)
+    ax.margins(x=0.03)
+
+
+def _plot_metric_series(
+    ax: plt.Axes,
+    df: pd.DataFrame,
+    metric: str,
+    x_var: str,
+    styles: Mapping[str, tuple[str, str]],
+    *,
+    with_labels: bool,
+) -> None:
+    for algorithm in _ordered_algorithms(df["algorithm"].unique()):
+        algorithm_data = df[df["algorithm"] == algorithm].sort_values(by=x_var)
+        x_values = algorithm_data[x_var].to_numpy(dtype=float)
+        y_values = algorithm_data[metric].to_numpy(dtype=float)
+        color, marker = styles[algorithm]
+
+        ax.plot(
+            x_values,
+            y_values,
+            color=color,
+            marker=marker,
+            label=algorithm if with_labels else None,
+            linewidth=2.3,
+            markersize=6.2,
+            markerfacecolor=color,
+            markeredgecolor=THEME.axes_face,
+            markeredgewidth=1.2,
+            solid_capstyle="round",
+            zorder=3,
+        )
+
+        std_key = f"{metric}_std"
+        if std_key in algorithm_data.columns and not algorithm_data[std_key].isna().all():
+            y_std = algorithm_data[std_key].fillna(0).to_numpy(dtype=float)
+            lower = y_values - y_std
+            upper = y_values + y_std
+            if metric == "time":
+                lower = np.clip(lower, np.finfo(float).eps, None)
+            ax.fill_between(
+                x_values,
+                lower,
+                upper,
+                color=color,
+                alpha=THEME.band_alpha,
+                linewidth=0,
+                zorder=2,
+            )
+
+
+def plot_single_metric(
+    df: pd.DataFrame,
+    metric: str,
+    x_var: str,
+    save_path: str = SAVE_PATH,
+) -> None:
+    algorithms = _ordered_algorithms(df["algorithm"].unique())
+    x_values = sorted(df[x_var].astype(float).unique())
+
+    styles = build_algorithm_styles(algorithms)
+    with theme_context():
+        fig, ax = plt.subplots(figsize=(8.6, 5.1))
+        _plot_metric_series(ax, df, metric, x_var, styles, with_labels=True)
+        style_axis(
+            ax,
+            x_label=_x_label(x_var),
+            y_label=METRIC_METADATA[metric]["label"],
+            x_var=x_var,
+            x_values=x_values,
+            log_scale="y" if metric == "time" else None,
+        )
+        legend = ax.legend(
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.18),
+            ncol=min(len(algorithms), 4),
+            columnspacing=1.1,
+            handlelength=2.1,
+            borderpad=0.6,
+        )
+        _legend_frame(legend)
+        fig.tight_layout()
+        export_figure(fig, save_path, f"{metric}_plot")
+
+
+def plot_comparison_matrix(
+    df: pd.DataFrame,
+    x_var: str,
+    save_path: str = SAVE_PATH,
+) -> None:
+    algorithms = _ordered_algorithms(df["algorithm"].unique())
+    x_values = sorted(df[x_var].astype(float).unique())
+    metrics = list(SUMMARY_METRICS)
+
+    styles = build_algorithm_styles(algorithms)
+    with theme_context():
+        fig, axes = plt.subplots(2, 2, figsize=(13.2, 8.6), sharex="col")
+        axes = axes.flatten()
+
+        for index, metric in enumerate(metrics):
+            ax = axes[index]
+            _plot_metric_series(
+                ax,
+                df,
+                metric,
+                x_var,
+                styles,
+                with_labels=index == 0,
+            )
+            add_panel_tag(ax, f"{chr(97 + index)})")
+            style_axis(
+                ax,
+                x_label=_x_label(x_var),
+                y_label=METRIC_METADATA[metric]["label"],
+                x_var=x_var,
+                x_values=x_values,
+                log_scale="y" if metric == "time" else None,
+            )
+
+        handles, labels = axes[0].get_legend_handles_labels()
+        legend = fig.legend(
+            handles,
+            labels,
+            loc="upper center",
+            bbox_to_anchor=(0.55, 0.02),
+            ncol=min(len(algorithms), 4),
+            columnspacing=1.5,
+            handlelength=2.2,
+        )
+        _legend_frame(legend)
+        fig.subplots_adjust(top=0.94, bottom=0.12, hspace=0.34, wspace=0.24)
+        export_figure(fig, save_path, "comparison_matrix")
+
+
+def _performance_rank_table(df: pd.DataFrame, x_var: str) -> pd.DataFrame:
+    rank_rows = []
+    for _, subset in df.groupby(x_var):
+        indexed = subset.set_index("algorithm")
+        for metric in SUMMARY_METRICS:
+            ascending = METRIC_METADATA[metric]["direction"] == "lower"
+            metric_ranks = indexed[metric].rank(ascending=ascending, method="average")
+            for algorithm, rank_value in metric_ranks.items():
+                rank_rows.append(
+                    {"algorithm": algorithm, "metric": metric, "rank": rank_value}
+                )
+
+    rank_frame = pd.DataFrame(rank_rows)
+    summary = rank_frame.pivot_table(
+        index="algorithm",
+        columns="metric",
+        values="rank",
+        aggfunc="mean",
+    )
+    summary = summary.reindex(_ordered_algorithms(df["algorithm"]))
+    summary["overall"] = summary[list(SUMMARY_METRICS)].mean(axis=1)
+    return summary
+
+
+def _rank_heatmap_cmap() -> LinearSegmentedColormap:
+    return LinearSegmentedColormap.from_list(
+        "benchmark_rank",
+        list(THEME.heatmap_colors),
+    )
+
+
+def _relative_luminance(color: tuple[float, float, float, float]) -> float:
+    red, green, blue = color[:3]
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+
+
+def plot_performance_scorecard(
+    df: pd.DataFrame,
+    x_var: str,
+    save_path: str = SAVE_PATH,
+) -> None:
+    rank_table = _performance_rank_table(df, x_var)
+    algorithms = list(rank_table.index)
+    columns = ["nmi", "ami", "modularity", "time", "overall"]
+    labels = ["NMI ↑", "AMI ↑", "Q ↑", "Time ↓", "Overall ↓"]
+    values = rank_table[columns].to_numpy(dtype=float)
+    vmin = 1.0
+    vmax = float(len(algorithms))
+
+    cmap = _rank_heatmap_cmap()
+    norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+    with theme_context():
+        fig, ax = plt.subplots(figsize=(8.3, 4.6))
+        image = ax.imshow(values, cmap=cmap, norm=norm, aspect="auto")
+        ax.set_xticks(np.arange(len(columns)))
+        ax.set_xticklabels(labels)
+        ax.set_yticks(np.arange(len(algorithms)))
+        ax.set_yticklabels(algorithms)
+        ax.tick_params(axis="x", rotation=0)
+        ax.set_xticks(np.arange(-0.5, len(columns), 1), minor=True)
+        ax.set_yticks(np.arange(-0.5, len(algorithms), 1), minor=True)
+        ax.grid(which="minor", color=THEME.figure_face, linewidth=1.4)
+        ax.tick_params(which="minor", bottom=False, left=False)
+
+        for spine in ax.spines.values():
+            spine.set_color(THEME.spine)
+            spine.set_linewidth(0.8)
+
+        for row in range(values.shape[0]):
+            for col in range(values.shape[1]):
+                cell_value = values[row, col]
+                color = cmap(norm(cell_value))
+                text_color = (
+                    "#f8fbff"
+                    if _relative_luminance(color) < 0.46
+                    else THEME.text
+                )
+                weight = (
+                    "semibold"
+                    if np.isclose(cell_value, np.nanmin(values[:, col]))
+                    else "normal"
+                )
+                ax.text(
+                    col,
+                    row,
+                    f"{cell_value:.2f}",
+                    ha="center",
+                    va="center",
+                    color=text_color,
+                    fontweight=weight,
+                    fontsize=9.5,
+                )
+
+        colorbar = fig.colorbar(image, ax=ax, fraction=0.05, pad=0.03)
+        colorbar.outline.set_edgecolor(THEME.spine)
+        colorbar.outline.set_linewidth(0.8)
+        colorbar.ax.tick_params(colors=THEME.muted_text, labelsize=8.8)
+        colorbar.set_label("Average rank", color=THEME.text, fontsize=9.5)
+        fig.tight_layout()
+        export_figure(fig, save_path, "performance_scorecard")
+
+
+def plot_metric_facets(
+    df: pd.DataFrame,
+    metric: str,
+    x_var: str,
+    facet_var: str,
+    save_path: str = SAVE_PATH,
+) -> None:
+    algorithms = _ordered_algorithms(df["algorithm"].unique())
+    facet_values = sorted(df[facet_var].astype(float).unique())
+    x_values = sorted(df[x_var].astype(float).unique())
+    n_facets = len(facet_values)
+    if n_facets == 0:
+        return
+
+    ncols = min(n_facets, 3)
+    nrows = (n_facets + ncols - 1) // ncols
+    fig_w = 4.8 * ncols + 1.0
+    fig_h = 3.6 * nrows + 1.4
+
+    styles = build_algorithm_styles(algorithms)
+    with theme_context():
+        fig, axes = plt.subplots(
+            nrows,
+            ncols,
+            figsize=(fig_w, fig_h),
+            sharey=True,
+            squeeze=False,
+        )
+        axes_flat = axes.flatten()
+
+        for idx, facet_value in enumerate(facet_values):
+            ax = axes_flat[idx]
+            mask = df[facet_var].astype(float) == facet_value
+            sub = df[mask]
+            _plot_metric_series(
+                ax,
+                sub,
+                metric,
+                x_var,
+                styles,
+                with_labels=(idx == 0),
+            )
+            style_axis(
+                ax,
+                x_label=_x_label(x_var),
+                y_label=METRIC_METADATA[metric]["label"] if idx % ncols == 0 else "",
+                x_var=x_var,
+                x_values=x_values,
+                log_scale="y" if metric == "time" else None,
+            )
+            ax.set_title(
+                _facet_label(facet_var, facet_value),
+                fontsize=11.5,
+                color=THEME.text,
+                pad=8,
+            )
+
+        for hidden in range(n_facets, nrows * ncols):
+            axes_flat[hidden].set_visible(False)
+
+        handles, labels = axes_flat[0].get_legend_handles_labels()
+        legend = fig.legend(
+            handles,
+            labels,
+            loc="upper center",
+            bbox_to_anchor=(0.5, 0.02),
+            ncol=min(len(algorithms), 5),
+            columnspacing=1.5,
+            handlelength=2.2,
+        )
+        _legend_frame(legend)
+        fig.subplots_adjust(
+            top=0.92, bottom=0.16, hspace=0.40, wspace=0.18
+        )
+        export_figure(
+            fig,
+            save_path,
+            f"{metric}_by_{x_var}_facet_{facet_var}",
+        )
+
+
+def plot_facet_results(
+    df: pd.DataFrame,
+    save_path: str = SAVE_PATH,
+) -> None:
+    for metric in SUMMARY_METRICS:
+        if metric not in df.columns:
+            continue
+        plot_metric_facets(df, metric, "mu", "nodes", save_path)
+        plot_metric_facets(df, metric, "nodes", "mu", save_path)
+
+
+def plot_results(
+    results: Union[Dict, pd.DataFrame],
+    save_path: str = SAVE_PATH,
+) -> None:
+    df = _prepare_results_frame(results)
+
+    has_mu = "mu" in df.columns and df["mu"].nunique() > 1
+    has_nodes = "nodes" in df.columns and df["nodes"].nunique() > 1
+
+    if has_mu and has_nodes:
+        plot_facet_results(df, save_path)
+        return
+
+    x_var = infer_x_var(df)
+
+    for metric in SUMMARY_METRICS:
+        if metric in df.columns:
+            plot_single_metric(df, metric, x_var, save_path)
+
+    plot_comparison_matrix(df, x_var, save_path)
+    if all(metric in df.columns for metric in ("nmi", "ami", "modularity", "time")):
+        plot_performance_scorecard(df, x_var, save_path)

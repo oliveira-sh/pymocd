@@ -1,8 +1,14 @@
-.PHONY: all dependencies stubs build test benchmark bump clean docs docs-serve
+.PHONY: all dependencies stubs build test benchmark benchmark-params benchmark-synthetic benchmark-real benchmark-parallelism bump clean docs docs-serve
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
+BENCH_PY := $(CURDIR)/$(PYTHON)
+BENCH_THREADS := 1 2 4 8
+
+ifndef BENCHMARK_RUN_ID
+BENCHMARK_RUN_ID := $(shell date +%Y-%m-%d_%H-%M-%S)
+endif
 
 all: build test
 
@@ -25,13 +31,24 @@ build: dependencies
 test: build
 	cargo test --manifest-path=Cargo.toml
 
-benchmark: build
-	$(eval BENCHMARK_RUN_ID := $(shell date +%Y-%m-%d_%H-%M-%S))
-	#cd tests/benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(CURDIR)/$(PYTHON) evolutionary.py
-	#cd tests/benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(CURDIR)/$(PYTHON) pareto_front.py
-	cd tests/benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(CURDIR)/$(PYTHON) -m lfr_experiment
-	cd tests/benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(CURDIR)/$(PYTHON) real_nets.py
-	@echo "Results saved to tests/outputs/$(BENCHMARK_RUN_ID)/"
+benchmark-params: build
+	cd benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(BENCH_PY) -m alg_params.num_generations
+	cd benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(BENCH_PY) -m alg_params.pareto_front
+	cd benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(BENCH_PY) -m alg_params.population_size
+
+benchmark-synthetic: build
+	cd benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(BENCH_PY) -m _exp_synt_net
+
+benchmark-real: build
+	cd benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(BENCH_PY) -m _exp_real_net
+
+benchmark-parallelism: build
+	cd benchmarks && for threads in $(BENCH_THREADS); do \
+		BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(BENCH_PY) -m parallelism.thread_scaling $$threads; \
+	done
+
+benchmark: benchmark-params benchmark-synthetic benchmark-real benchmark-parallelism
+	@echo "Results saved to benchmarks/results/$(BENCHMARK_RUN_ID)/"
 
 docs: dependencies stubs
 	$(PIP) install -q -r docs/requirements.txt
