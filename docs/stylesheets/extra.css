@@ -1,4 +1,3 @@
-/* pymocd palette — navy / blue / green from the project logo */
 :root {
   --md-primary-fg-color: #0F3D75;
   --md-primary-fg-color--light: #0B4DA2;
@@ -14,7 +13,6 @@
   --md-typeset-a-color: #4D94E8;
 }
 
-/* Header logo — larger icon; padding 0 keeps the button at Material's 2.4rem header baseline */
 .md-header__button.md-logo {
   padding: 0;
 }
@@ -28,14 +26,11 @@
   font-size: 1rem;
 }
 
-/* Mobile drawer logo */
 .md-nav__button.md-logo img {
   height: 2rem;
   width: auto;
 }
 
-/* Hero */
-/* Real page h1, visually hidden — keeps Material from injecting a "Home" heading */
 .pymocd-sr-title {
   position: absolute;
   width: 1px;
@@ -53,7 +48,6 @@
   text-align: center;
 }
 
-/* Soft gradient backdrop behind the hero */
 .pymocd-hero::before {
   content: "";
   position: absolute;
@@ -94,7 +88,6 @@
   margin: 0 auto 1.25rem;
 }
 
-/* The wordmark uses navy text — give it a soft light backdrop on dark bg */
 [data-md-color-scheme="slate"] .pymocd-hero-logo {
   background: rgba(255, 255, 255, 0.92);
   border-radius: 0.6rem;
@@ -113,7 +106,6 @@
   font-size: 0.85rem;
 }
 
-/* Highlights strip */
 .pymocd-highlights {
   display: flex;
   flex-wrap: wrap;

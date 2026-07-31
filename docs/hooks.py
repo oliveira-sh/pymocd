@@ -1,10 +1,3 @@
-"""Expose the generated pyo3 stub to mkdocstrings.
-
-API pages are rendered from ``pymocd.pyi`` (generated from the Rust sources
-by ``make stubs``), so the docs always match the compiled library. griffe
-only loads ``.py`` search-path modules, hence the shadow copy.
-"""
-
 import shutil
 from pathlib import Path
 
@@ -18,3 +11,8 @@ def on_startup(command, dirty):
     dest = ROOT / ".docs-stub"
     dest.mkdir(exist_ok=True)
     shutil.copy(stub, dest / "pymocd.py")
+
+    assets = ROOT / "docs" / "assets"
+    assets.mkdir(exist_ok=True)
+    for svg in ("logo.svg", "icon.svg"):
+        shutil.copy(ROOT / "res" / svg, assets / svg)

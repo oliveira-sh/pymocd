@@ -1,27 +1,15 @@
 # Custom objectives
 
-Replace the built-in objectives with custom Python functions to optimize for domain-specific community quality metrics.
-
-## Overview
-
-By default, `HpMocd` optimizes two built-in objectives implemented in Rust: **intra-community** and **inter-community** cost (both minimized). These are evaluated in parallel and cover the most common use case.
-
-You can **replace** these defaults with your own Python objective functions via the `objectives` parameter. This lets you optimize for any community quality metric — modularity, conductance, motif-based measures, or anything else you can express as a function. You can pass **any number** of objectives; the algorithm uses NSGA-II to find Pareto-optimal trade-offs across all of them.
+By default, `HpMocd` optimizes two built-in Rust objectives: **intra-community** and **inter-community** cost (both minimized), evaluated in parallel. The `objectives` parameter replaces them with any number of Python functions; NSGA-II finds Pareto-optimal trade-offs across all of them.
 
 ## Writing an objective function
 
-Each objective must follow this signature:
+Each objective takes the graph you passed to `HpMocd` and a `dict[int, int]` partition mapping node ID to community ID, and returns a `float`:
 
 ```python
 def objective(graph, partition: dict[int, int]) -> float:
     ...
 ```
-
-| Argument      | Type                       | Description                                               |
-|---------------|----------------------------|-----------------------------------------------------------|
-| **graph**     | Your original graph object | The same graph you passed to `HpMocd`                     |
-| **partition** | `dict[int, int]`           | Maps each node ID to its community ID                     |
-| **return**    | `float`                    | The objective value — **minimized** by the algorithm      |
 
 !!! warning
     All objectives are **minimized**. If you want to maximize a metric (e.g. modularity), return its negation or `1.0 - value`.
@@ -53,16 +41,13 @@ alg = HpMocd(G, objectives=[obj_1, obj_2, obj_3])
 
 ## Factory pattern for performance
 
-Each objective is called once **per individual, per generation** — that is `pop_size x num_gens` times. Recomputing graph properties inside the function body every time is wasteful.
-
-The factory pattern solves this: a function receives the graph once, precomputes constants, and returns a fast closure:
+Each objective is called once per individual, per generation — `pop_size x num_gens` times. A factory receives the graph once, precomputes constants, and returns a fast closure:
 
 ```python
 import numpy as np
 import scipy.sparse as sp
 
 def make_conductance(G):
-    # Precompute once (called at construction time)
     nodes = list(G.nodes())
     idx = {v: i for i, v in enumerate(nodes)}
     n = len(nodes)
@@ -73,7 +58,6 @@ def make_conductance(G):
     total_vol = degrees.sum()
     rows, cols = A.nonzero()
 
-    # Fast closure (called pop_size x num_gens times)
     def _obj(_G, partition):
         if total_vol == 0:
             return 0.0
@@ -90,7 +74,7 @@ def make_conductance(G):
     return _obj
 ```
 
-The split matters: everything above the closure runs **once**, when you call `make_conductance(G)` at construction time — building the sparse adjacency matrix, degree vector, and edge index arrays. The returned `_obj` closure is what `HpMocd` calls thousands of times, and it only does cheap vectorized work on the precomputed arrays.
+Everything above the closure runs once, when you call `make_conductance(G)` at construction time — building the sparse adjacency matrix, degree vector, and edge index arrays. The returned `_obj` closure is what `HpMocd` calls thousands of times, doing only cheap vectorized work on the precomputed arrays.
 
 ```python
 alg = HpMocd(
@@ -104,21 +88,19 @@ solution = alg.run()
 
 ## Changing objectives after construction
 
-Use `set_objectives()` to swap objectives on an existing instance. Pass an empty list to revert to the built-in Rust objectives:
+Use `set_objectives()` to swap objectives on an existing instance. An empty list reverts to the built-in Rust objectives:
 
 ```python
 alg = HpMocd(G)
 
-# Switch to custom objectives
 alg.set_objectives([make_conductance(G)])
 
-# Revert to built-in Rust objectives
 alg.set_objectives([])
 ```
 
 ## Progress tracking
 
-Register a callback with `set_on_generation()` to monitor the evolutionary process. The callback is invoked after every generation:
+`set_on_generation()` registers a callback invoked after every generation with the 0-indexed current generation, the total number of generations, and the size of the first Pareto front:
 
 ```python
 from tqdm import tqdm
@@ -139,20 +121,12 @@ solution = alg.run()
 
 Pass `None` to `set_on_generation()` to clear the callback.
 
-| Argument        | Type  | Description                                    |
-|-----------------|-------|------------------------------------------------|
-| **generation**  | `int` | Current generation (0-indexed)                 |
-| **num_gens**    | `int` | Total number of generations                    |
-| **front_size**  | `int` | Number of solutions in the first Pareto front  |
-
 ## Performance considerations
 
 !!! danger "Python objectives are slow"
     Python objectives are evaluated **sequentially under the GIL** — unlike the built-in Rust objectives, which run in parallel. Expect significantly longer runtimes.
 
-Recommendations:
-
 - **Reduce the evolutionary budget**: use a smaller `pop_size` and `num_gens` (e.g. `50/50` instead of the default `100/100`).
 - **Precompute graph constants**: use the [factory pattern](#factory-pattern-for-performance) to avoid redundant work inside the objective closure.
-- **Use vectorized operations**: leverage `numpy` and `scipy.sparse` instead of Python loops — sparse matmul and `np.bincount` run in C-level code.
-- **Prefer the built-ins when they suffice**: only use custom objectives when you need a metric the default objectives do not capture.
+- **Use vectorized operations**: `numpy` and `scipy.sparse` instead of Python loops — sparse matmul and `np.bincount` run in C-level code.
+- **Prefer the built-ins when they suffice.**

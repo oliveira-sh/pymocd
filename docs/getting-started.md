@@ -18,7 +18,7 @@ make build
 
 ## First detection
 
-`pymocd.scale` is the recommended entry point. Give it a NetworkX graph and get back a partition:
+`pymocd.scale` is the recommended entry point:
 
 ```python
 import networkx as nx
@@ -26,12 +26,7 @@ import pymocd
 
 G = nx.karate_club_graph()
 communities = pymocd.scale(G)
-
-print(communities)
-# {0: 0, 1: 0, 2: 0, 3: 0, ..., 32: 1, 33: 1}
 ```
-
-The result is a plain `dict` mapping every node id to an integer community label.
 
 !!! important "Graph format"
     Every detector accepts a **NetworkX** or **igraph** graph with **integer node ids** and returns a crisp `dict[node, community]`. Isolated nodes are always assigned community `-1`.
@@ -43,14 +38,16 @@ The result is a plain `dict` mapping every node id to an integer community label
 ```python
 communities = pymocd.scale(
     G,
-    pop_size=100,     # population size
-    num_gens=50,      # generations
-    cross_rate=0.1,   # crossover probability
-    mut_rate=0.1,     # mutation probability
-    gap=10,           # macro/micro co-evolution interval
-    beta=0.05,        # micro-stage perturbation strength
+    pop_size=100,
+    num_gens=50,
+    cross_rate=0.1,
+    mut_rate=0.1,
+    gap=10,
+    beta=0.05,
 )
 ```
+
+`gap` is the macro/micro co-evolution interval and `beta` the micro-stage perturbation strength.
 
 `scale` additionally supports an adaptive stopping rule:
 
@@ -66,9 +63,11 @@ For tuned HP-MOCD runs, use the `HpMocd` class — it exposes custom objectives,
 alg = pymocd.HpMocd(G, pop_size=100, num_gens=100, cross_rate=0.7, mut_rate=0.5)
 alg.set_on_generation(lambda gen, total, front_size: print(gen, total, front_size))
 
-best = alg.run()                       # max-Q partition from the front
-front = alg.generate_pareto_front()    # [(partition, objectives), ...]
+best = alg.run()
+front = alg.generate_pareto_front()
 ```
+
+`run` returns the max-Q partition from the front; `generate_pareto_front` returns `[(partition, objectives), ...]`.
 
 Custom objectives are callables `(graph, partition) -> float` to minimize, passed via `objectives=` or `set_objectives`; an empty list reverts to the built-in intra/inter pair.
 
@@ -76,7 +75,7 @@ See [Algorithms](algorithms.md) for what each detector optimizes, and the [detec
 
 ## Threads
 
-All detectors run on a shared Rayon thread pool. Cap it before the first detection:
+All detectors run on a shared Rayon thread pool. To cap it:
 
 ```python
 pymocd.max_cores(4)
@@ -103,7 +102,6 @@ Each metric is also available on its own: `pymocd.nmi`, `pymocd.ami`, `pymocd.ar
 
 ```python
 front = pymocd.scale_fronts(G)
-print(len(front))          # number of non-dominated partitions
 best = max(front, key=lambda p: pymocd.ari(p, gt))
 ```
 
