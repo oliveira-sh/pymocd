@@ -3,8 +3,6 @@ site_description: Multi-objective evolutionary community detection, powered by R
 site_url: https://oliveira-sh.github.io/pymocd/
 repo_url: https://github.com/oliveira-sh/pymocd
 repo_name: oliveira-sh/pymocd
-copyright: Copyright &copy; pymocd authors — GPL-3.0-or-later
-
 theme:
   name: material
   logo: assets/icon.svg
@@ -40,11 +38,7 @@ extra_css:
   - stylesheets/extra.css
 
 extra:
-  social:
-    - icon: fontawesome/brands/github
-      link: https://github.com/oliveira-sh/pymocd
-    - icon: fontawesome/brands/python
-      link: https://pypi.org/project/pymocd/
+  generator: false
 
 hooks:
   - docs/hooks.py
