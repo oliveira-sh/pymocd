@@ -1,0 +1,61 @@
+/* pymocd palette — navy / blue / green from the project logo */
+:root {
+  --md-primary-fg-color: #0F3D75;
+  --md-primary-fg-color--light: #0B4DA2;
+  --md-primary-fg-color--dark: #0A2C55;
+  --md-accent-fg-color: #009B3A;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #0B4DA2;
+  --md-primary-fg-color--light: #2F6FC4;
+  --md-primary-fg-color--dark: #0A2C55;
+  --md-accent-fg-color: #00C24A;
+  --md-typeset-a-color: #4D94E8;
+}
+
+/* Hero */
+/* Real page h1, visually hidden — keeps Material from injecting a "Home" heading */
+.pymocd-sr-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.pymocd-hero {
+  max-width: 46rem;
+  margin: 2.5rem auto 3rem;
+  text-align: center;
+}
+
+.pymocd-hero-logo {
+  display: block;
+  width: min(100%, 34rem);
+  margin: 0 auto 1.25rem;
+}
+
+/* The wordmark uses navy text — give it a soft light backdrop on dark bg */
+[data-md-color-scheme="slate"] .pymocd-hero-logo {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 0.6rem;
+  padding: 0.9rem 1.4rem;
+}
+
+.pymocd-tagline {
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  margin-bottom: 0.3rem;
+}
+
+.pymocd-hero > p:not(.pymocd-tagline) {
+  color: var(--md-default-fg-color--light);
+  margin-top: 0;
+}
+
+.pymocd-hero .md-button {
+  margin: 0.4rem 0.3rem 0;
+}

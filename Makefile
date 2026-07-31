@@ -1,4 +1,4 @@
-.PHONY: all dependencies stubs build test benchmark bump clean
+.PHONY: all dependencies stubs build test benchmark bump clean docs docs-serve
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -32,6 +32,14 @@ benchmark: build
 	cd tests/benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(CURDIR)/$(PYTHON) -m lfr_experiment
 	cd tests/benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(CURDIR)/$(PYTHON) real_nets.py
 	@echo "Results saved to tests/outputs/$(BENCHMARK_RUN_ID)/"
+
+docs: dependencies stubs
+	$(PIP) install -q -r docs/requirements.txt
+	$(VENV)/bin/mkdocs build
+
+docs-serve: dependencies stubs
+	$(PIP) install -q -r docs/requirements.txt
+	$(VENV)/bin/mkdocs serve
 
 bump:
 	$(if $(V),,$(error Usage: make bump V=2.0.2))
