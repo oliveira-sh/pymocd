@@ -1,8 +1,8 @@
 # Algorithms
 
 `pymocd` ships eight detectors. **SCALE** and **HP-MOCD** are the library's
-own contributions; the remaining six are faithful re-implementations of
-published baselines whose authors released no code.
+own contributions; the remaining six re-implement published baselines whose
+authors released no code.
 
 ## Overview
 
@@ -22,13 +22,12 @@ isolated nodes are assigned community `-1`.
 
 ## Which one should I use?
 
-- **[`scale`](api/detectors.md#pymocd.scale)** — the recommended default. Its
-  SBM/MDL selection is label-free (no ground truth needed to pick a partition)
-  and its sparse co-evolution runs in near-linear time and memory.
-- **[`hpmocd`](api/detectors.md#pymocd.hpmocd)** — when you want the published
-  HP-MOCD behaviour with max-modularity selection.
-- **The other six** — baselines for papers and benchmarks. Sensible defaults
-  work out of the box; `pop_size`, `num_gens` and rates are tunable kwargs.
+- **[`scale`](api/detectors.md#pymocd.scale)** — the recommended default:
+  label-free SBM/MDL selection, near-linear time and memory.
+- **[`hpmocd`](api/detectors.md#pymocd.hpmocd)** — the published HP-MOCD
+  behaviour with max-modularity selection.
+- **The other six** — baselines for papers and benchmarks; `pop_size`,
+  `num_gens` and rates are tunable kwargs.
 
 ## SCALE
 
@@ -54,8 +53,6 @@ inspection. Published in
 [Social Network Analysis and Mining (2025)](https://doi.org/10.1007/s13278-025-01519-7).
 
 ## Citation
-
-If you use any algorithm in your research, please cite:
 
 ```bibtex
 @article{Santos2025,

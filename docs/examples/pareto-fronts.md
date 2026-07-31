@@ -1,8 +1,8 @@
 # Pareto fronts
 
-Multi-objective community detection does not produce one answer. The evolutionary search optimizes two (or more) competing objectives at once, so it ends with a **Pareto front**: a set of partitions where no member is better than another on every objective. Coarse partitions trade against fine ones, tight communities against well-separated ones.
+The evolutionary search optimizes competing objectives at once, so it ends with a **Pareto front**: a set of partitions where no member is better than another on every objective — coarse trades against fine, tight communities against well-separated ones.
 
-Every detector in pymocd already resolves this for you — each applies the selection rule published with its algorithm (max-modularity, MDL, etc.; see [Algorithms](../algorithms.md)) and returns a single partition. The front accessors exist for when you want to make that choice yourself: you have ground truth, domain knowledge about the expected number of communities, or your own quality metric.
+Every detector already resolves this — each applies the selection rule published with its algorithm (max-modularity, MDL, etc.; see [Algorithms](../algorithms.md)) and returns a single partition. The front accessors exist for making that choice yourself: ground truth, a known expected community count, or your own quality metric.
 
 ## `HpMocd.generate_pareto_front()`
 
@@ -30,8 +30,6 @@ for partition, objectives in front:
 
 ### Max modularity
 
-Score each partition with NetworkX and keep the best:
-
 ```python
 def modularity(G, partition):
     comms = {}
@@ -44,7 +42,7 @@ best, _ = max(front, key=lambda sol: modularity(G, sol[0]))
 
 ### Against ground truth
 
-If you have labels, score every member with `pymocd.gt_metrics` (or `ari`, `nmi`, `ami`, `f1` individually) and pick the best. Karate club, using the `club` attribute as ground truth:
+Score every member with `pymocd.gt_metrics` (or `ari`, `nmi`, `ami`, `f1` individually). Karate club, using the `club` attribute as ground truth:
 
 ```python
 import pymocd
@@ -68,7 +66,7 @@ best, _ = min(front, key=lambda sol: abs(len(set(sol[0].values())) - target))
 
 ## `scale_fronts` and `mmcomo_fronts`
 
-`scale` and `mmcomo` expose their candidate sets too, but as a plain `list[dict]` of partitions — no objective values attached. Each list is exactly what the corresponding detector selects from:
+`scale` and `mmcomo` expose their candidate sets as a plain `list[dict]` of partitions — no objective values attached. Each list is exactly what the corresponding detector selects from:
 
 ```python
 candidates = pymocd.scale_fronts(G)
