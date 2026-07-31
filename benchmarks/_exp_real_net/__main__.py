@@ -5,28 +5,25 @@ import sys
 import time
 from typing import Callable
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
 
-from utils import SAVE_PATH, evaluate_communities
+from utils import SAVE_PATH, THEME, evaluate_communities
 from utils.lfr import convert_communities_to_partition
 from utils.plotting import (
     METRIC_METADATA,
     _legend_frame,
-    _sort_algorithms,
+    _ordered_algorithms,
     build_algorithm_styles,
     export_figure,
-    resolve_themes,
     theme_context,
 )
 
-# Populate the algorithm registry as a side effect of this import.
-from lfr_experiment import ALGORITHM_REGISTRY  # noqa: F401
-from lfr_experiment.registry import ALGORITHM_REGISTRY  # noqa: F811
+from _exp_synt_net import ALGORITHM_REGISTRY
 
 N_RUNS = 3
 
@@ -43,7 +40,6 @@ def _les_miserables() -> tuple[nx.Graph, None]:
 
 def _florentine() -> tuple[nx.Graph, None]:
     G = nx.florentine_families_graph()
-    # Isolate "Pucci" has no edges → drop to keep algorithms happy.
     G = G.subgraph([n for n, d in G.degree() if d > 0]).copy()
     return G, None
 
@@ -121,75 +117,71 @@ def _bar_plot(
     df: pd.DataFrame,
     metric: str,
     save_path: str,
-    theme_names=None,
 ) -> None:
     if metric not in df.columns or df[metric].isna().all():
         return
 
-    # Only include networks that have at least one non-NaN value for this
-    # metric — keeps NMI/AMI plots restricted to networks with ground truth.
     networks_with_data = df.dropna(subset=[metric])["network"].unique().tolist()
     if not networks_with_data:
         return
     networks = sorted(networks_with_data, key=lambda s: s.lower())
-    algorithms = _sort_algorithms(df["algorithm"].unique())
+    algorithms = _ordered_algorithms(df["algorithm"].unique())
     x = np.arange(len(networks), dtype=float)
     n_algos = max(len(algorithms), 1)
     width = 0.82 / n_algos
 
-    for theme in resolve_themes(theme_names):
-        styles = build_algorithm_styles(algorithms, theme)
-        with theme_context(theme):
-            fig, ax = plt.subplots(figsize=(9.2, 5.2))
-            for i, alg in enumerate(algorithms):
-                sub = df[df["algorithm"] == alg].set_index("network")
-                values = np.array(
-                    [sub[metric].get(net, np.nan) for net in networks], dtype=float
-                )
-                errs = np.array(
-                    [
-                        sub.get(f"{metric}_std", pd.Series()).get(net, 0.0)
-                        for net in networks
-                    ],
-                    dtype=float,
-                )
-                color, _ = styles[alg]
-                offset = (i - (n_algos - 1) / 2.0) * width
-                ax.bar(
-                    x + offset,
-                    np.nan_to_num(values, nan=0.0),
-                    width=width * 0.94,
-                    color=color,
-                    label=alg,
-                    yerr=np.nan_to_num(errs, nan=0.0),
-                    capsize=3.0,
-                    edgecolor=theme.axes_face,
-                    linewidth=0.8,
-                    zorder=3,
-                )
-
-            ax.set_xticks(x)
-            ax.set_xticklabels(networks)
-            ax.set_ylabel(METRIC_METADATA[metric]["label"], labelpad=10)
-            ax.set_axisbelow(True)
-            ax.grid(axis="y", which="major", linewidth=0.9, color=theme.grid_major)
-            ax.spines["top"].set_visible(False)
-            ax.spines["right"].set_visible(False)
-            ax.spines["left"].set_color(theme.spine)
-            ax.spines["bottom"].set_color(theme.spine)
-            if metric == "time":
-                ax.set_yscale("log")
-
-            legend = ax.legend(
-                loc="upper center",
-                bbox_to_anchor=(0.5, -0.12),
-                ncol=min(n_algos, 4),
-                columnspacing=1.2,
-                handlelength=1.8,
+    styles = build_algorithm_styles(algorithms)
+    with theme_context():
+        fig, ax = plt.subplots(figsize=(9.2, 5.2))
+        for i, alg in enumerate(algorithms):
+            sub = df[df["algorithm"] == alg].set_index("network")
+            values = np.array(
+                [sub[metric].get(net, np.nan) for net in networks], dtype=float
             )
-            _legend_frame(legend, theme)
-            fig.tight_layout()
-            export_figure(fig, save_path, f"real_nets_{metric}", theme)
+            errs = np.array(
+                [
+                    sub.get(f"{metric}_std", pd.Series()).get(net, 0.0)
+                    for net in networks
+                ],
+                dtype=float,
+            )
+            color, _ = styles[alg]
+            offset = (i - (n_algos - 1) / 2.0) * width
+            ax.bar(
+                x + offset,
+                np.nan_to_num(values, nan=0.0),
+                width=width * 0.94,
+                color=color,
+                label=alg,
+                yerr=np.nan_to_num(errs, nan=0.0),
+                capsize=3.0,
+                edgecolor=THEME.axes_face,
+                linewidth=0.8,
+                zorder=3,
+            )
+
+        ax.set_xticks(x)
+        ax.set_xticklabels(networks)
+        ax.set_ylabel(METRIC_METADATA[metric]["label"], labelpad=10)
+        ax.set_axisbelow(True)
+        ax.grid(axis="y", which="major", linewidth=0.9, color=THEME.grid_major)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_color(THEME.spine)
+        ax.spines["bottom"].set_color(THEME.spine)
+        if metric == "time":
+            ax.set_yscale("log")
+
+        legend = ax.legend(
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.12),
+            ncol=min(n_algos, 4),
+            columnspacing=1.2,
+            handlelength=1.8,
+        )
+        _legend_frame(legend)
+        fig.tight_layout()
+        export_figure(fig, save_path, f"real_nets_{metric}")
 
 
 def main() -> None:

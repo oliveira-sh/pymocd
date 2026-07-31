@@ -1,13 +1,13 @@
 import sys
 import os
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import time
 import pymocd
 import pandas as pd
 
-from utils import generate_lfr_benchmark, evaluate_communities, SAVE_PATH  # noqa: E402
+from utils import generate_lfr_benchmark, evaluate_communities, SAVE_PATH
 
 network_sizes = [10000, 20000, 30000]
 population_sizes = [50, 100, 150, 200]
@@ -28,10 +28,7 @@ for n in network_sizes:
                 )
 
                 start = time.time()
-                solver = pymocd.HpMocd(
-                    G, debug_level=0, pop_size=pop_size, num_gens=num_gens
-                )
-                rdict = solver.run()
+                rdict = pymocd.scale(G, pop_size=pop_size, num_gens=num_gens)
                 elapsed = time.time() - start
 
                 metrics = evaluate_communities(G, rdict, ground_truth, convert=False)

@@ -131,6 +131,14 @@ class ExperimentRunner:
                 )
                 pbar.update()
 
+        order = {name: index for index, name in enumerate(ALGORITHM_REGISTRY)}
+        results.sort(
+            key=lambda r: (
+                order.get(r["algorithm"], len(order)),
+                r["mu"],
+                r["nodes"],
+            )
+        )
         df = pd.DataFrame(results).rename(
             columns={
                 "modularity_mean": "modularity",

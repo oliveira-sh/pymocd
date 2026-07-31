@@ -4,6 +4,15 @@ import networkx as nx
 import pymocd
 
 
+def build_two_clique_graph():
+    graph = nx.Graph()
+    graph.add_nodes_from(range(6))
+    graph.add_edges_from([(0, 1), (0, 2), (1, 2)])
+    graph.add_edges_from([(3, 4), (3, 5), (4, 5)])
+    graph.add_edge(2, 3)
+    return graph
+
+
 class TestPartitions(unittest.TestCase):
     def setUp(self):
         self.graph = nx.karate_club_graph()
@@ -55,6 +64,25 @@ class TestPartitions(unittest.TestCase):
         self.assertTrue(front)
         for partition in front:
             self.assert_valid_partition(partition)
+
+
+class TestTwoCliquePartition(unittest.TestCase):
+    def setUp(self):
+        self.graph = build_two_clique_graph()
+
+    def assert_exact_two_clique_split(self, result):
+        groups = {}
+        for node, community in result.items():
+            groups.setdefault(community, set()).add(node)
+        self.assertEqual(len(groups), 2)
+        parts = tuple(sorted(tuple(sorted(nodes)) for nodes in groups.values()))
+        self.assertEqual(parts, ((0, 1, 2), (3, 4, 5)))
+
+    def test_hpmocd_recovers_exact_partition(self):
+        self.assert_exact_two_clique_split(pymocd.hpmocd(self.graph))
+
+    def test_scale_recovers_exact_partition(self):
+        self.assert_exact_two_clique_split(pymocd.scale(self.graph))
 
 
 if __name__ == "__main__":
