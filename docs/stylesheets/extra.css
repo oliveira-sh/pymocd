@@ -14,6 +14,26 @@
   --md-typeset-a-color: #4D94E8;
 }
 
+/* Header logo — larger icon; padding 0 keeps the button at Material's 2.4rem header baseline */
+.md-header__button.md-logo {
+  padding: 0;
+}
+
+.md-header__button.md-logo img {
+  height: 2rem;
+  width: auto;
+}
+
+.md-header__topic {
+  font-size: 1rem;
+}
+
+/* Mobile drawer logo */
+.md-nav__button.md-logo img {
+  height: 2rem;
+  width: auto;
+}
+
 /* Hero */
 /* Real page h1, visually hidden — keeps Material from injecting a "Home" heading */
 .pymocd-sr-title {
@@ -26,9 +46,46 @@
 }
 
 .pymocd-hero {
+  position: relative;
   max-width: 46rem;
-  margin: 2.5rem auto 3rem;
+  margin: 1.75rem auto 2.5rem;
+  padding: 2.25rem 1rem 1.75rem;
   text-align: center;
+}
+
+/* Soft gradient backdrop behind the hero */
+.pymocd-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 1rem;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(11, 77, 162, 0.10), transparent 65%),
+    radial-gradient(ellipse at 85% 100%, rgba(0, 155, 58, 0.08), transparent 60%);
+}
+
+[data-md-color-scheme="slate"] .pymocd-hero::before {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(77, 148, 232, 0.16), transparent 65%),
+    radial-gradient(ellipse at 85% 100%, rgba(0, 194, 74, 0.10), transparent 60%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pymocd-hero {
+    animation: pymocd-fade 0.6s ease-out both;
+  }
+}
+
+@keyframes pymocd-fade {
+  from {
+    opacity: 0;
+    transform: translateY(0.4rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .pymocd-hero-logo {
@@ -42,20 +99,45 @@
   background: rgba(255, 255, 255, 0.92);
   border-radius: 0.6rem;
   padding: 0.9rem 1.4rem;
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.35);
 }
 
-.pymocd-tagline {
-  font-size: 1.15rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  margin-bottom: 0.3rem;
-}
-
-.pymocd-hero > p:not(.pymocd-tagline) {
+.pymocd-hero > p {
   color: var(--md-default-fg-color--light);
   margin-top: 0;
 }
 
 .pymocd-hero .md-button {
   margin: 0.4rem 0.3rem 0;
+  padding: 0.7em 2.2em;
+  font-size: 0.85rem;
+}
+
+/* Highlights strip */
+.pymocd-highlights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 1.25rem 0 1.75rem;
+}
+
+.pymocd-highlights > div {
+  flex: 1 1 10rem;
+  border: 0.05rem solid var(--md-default-fg-color--lightest);
+  border-radius: 0.4rem;
+  padding: 0.7rem 0.9rem;
+  text-align: center;
+}
+
+.pymocd-highlights strong {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--md-default-fg-color);
+}
+
+.pymocd-highlights span {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.64rem;
+  color: var(--md-default-fg-color--light);
 }

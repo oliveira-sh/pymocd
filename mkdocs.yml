@@ -92,6 +92,10 @@ nav:
   - Home: index.md
   - Getting started: getting-started.md
   - Algorithms: algorithms.md
+  - Examples:
+      - Plotting communities: examples/plotting.md
+      - Custom objectives: examples/custom-objectives.md
+      - Pareto fronts: examples/pareto-fronts.md
   - API reference:
       - Detectors: api/detectors.md
       - Pareto fronts: api/fronts.md
