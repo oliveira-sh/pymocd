@@ -31,10 +31,6 @@ pip install pymocd
     <span>Multi-objective evolutionary engines</span>
   </div>
   <div>
-    <strong>Peer-reviewed</strong>
-    <span><a href="https://doi.org/10.1007/s13278-025-01519-7">SNAM 2025</a></span>
-  </div>
-  <div>
     <strong>GPL-3.0-or-later</strong>
     <span>Free and open source</span>
   </div>
@@ -49,15 +45,6 @@ pip install pymocd
     The core is written in Rust with PyO3 bindings and Rayon data
     parallelism — evolutionary search scales across every core you
     give it with `max_cores`.
-
-- :material-graph:{ .lg .middle } **Eight detectors**
-
-    ---
-
-    From HP-MOCD and SCALE to MMCoMO and classic MOCD baselines, all
-    behind one uniform interface.
-
-    [:octicons-arrow-right-24: Algorithms](algorithms.md)
 
 - :material-power-plug:{ .lg .middle } **Drop-in for NetworkX and igraph**
 
@@ -74,50 +61,6 @@ pip install pymocd
     Pareto fronts with copy-paste-runnable examples.
 
     [:octicons-arrow-right-24: Examples](examples/plotting.md)
-
-- :material-file-document-check:{ .lg .middle } **Docs generated from the code**
-
-    ---
-
-    The API reference is rendered by mkdocstrings from the PyO3 type
-    stub, so signatures and docstrings always match the installed
-    package.
-
-</div>
-
-## Quickstart
-
-```python
-import networkx as nx
-import pymocd
-
-G = nx.karate_club_graph()
-communities = pymocd.scale(G)
-# {0: 2, 1: 2, 2: 2, ..., 33: 0}
-```
-
-## Detect, evaluate, inspect
-
-<div class="grid" markdown>
-
-```python title="Detect"
-import networkx as nx
-import pymocd
-
-G = nx.karate_club_graph()
-part = pymocd.scale(G)
-```
-
-```python title="Evaluate"
-gt = {n: int(d["club"] == "Officer")
-      for n, d in G.nodes(data=True)}
-nmi, ami, ari, f1 = pymocd.gt_metrics(part, gt)
-```
-
-```python title="Inspect the Pareto front"
-for p in pymocd.scale_fronts(G):
-    print(len(set(p.values())), "communities")
-```
 
 </div>
 
