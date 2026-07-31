@@ -1,7 +1,0 @@
-MIN_MU = 0.1
-MAX_MU = 0.7
-STP_MU = 0.1
-NUM_ND = 1_000
-
-NUM_RUNS = 2
-DEBUG = True

@@ -10,7 +10,7 @@ Selection rules (matching the paper):
   * NMI table -> max NMI vs ground truth over the front (the paper's GT rule).
 Both are read from a single `mmcomo_fronts()` call per run.
 
-  python3 -u tests/benchmarks/mmcomo_reproduce.py
+  python3 -u benchmarks/mmcomo_reproduce.py
 """
 from __future__ import annotations
 

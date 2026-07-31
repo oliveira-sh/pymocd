@@ -1,6 +1,6 @@
 """Ablation & next-gen experiment harness for PRISM.
 
-Run from tests/benchmarks:
+Run from benchmarks:
     python exp_bench.py <tag>
 
 Saves results/exp_<tag>.json. Cheap: n=500, 3 seeds, μ∈[0.1..0.8].

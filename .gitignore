@@ -6,13 +6,12 @@
 # User-specific files
 web_media
 temp.py
-benchmarks/tests
+benchmarks/results/
 *.png
 *.csv
 .ignore
 *.pdf
 *.out
-tests/outputs/
 .venv
 *.suo
 *.user

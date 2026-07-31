@@ -27,11 +27,11 @@ test: build
 
 benchmark: build
 	$(eval BENCHMARK_RUN_ID := $(shell date +%Y-%m-%d_%H-%M-%S))
-	#cd tests/benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(CURDIR)/$(PYTHON) evolutionary.py
-	#cd tests/benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(CURDIR)/$(PYTHON) pareto_front.py
-	cd tests/benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(CURDIR)/$(PYTHON) -m lfr_experiment
-	cd tests/benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(CURDIR)/$(PYTHON) real_nets.py
-	@echo "Results saved to tests/outputs/$(BENCHMARK_RUN_ID)/"
+	#cd benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(CURDIR)/$(PYTHON) evolutionary.py
+	#cd benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(CURDIR)/$(PYTHON) pareto_front.py
+	cd benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(CURDIR)/$(PYTHON) -m lfr_experiment
+	cd benchmarks && BENCHMARK_RUN_ID=$(BENCHMARK_RUN_ID) $(CURDIR)/$(PYTHON) real_nets.py
+	@echo "Results saved to benchmarks/results/$(BENCHMARK_RUN_ID)/"
 
 docs: dependencies stubs
 	$(PIP) install -q -r docs/requirements.txt

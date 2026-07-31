@@ -10,13 +10,7 @@ _run_id = os.environ.get("BENCHMARK_RUN_ID") or datetime.now().strftime(
     "%Y-%m-%d_%H-%M-%S"
 )
 SAVE_PATH = (
-    str(
-        Path(__file__).resolve().parent.parent.parent.parent
-        / "tests"
-        / "outputs"
-        / _run_id
-    )
-    + "/"
+    str(Path(__file__).resolve().parent.parent / "results" / _run_id) + "/"
 )
 
 EXPORT_FORMATS = ("pdf", "png", "svg")
