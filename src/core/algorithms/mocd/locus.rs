@@ -7,25 +7,26 @@
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use crate::core::graph::{Graph, NodeId, Partition};
+use crate::core::graph::{Graph, NodeId};
 use rand::RngExt;
-use rustc_hash::FxHashMap;
+use std::collections::HashMap;
 
 /// Dense `[0, n)` index for a graph's NodeId set (NodeIds are not guaranteed
 /// contiguous), plus per-index legal alleles (the node's neighbours, or
-/// `[self]` for isolated nodes).
+/// `[self]` for isolated nodes). Built once per run; the NodeId map is a
+/// cold boundary structure, hence std `HashMap`.
 pub struct NodeIndex {
     pub index_to_node: Vec<NodeId>,
     // Only used during `build` and by tests; allowed dead in non-test builds.
     #[allow(dead_code)]
-    pub node_to_index: FxHashMap<NodeId, usize>,
+    pub node_to_index: HashMap<NodeId, usize>,
     pub neighbor_candidates: Vec<Vec<usize>>,
 }
 
 impl NodeIndex {
     pub fn build(graph: &Graph) -> Self {
         let index_to_node: Vec<NodeId> = graph.nodes_vec().clone();
-        let node_to_index: FxHashMap<NodeId, usize> = index_to_node
+        let node_to_index: HashMap<NodeId, usize> = index_to_node
             .iter()
             .enumerate()
             .map(|(i, &n)| (n, i))
@@ -78,9 +79,11 @@ fn find(parent: &mut [usize], mut x: usize) -> usize {
     x
 }
 
-/// Decode a locus genome into a community `Partition`: communities are the
-/// connected components of the implied graph `i -> genome[i]`.
-pub fn decode(genome: &Genome, idx: &NodeIndex) -> Partition {
+/// Decode a locus genome into dense community labels (`labels[i]` = compacted
+/// community id `0..k` of node position `i`, first-seen order over ascending
+/// positions): communities are the connected components of the implied graph
+/// `i -> genome[i]`.
+pub fn decode(genome: &Genome) -> Vec<i32> {
     let n = genome.len();
     let mut parent: Vec<usize> = (0..n).collect();
 
@@ -92,12 +95,18 @@ pub fn decode(genome: &Genome, idx: &NodeIndex) -> Partition {
         }
     }
 
-    let mut partition = Partition::default();
-    for i in 0..n {
+    let mut root_label = vec![-1i32; n];
+    let mut labels = vec![0i32; n];
+    let mut next = 0i32;
+    for (i, label) in labels.iter_mut().enumerate() {
         let root = find(&mut parent, i);
-        partition.insert(idx.index_to_node[i], root as i32);
+        if root_label[root] < 0 {
+            root_label[root] = next;
+            next += 1;
+        }
+        *label = root_label[root];
     }
-    partition
+    labels
 }
 
 /// Shi's "uniform two-point crossover" — per the paper's own functional
@@ -134,15 +143,17 @@ mod tests {
             g.add_edge(a, b);
         }
         g.finalize();
-        let idx = NodeIndex::build(&g);
         // Genome forming exactly two triangle components (no use of the bridge).
         let genome: Genome = vec![1, 2, 0, 4, 5, 3];
-        let partition = decode(&genome, &idx);
-        assert_eq!(partition[&0], partition[&1]);
-        assert_eq!(partition[&1], partition[&2]);
-        assert_eq!(partition[&3], partition[&4]);
-        assert_eq!(partition[&4], partition[&5]);
-        assert_ne!(partition[&0], partition[&3]);
+        let labels = decode(&genome);
+        assert_eq!(labels[0], labels[1]);
+        assert_eq!(labels[1], labels[2]);
+        assert_eq!(labels[3], labels[4]);
+        assert_eq!(labels[4], labels[5]);
+        assert_ne!(labels[0], labels[3]);
+        // Compacted labels: ascending first-seen order starts at 0.
+        assert_eq!(labels[0], 0);
+        assert_eq!(labels[3], 1);
     }
 
     #[test]

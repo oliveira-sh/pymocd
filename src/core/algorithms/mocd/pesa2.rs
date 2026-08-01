@@ -6,17 +6,17 @@
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use super::locus::{self, Genome, NodeIndex};
-use crate::core::graph::{Graph, NodeId, Partition};
 use super::objectives::calculate_objectives;
+use crate::core::graph::Graph;
 use rand::RngExt;
-use rustc_hash::FxHashMap;
 
 /// Hyper-grid resolution per objective axis (Corne et al. 2001).
 pub const GRID_DIVISIONS: usize = 8;
 
 #[derive(Clone, Debug)]
 pub struct Solution {
-    pub partition: Partition,
+    /// Compacted dense community labels indexed by node position.
+    pub labels: Vec<i32>,
     /// `[intra, inter]` (Shi Eqs. 3.5/3.6), both minimised.
     pub objectives: Vec<f64>,
 }
@@ -45,8 +45,8 @@ struct Member {
 
 /// Bin every member's objective vector into one of `divisions^k` hyper-grid
 /// cells (each axis independently normalised to its current EP range) and
-/// return the per-cell occupancy ("squeeze factor").
-fn assign_cells(members: &mut [Member], divisions: usize) -> FxHashMap<usize, usize> {
+/// rebuild the flat per-cell occupancy ("squeeze factor") vector in place.
+fn assign_cells(members: &mut [Member], divisions: usize, occ: &mut Vec<usize>) {
     let obj_len = members[0].solution.objectives.len();
     let mut min_v = vec![f64::INFINITY; obj_len];
     let mut max_v = vec![f64::NEG_INFINITY; obj_len];
@@ -73,51 +73,50 @@ fn assign_cells(members: &mut [Member], divisions: usize) -> FxHashMap<usize, us
         m.cell = cell;
     }
 
-    let mut occ: FxHashMap<usize, usize> = FxHashMap::default();
+    occ.clear();
+    occ.resize(divisions.pow(obj_len as u32), 0);
     for m in members.iter() {
-        *occ.entry(m.cell).or_insert(0) += 1;
+        occ[m.cell] += 1;
     }
-    occ
 }
 
-/// Classic PESA-II binary tournament (Corne et al. 2001): sample two EP
-/// members uniformly at random, keep whichever sits in the less-crowded
-/// niche (lower squeeze factor); ties broken by a coin flip.
+/// True PESA-II selection (Corne et al. 2001): binary tournament over
+/// OCCUPIED hyper-grid cells — pick two random occupied cells, keep the one
+/// with the lower squeeze factor (ties: coin flip) — then return a uniformly
+/// random member of the winning cell.
 fn squeeze_tournament<'a>(
     ep: &'a [Member],
-    occ: &FxHashMap<usize, usize>,
+    occ: &[usize],
+    occupied: &[usize],
     rng: &mut impl rand::Rng,
 ) -> &'a Member {
-    let i = rng.random_range(0..ep.len());
-    let j = rng.random_range(0..ep.len());
-    let si = occ[&ep[i].cell];
-    let sj = occ[&ep[j].cell];
-    match si.cmp(&sj) {
-        std::cmp::Ordering::Less => &ep[i],
-        std::cmp::Ordering::Greater => &ep[j],
+    let ci = occupied[rng.random_range(0..occupied.len())];
+    let cj = occupied[rng.random_range(0..occupied.len())];
+    let cell = match occ[ci].cmp(&occ[cj]) {
+        std::cmp::Ordering::Less => ci,
+        std::cmp::Ordering::Greater => cj,
         std::cmp::Ordering::Equal => {
             if rng.random_bool(0.5) {
-                &ep[i]
+                ci
             } else {
-                &ep[j]
+                cj
             }
         }
-    }
+    };
+    let k = rng.random_range(0..occ[cell]);
+    ep.iter()
+        .filter(|m| m.cell == cell)
+        .nth(k)
+        .expect("occupancy out of sync with EP")
 }
 
-fn evaluate(
-    graph: &Graph,
-    idx: &NodeIndex,
-    degrees: &FxHashMap<NodeId, usize>,
-    genome: Genome,
-) -> Member {
-    let partition = locus::decode(&genome, idx);
-    // Single-threaded constraint: parallel=false.
-    let metrics = calculate_objectives(graph, &partition, degrees, false);
+fn evaluate(graph: &Graph, idx: &NodeIndex, degrees: &[usize], genome: Genome) -> Member {
+    let labels = locus::decode(&genome);
+    let metrics = calculate_objectives(graph, idx, &labels, degrees);
     Member {
         genome,
         solution: Solution {
-            partition,
+            labels,
             objectives: vec![metrics.intra, metrics.inter],
         },
         cell: 0,
@@ -139,13 +138,15 @@ fn insert_nondominated(ep: &mut Vec<Member>, candidate: Member) {
 /// among equally-crowded niches broken uniformly too), rebuilding the grid
 /// after every removal, until `|EP| == epsize`.
 fn truncate(ep: &mut Vec<Member>, epsize: usize, rng: &mut impl rand::Rng) {
+    let mut occ: Vec<usize> = Vec::new();
     while ep.len() > epsize {
-        let occ = assign_cells(ep, GRID_DIVISIONS);
-        let max_occ = *occ.values().max().unwrap();
+        assign_cells(ep, GRID_DIVISIONS, &mut occ);
+        let max_occ = *occ.iter().max().unwrap();
         let crowded_cells: Vec<usize> = occ
             .iter()
+            .enumerate()
             .filter(|&(_, &c)| c == max_occ)
-            .map(|(&cell, _)| cell)
+            .map(|(cell, _)| cell)
             .collect();
         let chosen_cell = crowded_cells[rng.random_range(0..crowded_cells.len())];
 
@@ -161,31 +162,33 @@ fn truncate(ep: &mut Vec<Member>, epsize: usize, rng: &mut impl rand::Rng) {
 }
 
 /// Run PESA-II for `num_gens` generations and return the final external
-/// archive (EP) as the Pareto front. `pop_size` maps to `ipsize` directly and
-/// to `epsize` via `min(pop_size, 100)` (Shi 2012 Table 1 caps epsize at 100).
+/// archive (EP) as the Pareto front. `pop_size` maps to `ipsize`; `ep_size`
+/// is the EP capacity (callers default it to `min(pop_size, EPSIZE_CAP)`).
 pub fn evolutionary_phase(
     graph: &Graph,
     debug_level: i8,
     num_gens: usize,
     pop_size: usize,
+    ep_size: usize,
     cross_rate: f64,
     mut_rate: f64,
-    degrees: &FxHashMap<NodeId, usize>,
 ) -> Vec<Solution> {
     if graph.nodes.is_empty() || graph.edges.is_empty() {
         return Vec::new();
     }
 
     let idx = NodeIndex::build(graph);
+    // Dense per-position degrees, built once per run at the boundary.
+    let degrees: Vec<usize> = idx.index_to_node.iter().map(|n| graph.degree(n)).collect();
     let ipsize = pop_size.max(1);
-    let epsize = pop_size.clamp(1, super::EPSIZE_CAP);
+    let epsize = ep_size.max(1);
 
     let mut rng = rand::rng();
 
     // Generation 0 (Corne et al. 2001 §3): random IP, then seed EP with its
     // non-dominated members.
     let initial_ip: Vec<Member> = (0..ipsize)
-        .map(|_| evaluate(graph, &idx, degrees, locus::random_genome(&idx, &mut rng)))
+        .map(|_| evaluate(graph, &idx, &degrees, locus::random_genome(&idx, &mut rng)))
         .collect();
 
     let mut ep: Vec<Member> = Vec::new();
@@ -196,22 +199,29 @@ pub fn evolutionary_phase(
         truncate(&mut ep, epsize, &mut rng);
     }
 
+    let mut occ: Vec<usize> = Vec::new();
     for generation in 0..num_gens {
         if ep.is_empty() {
             break;
         }
 
-        // Parents for the new IP are drawn from EP via squeeze-factor tournament.
-        let occ = assign_cells(&mut ep, GRID_DIVISIONS);
+        // Parents for the new IP are drawn from EP via region-based tournament.
+        assign_cells(&mut ep, GRID_DIVISIONS, &mut occ);
+        let occupied: Vec<usize> = occ
+            .iter()
+            .enumerate()
+            .filter(|&(_, &c)| c > 0)
+            .map(|(cell, _)| cell)
+            .collect();
 
         let mut new_ip: Vec<Genome> = Vec::with_capacity(ipsize);
         for _ in 0..ipsize {
             let mut child = if rng.random_bool(cross_rate) {
-                let p1 = squeeze_tournament(&ep, &occ, &mut rng);
-                let p2 = squeeze_tournament(&ep, &occ, &mut rng);
+                let p1 = squeeze_tournament(&ep, &occ, &occupied, &mut rng);
+                let p2 = squeeze_tournament(&ep, &occ, &occupied, &mut rng);
                 locus::uniform_crossover(&p1.genome, &p2.genome, &mut rng)
             } else {
-                let p1 = squeeze_tournament(&ep, &occ, &mut rng);
+                let p1 = squeeze_tournament(&ep, &occ, &occupied, &mut rng);
                 p1.genome.clone()
             };
             locus::mutate(&mut child, &idx, mut_rate, &mut rng);
@@ -220,7 +230,7 @@ pub fn evolutionary_phase(
 
         let evaluated: Vec<Member> = new_ip
             .into_iter()
-            .map(|g| evaluate(graph, &idx, degrees, g))
+            .map(|g| evaluate(graph, &idx, &degrees, g))
             .collect();
 
         for m in evaluated {
@@ -256,7 +266,7 @@ mod tests {
     #[test]
     fn archive_is_pareto_nondominated() {
         let g = two_triangles();
-        let front = evolutionary_phase(&g, 0, 30, 30, 0.6, 0.4, g.precompute_degrees());
+        let front = evolutionary_phase(&g, 0, 30, 30, 30, 0.6, 0.4);
         assert!(!front.is_empty());
         for (i, a) in front.iter().enumerate() {
             for (j, b) in front.iter().enumerate() {
@@ -270,7 +280,7 @@ mod tests {
     #[test]
     fn epsize_cap_respected() {
         let g = two_triangles();
-        let front = evolutionary_phase(&g, 0, 5, 200, 0.6, 0.4, g.precompute_degrees());
+        let front = evolutionary_phase(&g, 0, 5, 200, super::super::EPSIZE_CAP, 0.6, 0.4);
         assert!(front.len() <= super::super::EPSIZE_CAP);
     }
 }
