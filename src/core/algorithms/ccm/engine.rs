@@ -7,20 +7,20 @@
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use crate::core::graph::{CommunityId, Graph, NodeId, Partition};
 use rand::{Rng, RngExt, rng};
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::cmp::Ordering;
+use std::collections::HashSet;
 
 use super::locus::{self, Genome};
 
-/// One population member. Objectives use the caller's sign convention — CCM
-/// stores `(-CS, -CF, -Q)` so dominance is pure minimization. Rank is 1-based
-/// (1 = non-dominated).
+/// One population member. `labels` is the decoded partition as community
+/// labels indexed by node position. Objectives use the caller's sign
+/// convention — CCM stores `(-CS, -CF, -Q)` so dominance is pure minimization.
+/// Rank is 1-based (1 = non-dominated).
 #[derive(Clone)]
 pub struct Individual {
     pub genome: Genome,
-    pub partition: Partition,
+    pub labels: Vec<i32>,
     pub objectives: Vec<f64>,
     pub rank: usize,
 }
@@ -41,15 +41,11 @@ impl Individual {
     }
 }
 
-fn new_individual(
-    nodes: &[NodeId],
-    index_of: &FxHashMap<NodeId, usize>,
-    genome: Genome,
-) -> Individual {
-    let partition = locus::decode(nodes, index_of, &genome);
+fn new_individual(genome: Genome) -> Individual {
+    let labels = locus::decode(&genome);
     Individual {
         genome,
-        partition,
+        labels,
         objectives: Vec::new(),
         rank: usize::MAX,
     }
@@ -96,38 +92,19 @@ pub fn fast_non_dominated_sort(pop: &mut [Individual]) {
     }
 }
 
-/// Binary tournament mating selection: lower rank wins; ties broken randomly
-/// (NSGA-III has no crowding distance to tie-break with).
-fn binary_tournament(pop: &[Individual], rng: &mut impl Rng) -> usize {
-    let i = rng.random_range(0..pop.len());
-    let j = rng.random_range(0..pop.len());
-    match pop[i].rank.cmp(&pop[j].rank) {
-        Ordering::Less => i,
-        Ordering::Greater => j,
-        Ordering::Equal => {
-            if rng.random_bool(0.5) {
-                i
-            } else {
-                j
-            }
-        }
-    }
-}
-
-/// Relabel communities by first-seen order over `nodes` so that
+/// Relabel communities by first-seen order over positions so that
 /// permutation-equivalent partitions compare equal.
-fn canonical_labels(nodes: &[NodeId], partition: &Partition) -> Vec<i32> {
+fn canonical_labels(labels: &[i32]) -> Vec<i32> {
     let mut next_id = 0i32;
-    let mut remap: FxHashMap<CommunityId, i32> = FxHashMap::default();
-    nodes
+    let mut remap = vec![-1i32; labels.len()]; // labels are root positions in 0..n
+    labels
         .iter()
-        .map(|node| {
-            let c = partition[node];
-            *remap.entry(c).or_insert_with(|| {
-                let id = next_id;
+        .map(|&c| {
+            if remap[c as usize] == -1 {
+                remap[c as usize] = next_id;
                 next_id += 1;
-                id
-            })
+            }
+            remap[c as usize]
         })
         .collect()
 }
@@ -137,23 +114,21 @@ fn canonical_labels(nodes: &[NodeId], partition: &Partition) -> Vec<i32> {
 /// Replacements get a fresh random genome and are re-evaluated immediately.
 fn apply_customizations<F>(
     pop: &mut [Individual],
-    graph: &Graph,
-    nodes: &[NodeId],
-    index_of: &FxHashMap<NodeId, usize>,
+    neighbor_pos: &[Vec<usize>],
     rng: &mut impl Rng,
     evaluate: &mut F,
 ) where
-    F: FnMut(&Partition) -> Vec<f64>,
+    F: FnMut(&[i32]) -> Vec<f64>,
 {
     let mut replace = |ind: &mut Individual| {
-        *ind = new_individual(nodes, index_of, locus::random_genome(graph, nodes, rng));
-        ind.objectives = evaluate(&ind.partition);
+        *ind = new_individual(locus::random_genome(neighbor_pos, rng));
+        ind.objectives = evaluate(&ind.labels);
     };
 
     // (a) duplicate-permutation filter.
-    let mut seen: FxHashSet<Vec<i32>> = FxHashSet::default();
+    let mut seen: HashSet<Vec<i32>> = HashSet::new();
     for ind in pop.iter_mut() {
-        let canon = canonical_labels(nodes, &ind.partition);
+        let canon = canonical_labels(&ind.labels);
         if !seen.insert(canon) {
             replace(ind);
         }
@@ -161,21 +136,19 @@ fn apply_customizations<F>(
 
     // (b) single-community exclusion.
     for ind in pop.iter_mut() {
-        let distinct: FxHashSet<CommunityId> = ind.partition.values().copied().collect();
-        if distinct.len() == 1 {
+        if let Some(&first) = ind.labels.first()
+            && ind.labels.iter().all(|&c| c == first)
+        {
             replace(ind);
         }
     }
 }
 
-/// CCM's self-contained NSGA-III generational loop. `evaluate` maps a decoded
-/// partition to its objective vector (caller's min/max sign convention).
+/// CCM's self-contained NSGA-III generational loop. `evaluate` maps decoded
+/// labels to their objective vector (caller's min/max sign convention).
 /// Returns the final, rank-sorted population.
-#[allow(clippy::too_many_arguments)]
 pub fn evolve<F>(
-    graph: &Graph,
-    nodes: &[NodeId],
-    index_of: &FxHashMap<NodeId, usize>,
+    neighbor_pos: &[Vec<usize>],
     pop_size: usize,
     num_gens: usize,
     cross_rate: f64,
@@ -184,15 +157,15 @@ pub fn evolve<F>(
     mut evaluate: F,
 ) -> Vec<Individual>
 where
-    F: FnMut(&Partition) -> Vec<f64>,
+    F: FnMut(&[i32]) -> Vec<f64>,
 {
     let mut r = rng();
 
     let mut pop: Vec<Individual> = (0..pop_size)
-        .map(|_| new_individual(nodes, index_of, locus::random_genome(graph, nodes, &mut r)))
+        .map(|_| new_individual(locus::random_genome(neighbor_pos, &mut r)))
         .collect();
     for ind in pop.iter_mut() {
-        ind.objectives = evaluate(&ind.partition);
+        ind.objectives = evaluate(&ind.labels);
     }
     fast_non_dominated_sort(&mut pop);
 
@@ -204,28 +177,31 @@ where
         // parent instead of crossing over.
         let mut offspring: Vec<Individual> = Vec::with_capacity(pop_size);
         for _ in 0..pop_size {
-            let pa = binary_tournament(&pop, &mut r);
-            let pb = binary_tournament(&pop, &mut r);
+            // Uniform random parents: pymoo's NSGA-III (which the paper adapted)
+            // uses no fitness-based mating selection for unconstrained problems
+            // (Deb & Jain 2014).
+            let pa = r.random_range(0..pop.len());
+            let pb = r.random_range(0..pop.len());
             let mut child_genome = if r.random_bool(cross_rate) {
                 locus::uniform_crossover(&pop[pa].genome, &pop[pb].genome, &mut r)
             } else {
                 let pick = if r.random_bool(0.5) { pa } else { pb };
                 pop[pick].genome.clone()
             };
-            locus::mutate(&mut child_genome, graph, nodes, mut_rate, &mut r);
-            offspring.push(new_individual(nodes, index_of, child_genome));
+            locus::mutate(&mut child_genome, neighbor_pos, mut_rate, &mut r);
+            offspring.push(new_individual(child_genome));
         }
         for ind in offspring.iter_mut() {
-            ind.objectives = evaluate(&ind.partition);
+            ind.objectives = evaluate(&ind.labels);
         }
         let mut combined = pop;
         combined.extend(offspring);
 
         pop = environmental_selection(combined, pop_size, &ref_points, &mut r);
 
-        // Re-rank after customizations: mating selection reads `rank`, which
-        // must reflect any individuals replaced just now.
-        apply_customizations(&mut pop, graph, nodes, index_of, &mut r, &mut evaluate);
+        // Re-rank after customizations so `rank` reflects any individuals
+        // replaced just now.
+        apply_customizations(&mut pop, neighbor_pos, &mut r, &mut evaluate);
         fast_non_dominated_sort(&mut pop);
     }
 
@@ -296,11 +272,14 @@ fn environmental_selection(
 
 /// Move the individuals at `indices` out of `combined`, rank-sorted.
 fn gather(combined: Vec<Individual>, indices: &[usize]) -> Vec<Individual> {
-    let keep: FxHashSet<usize> = indices.iter().copied().collect();
+    let mut keep = vec![false; combined.len()];
+    for &i in indices {
+        keep[i] = true;
+    }
     let mut out: Vec<Individual> = combined
         .into_iter()
         .enumerate()
-        .filter_map(|(i, ind)| if keep.contains(&i) { Some(ind) } else { None })
+        .filter_map(|(i, ind)| if keep[i] { Some(ind) } else { None })
         .collect();
     out.sort_by_key(|i| i.rank);
     out
@@ -568,7 +547,7 @@ mod tests {
 
     #[test]
     fn dominates_minimization_convention() {
-        let mut a = new_individual(&[0], &build_index_for_test(&[0]), vec![0]);
+        let mut a = new_individual(vec![0]);
         let mut b = a.clone();
         a.objectives = vec![-1.0, -1.0];
         b.objectives = vec![-1.0, -0.5];
@@ -576,17 +555,12 @@ mod tests {
         assert!(!b.dominates(&a));
     }
 
-    fn build_index_for_test(nodes: &[NodeId]) -> FxHashMap<NodeId, usize> {
-        locus::build_index(nodes)
-    }
-
     #[test]
     fn fast_non_dominated_sort_ranks() {
-        let idx = build_index_for_test(&[0]);
         let mut pop: Vec<Individual> = vec![
-            new_individual(&[0], &idx, vec![0]),
-            new_individual(&[0], &idx, vec![0]),
-            new_individual(&[0], &idx, vec![0]),
+            new_individual(vec![0]),
+            new_individual(vec![0]),
+            new_individual(vec![0]),
         ];
         pop[0].objectives = vec![0.0, 0.0];
         pop[1].objectives = vec![1.0, 1.0];
@@ -595,5 +569,10 @@ mod tests {
         assert_eq!(pop[0].rank, 1);
         assert_eq!(pop[1].rank, 2);
         assert_eq!(pop[2].rank, 3);
+    }
+
+    #[test]
+    fn canonical_labels_first_seen_order() {
+        assert_eq!(canonical_labels(&[3, 3, 0, 0, 3]), vec![0, 0, 1, 1, 0]);
     }
 }
