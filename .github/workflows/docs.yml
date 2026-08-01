@@ -15,58 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  benchmarks:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: res/requirements.txt
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Generate type stubs from Rust sources
-        run: cargo run --no-default-features --bin stub_gen
-
-      - name: Install benchmark dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r res/requirements.txt
-
-      - name: Build and install pymocd
-        run: pip install .
-
-      - name: Run bounded benchmark suite
-        working-directory: benchmarks
-        env:
-          BENCHMARK_RUN_ID: docs
-          MPLBACKEND: Agg
-          PYMOCD_BENCH_RUNS: "1"
-          PYMOCD_BENCH_MUS: "0.1,0.3,0.5,0.7"
-          PYMOCD_BENCH_NODES: "500"
-          PYMOCD_BENCH_SKIP_NODES: "1"
-        run: |
-          python -m _exp_real_net
-          python -m _exp_synt_net
-          python -m alg_params.num_generations
-          python -m alg_params.pareto_front
-
-      - name: Upload benchmark results
-        uses: actions/upload-artifact@v7
-        with:
-          name: benchmark-results
-          path: benchmarks/results/
-          if-no-files-found: error
-
   deploy:
-    needs: benchmarks
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -87,57 +36,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Generate type stubs from Rust sources
-        run: cargo run --no-default-features --bin stub_gen
+        run: cargo run --bin stub_gen
 
       - name: Install docs dependencies
         run: pip install -r docs/requirements.txt
 
-      - name: Download benchmark results
-        uses: actions/download-artifact@v8
-        with:
-          name: benchmark-results
-          path: benchmark-results
-
-      - name: Copy benchmark plots into docs tree
-        run: |
-          run_dir=$(find benchmark-results -mindepth 1 -maxdepth 1 -type d -print -quit)
-          test -n "$run_dir"
-          dest=docs/assets/benchmarks
-          mkdir -p "$dest"
-          cp -r "$run_dir/real_nets" "$dest/"
-          cp -r "$run_dir/mu" "$dest/"
-          cp "$run_dir"/lfr_mu.csv "$run_dir"/lfr_mu_bk.csv "$dest/"
-          cp "$run_dir"/community_evolution_overview.* "$dest/"
-          cp "$run_dir"/communities_gen_*.* "$dest/"
-          cp "$run_dir"/pareto_frontier_analysis.* "$dest/"
-          cp "$run_dir"/pareto_front_plot.* "$dest/"
-          for f in \
-            real_nets/real_nets.csv \
-            real_nets/real_nets_modularity.svg \
-            real_nets/real_nets_nmi.svg \
-            real_nets/real_nets_ami.svg \
-            real_nets/real_nets_time.svg \
-            lfr_mu.csv \
-            mu/nmi_plot.svg \
-            mu/ami_plot.svg \
-            mu/modularity_plot.svg \
-            mu/time_plot.svg \
-            mu/comparison_matrix.svg \
-            mu/performance_scorecard.svg \
-            community_evolution_overview.svg \
-            communities_gen_10.svg \
-            communities_gen_30.svg \
-            communities_gen_50.svg \
-            communities_gen_80.svg \
-            communities_gen_100.svg \
-            communities_gen_110.svg \
-            pareto_frontier_analysis.svg \
-            pareto_front_plot.svg; do
-            test -f "$dest/$f"
-          done
-
       - name: Build site
-        run: mkdocs build
+        run: mkdocs build --strict
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6

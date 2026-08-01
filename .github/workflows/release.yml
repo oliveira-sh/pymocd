@@ -48,7 +48,7 @@ jobs:
 
       - name: Generate type stubs
         run: |
-          cargo run --no-default-features --bin stub_gen
+          cargo run --bin stub_gen
 
       - name: Build wheels
         run: |
