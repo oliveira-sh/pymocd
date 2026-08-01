@@ -31,6 +31,9 @@ fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(scale_fn, m)?)?;
 
     // detectors -> pareto frontier
+    m.add_function(wrap_pyfunction!(ccm_fronts_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(krm_fronts_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(moga_net_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mmcomo_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(scale_fronts_fn, m)?)?;
 
