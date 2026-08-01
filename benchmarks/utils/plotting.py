@@ -158,10 +158,14 @@ def _prepare_results_frame(results: Union[Dict, pd.DataFrame]) -> pd.DataFrame:
 
 
 def infer_x_var(df: pd.DataFrame) -> str:
-    if "mu" in df.columns:
-        return "mu"
-    if "nodes" in df.columns:
-        return "nodes"
+    # Both columns are always present; pick the one that actually varies, or the
+    # |n| sweep (constant mu, many sizes) would be plotted against mu.
+    for column in ("mu", "nodes"):
+        if column in df.columns and df[column].nunique() > 1:
+            return column
+    for column in ("mu", "nodes"):
+        if column in df.columns:
+            return column
     raise ValueError("Neither 'mu' nor 'nodes' found in benchmark results")
 
 

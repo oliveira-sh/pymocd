@@ -5,7 +5,18 @@ from typing import Callable
 ALGORITHM_REGISTRY = {}
 
 
-def algorithm(name: str, needs_conversion: bool = True, parallel: bool = True):
+def algorithm(
+    name: str,
+    needs_conversion: bool = True,
+    parallel: bool = True,
+    max_nodes: int | None = None,
+):
+    """Register a detector.
+
+    ``max_nodes`` caps the graph sizes the detector is asked to run on; sweeps
+    silently skip larger graphs instead of hanging. ``None`` means uncapped.
+    """
+
     def decorator(func: Callable):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -15,6 +26,7 @@ def algorithm(name: str, needs_conversion: bool = True, parallel: bool = True):
             "function": wrapper,
             "needs_conversion": needs_conversion,
             "parallel": parallel,
+            "max_nodes": max_nodes,
         }
         return wrapper
 
