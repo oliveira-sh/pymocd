@@ -211,8 +211,21 @@ pub fn krm_fn(
     ))
 }
 
-/// The rank-1 Pareto front ``ccm`` selects from, as a list of partitions —
-/// enables the paper's best-NMI/best-Q-over-front reporting protocol.
+/// The rank-1 Pareto front ``ccm`` selects from, as a list of partitions.
+///
+/// ``ccm`` returns only the max-modularity member; Shaik et al. report the
+/// best-NMI *and* best-modularity solutions of the front, so reproducing their
+/// Tables 1–2 needs the whole candidate set.
+///
+/// Args:
+///     graph: networkx.Graph or igraph.Graph (integer node ids).
+///     r: Community Score power-mean exponent (Shaik default 1).
+///     alpha: Community Fitness exponent (Shaik default 1).
+///     divisions: Das–Dennis reference-point granularity ``p`` (default 12 →
+///         91 reference points for the 3 objectives).
+///
+/// Returns:
+///     ``list[dict[node, community]]``. Isolated nodes get community ``-1``.
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(name = "ccm_fronts", signature = (graph, pop_size = ccm::DEFAULT_POP_SIZE, num_gens = ccm::DEFAULT_NUM_GENS, cross_rate = ccm::DEFAULT_CROSS_RATE, mut_rate = ccm::DEFAULT_MUT_RATE, r = ccm::DEFAULT_R, alpha = ccm::DEFAULT_ALPHA, divisions = ccm::DEFAULT_DIVISIONS))]
@@ -233,8 +246,19 @@ pub fn ccm_fronts_fn(
     ))
 }
 
-/// The rank-1 Pareto front ``krm`` selects from, as a list of partitions —
-/// enables the paper's best-NMI/best-Q-over-front reporting protocol.
+/// The rank-1 Pareto front ``krm`` selects from, as a list of partitions.
+///
+/// ``krm`` returns only the max-modularity member; Shaik et al. report the
+/// best-NMI *and* best-modularity solutions of the front, so reproducing their
+/// Tables 1–2 needs the whole candidate set.
+///
+/// Args:
+///     graph: networkx.Graph or igraph.Graph (integer node ids).
+///     divisions: Das–Dennis reference-point granularity ``p`` (default 12 →
+///         91 reference points for the 3 objectives).
+///
+/// Returns:
+///     ``list[dict[node, community]]``. Isolated nodes get community ``-1``.
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(name = "krm_fronts", signature = (graph, pop_size = krm::DEFAULT_POP_SIZE, num_gens = krm::DEFAULT_NUM_GENS, cross_rate = krm::DEFAULT_CROSS_RATE, mut_rate = krm::DEFAULT_MUT_RATE, divisions = krm::DEFAULT_DIVISIONS))]
@@ -252,8 +276,20 @@ pub fn krm_fronts_fn(
     ))
 }
 
-/// The rank-1 Pareto front ``moga_net`` selects from, as a list of partitions —
-/// enables Pizzuti's Table 1 (best-NMI-over-front) reporting protocol.
+/// The rank-1 Pareto front ``moga_net`` selects from, as a list of partitions.
+///
+/// ``moga_net`` returns only the max-modularity member; Pizzuti's Table 1
+/// reports the best-NMI solution of the front, so reproducing it needs the
+/// whole candidate set.
+///
+/// Args:
+///     graph: networkx.Graph or igraph.Graph (integer node ids).
+///     r: Community Score power-mean exponent. The paper never fixes it; 1.5
+///         reproduces its real-world tables.
+///     alpha: Community Fitness exponent (Pizzuti default 1).
+///
+/// Returns:
+///     ``list[dict[node, community]]``. Isolated nodes get community ``-1``.
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(name = "moga_net_fronts", signature = (graph, pop_size = moganet::DEFAULT_POP_SIZE, num_gens = moganet::DEFAULT_NUM_GENS, cross_rate = moganet::DEFAULT_CROSS_RATE, mut_rate = moganet::DEFAULT_MUT_RATE, r = moganet::DEFAULT_R, alpha = moganet::DEFAULT_ALPHA))]
