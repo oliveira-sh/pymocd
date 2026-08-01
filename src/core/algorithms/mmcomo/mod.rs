@@ -225,11 +225,18 @@ fn influence(
     let n = g.n;
     let mut smv = vec![vec![0.0f64; n]; n];
     for e in &elites {
-        let mut groups: HashMap<i32, Vec<usize>> = HashMap::new();
+        // first-seen Vec compaction (order-insensitive: each SM_v cell gets one vote per elite)
+        let mut compact: Vec<i32> = vec![-1; n];
+        let mut groups: Vec<Vec<usize>> = Vec::new();
         for (i, &lab) in e.labels.iter().enumerate() {
-            groups.entry(lab).or_default().push(i);
+            let lab = lab as usize;
+            if compact[lab] < 0 {
+                compact[lab] = groups.len() as i32;
+                groups.push(Vec::new());
+            }
+            groups[compact[lab] as usize].push(i);
         }
-        for members in groups.values() {
+        for members in &groups {
             for &a in members {
                 for &b in members {
                     smv[a][b] += 1.0 / pf;
