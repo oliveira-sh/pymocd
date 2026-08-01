@@ -8,16 +8,15 @@
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use crate::core::graph::{Graph, Partition};
-use crate::core::metrics::modularity::modularity;
 use crate::core::graph::normalize_community_ids;
+use crate::core::graph::{Graph, Partition};
 use std::cmp::Ordering;
 
 mod defaults;
 mod individual;
 mod locus;
-mod objectives;
 mod nsga3;
+mod objectives;
 mod operators;
 
 pub use defaults::*;
@@ -45,12 +44,50 @@ pub fn krm(
     let best = pop
         .iter()
         .filter(|ind| ind.rank == 1)
-        .map(|ind| (modularity(graph, &ind.partition), ind))
+        // objectives[2] holds −Q from the in-module labels evaluator.
+        .map(|ind| (-ind.objectives[2], ind))
         .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal))
         .expect("empty Pareto front")
         .1;
 
-    normalize_community_ids(graph, best.partition.clone())
+    // Labels -> shared Partition only here, at the module boundary.
+    let partition: Partition = locus
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(p, &node)| (node, best.labels[p]))
+        .collect();
+    normalize_community_ids(graph, partition)
+}
+
+/// The rank-1 Pareto front `krm` selects from, as normalized partitions —
+/// the paper's Table 1/2 protocol (best-NMI / best-Q over the front) needs it.
+pub fn krm_fronts(
+    graph: &Graph,
+    pop_size: usize,
+    num_gens: usize,
+    cross_rate: f64,
+    mut_rate: f64,
+    divisions: usize,
+) -> Vec<Partition> {
+    let locus = Locus::build(graph);
+    let mut pop = nsga3::run(
+        graph, &locus, pop_size, num_gens, cross_rate, mut_rate, divisions,
+    );
+
+    fast_non_dominated_sort(&mut pop);
+    pop.iter()
+        .filter(|ind| ind.rank == 1)
+        .map(|ind| {
+            let partition: Partition = locus
+                .nodes
+                .iter()
+                .enumerate()
+                .map(|(p, &node)| (node, ind.labels[p]))
+                .collect();
+            normalize_community_ids(graph, partition)
+        })
+        .collect()
 }
 
 #[cfg(test)]

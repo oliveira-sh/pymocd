@@ -9,23 +9,22 @@
 
 use super::individual::{Individual, fast_non_dominated_sort};
 use super::locus::{Genome, Locus};
-use super::operators::{binary_tournament, crossover, mutate};
+use super::objectives::{kkm_ratiocut, modularity};
+use super::operators::{crossover, mutate, random_parent};
 use crate::core::graph::Graph;
-use super::objectives::kkm_ratiocut;
-use crate::core::metrics::modularity::modularity;
 use rand::rngs::ThreadRng;
 use rand::{RngExt, rng}; // rand 0.10: random_range/random_bool live on RngExt
-use rustc_hash::FxHashSet;
 use std::cmp::Ordering;
+use std::collections::HashSet;
 
 fn make_individual(graph: &Graph, locus: &Locus, genome: Genome) -> Individual {
-    let partition = locus.decode(&genome);
-    let (kkm, rc) = kkm_ratiocut(graph, &partition);
-    let q = modularity(graph, &partition);
+    let labels = locus.decode(&genome);
+    let (kkm, rc) = kkm_ratiocut(locus, &labels);
+    let q = modularity(graph, locus, &labels);
     // KKM & RC minimized (fed as-is); Q maximized -> fed negated.
     Individual {
         genome,
-        partition,
+        labels,
         objectives: vec![kkm, rc, -q],
         rank: usize::MAX,
     }
@@ -40,15 +39,15 @@ fn apply_paper_customizations(
     pop: &mut [Individual],
     rng: &mut ThreadRng,
 ) {
-    let mut seen: FxHashSet<Vec<i32>> = FxHashSet::default();
+    let mut seen: HashSet<Vec<i32>> = HashSet::new();
     for ind in pop.iter_mut() {
-        let canon = locus.canonical_labels(&ind.partition);
+        let canon = locus.canonical_labels(&ind.labels);
         if !seen.insert(canon) {
             *ind = make_individual(graph, locus, locus.random_genome(rng));
         }
     }
     for ind in pop.iter_mut() {
-        if locus.is_single_community(&ind.partition) {
+        if locus.is_single_community(&ind.labels) {
             *ind = make_individual(graph, locus, locus.random_genome(rng));
         }
     }
@@ -78,8 +77,8 @@ pub fn run(
     for _generation in 0..num_gens {
         let mut offspring: Vec<Individual> = Vec::with_capacity(pop_size);
         for _ in 0..pop_size {
-            let pa = binary_tournament(&pop, &mut rng);
-            let pb = binary_tournament(&pop, &mut rng);
+            let pa = random_parent(pop.len(), &mut rng);
+            let pb = random_parent(pop.len(), &mut rng);
             let mut child_genome =
                 crossover(&pop[pa].genome, &pop[pb].genome, cross_rate, &mut rng);
             mutate(&mut child_genome, locus, mut_rate, &mut rng);
@@ -182,7 +181,8 @@ fn niche_select(
     let m = combined[st_indices[0]].objectives.len();
 
     // Normalize (Alg. 2): translate by the ideal point, then scale by the
-    // hyperplane intercepts.
+    // hyperplane intercepts. Note: ideal/extreme points are recomputed fresh
+    // per call; pymoo persists them across generations (known minor difference).
     let mut ideal = vec![f64::INFINITY; m];
     for &idx in st_indices {
         for (j, id) in ideal.iter_mut().enumerate() {
