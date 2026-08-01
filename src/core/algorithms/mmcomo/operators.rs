@@ -1,7 +1,6 @@
 use super::*;
 
 use rand::{Rng, RngExt};
-use std::collections::HashMap;
 
 // Binary tournament: lower Pareto rank wins, ties broken by larger crowding.
 #[inline]
@@ -116,10 +115,14 @@ pub fn local_search(g: &Graph, labels: &mut Labels) {
         return;
     }
 
-    let mut tot: HashMap<i32, f64> = HashMap::new();
+    // Labels are node-index-valued (< n), so accumulators index directly by label.
+    let mut tot: Vec<f64> = vec![0.0; n];
     for (&lab, &d) in labels.iter().zip(&g.deg) {
-        *tot.entry(lab).or_insert(0.0) += d;
+        tot[lab as usize] += d;
     }
+
+    let mut w: Vec<f64> = vec![0.0; n]; // candidate-community edge counts, reset via `cand`
+    let mut cand: Vec<usize> = Vec::new();
 
     let mut improved = true;
     let mut sweeps = 0usize;
@@ -132,37 +135,44 @@ pub fn local_search(g: &Graph, labels: &mut Labels) {
             if ki == 0.0 {
                 continue;
             }
-            let ci = labels[i];
+            let ci = labels[i] as usize;
 
-            let mut w: HashMap<i32, f64> = HashMap::new();
+            cand.clear();
             for &t in &g.adj[i] {
-                *w.entry(labels[t]).or_insert(0.0) += 1.0;
+                let c = labels[t] as usize;
+                if w[c] == 0.0 {
+                    cand.push(c);
+                }
+                w[c] += 1.0;
             }
 
             // remove i from its own community before scoring candidates
-            if let Some(s) = tot.get_mut(&ci) {
-                *s -= ki;
-            }
+            tot[ci] -= ki;
 
             let mut best_c = ci;
-            let mut best_g =
-                w.get(&ci).copied().unwrap_or(0.0) - tot.get(&ci).copied().unwrap_or(0.0) * ki / m2;
+            let mut best_g = w[ci] - tot[ci] * ki / m2;
 
-            for (&c, &wc) in w.iter() {
+            // ascending candidate order: equal-gain ties resolve to the lowest community id
+            cand.sort_unstable();
+            for &c in &cand {
                 if c == ci {
                     continue;
                 }
-                let g_move = wc - tot.get(&c).copied().unwrap_or(0.0) * ki / m2;
+                let g_move = w[c] - tot[c] * ki / m2;
                 if g_move > best_g + 1e-12 {
                     best_g = g_move;
                     best_c = c;
                 }
             }
 
-            *tot.entry(best_c).or_insert(0.0) += ki;
+            tot[best_c] += ki;
             if best_c != ci {
-                labels[i] = best_c;
+                labels[i] = best_c as i32;
                 improved = true;
+            }
+
+            for &c in &cand {
+                w[c] = 0.0;
             }
         }
     }

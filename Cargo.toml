@@ -10,7 +10,10 @@ name = "pymocd"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["extension-module"]
+# Deliberately NOT in `default`: pyo3/extension-module omits libpython linkage,
+# so with it on by default every `cargo build`/`test`/`run` fails to link the
+# stub_gen binary. Maturin turns it on for wheels via [tool.maturin] features.
+default = []
 extension-module = ["pyo3/extension-module"]
 
 [profile.release]

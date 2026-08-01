@@ -86,7 +86,6 @@ nav:
   - Home: index.md
   - Getting started: getting-started.md
   - Algorithms: algorithms.md
-  - Benchmarks: benchmarks.md
   - Examples:
       - Plotting communities: examples/plotting.md
       - Custom objectives: examples/custom-objectives.md

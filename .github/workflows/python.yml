@@ -25,7 +25,7 @@ jobs:
         run: python -m pip install --upgrade pip
 
       - name: Generate type stubs
-        run: cargo run --no-default-features --bin stub_gen
+        run: cargo run --bin stub_gen
 
       - name: Dependencies
         run: |

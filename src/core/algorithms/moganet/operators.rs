@@ -4,7 +4,7 @@
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use super::locus::{Genome, Locus};
-use rand::{Rng, RngExt}; // rand 0.10: random_range/random_bool live on RngExt
+use rand::{Rng, RngExt}; // rand 0.10: random_bool lives on RngExt
 
 /// Uniform crossover (Pizzuti 2009, Sec. 4): per-gene independent coin flip;
 /// no repair needed since every gene value is copied verbatim from one of
@@ -17,13 +17,12 @@ pub fn crossover(a: &Genome, b: &Genome, rng: &mut impl Rng) -> Genome {
 }
 
 /// Repaired mutation (Pizzuti 2009, Sec. 4): each gene independently, with
-/// probability `mut_rate`, is resampled uniformly from `{node itself} ∪
-/// neighbours(node)` -- never produces an unsafe locus value.
+/// probability `mut_rate`, is resampled uniformly from neighbours(node) --
+/// "restricted to the neighbors of gene i"; self only for isolated nodes.
 pub fn mutate(genome: &mut Genome, locus: &Locus, mut_rate: f64, rng: &mut impl Rng) {
     for (p, gene) in genome.iter_mut().enumerate() {
         if rng.random_bool(mut_rate) {
-            let cands = &locus.candidates[p];
-            *gene = cands[rng.random_range(0..cands.len())];
+            *gene = locus.random_allele(p, rng);
         }
     }
 }

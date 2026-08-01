@@ -6,12 +6,12 @@
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use super::locus::Genome;
-use crate::core::graph::Partition;
 
 #[derive(Clone, Debug)]
 pub struct Individual {
     pub genome: Genome,
-    pub partition: Partition,
+    /// Decoded compact community labels, indexed by node position.
+    pub labels: Vec<i32>,
     /// `[-CS, -CF]`, both minimized.
     pub objectives: Vec<f64>,
     pub rank: usize,

@@ -1,7 +1,5 @@
 use super::*;
 
-use std::collections::HashMap;
-
 /// Eq.1 — KKM/RC bi-objective (Shi 2012, Gong), both minimized.
 ///
 /// ```text
@@ -10,21 +8,30 @@ use std::collections::HashMap;
 /// ```
 /// `L(V_i,V_i)` = twice the internal-edge count; cut = Σ deg − L(V_i,V_i).
 pub fn kkm_rc(g: &Graph, labels: &Labels) -> (f64, f64) {
-    let mut size: HashMap<i32, f64> = HashMap::new();
-    let mut l_in: HashMap<i32, f64> = HashMap::new();
-    let mut deg_sum: HashMap<i32, f64> = HashMap::new();
+    // Labels are node-index-valued (< n); compact first-seen over ascending v for deterministic sums.
+    let mut compact: Vec<i32> = vec![-1; g.n];
+    let mut size: Vec<f64> = Vec::new();
+    let mut l_in: Vec<f64> = Vec::new();
+    let mut deg_sum: Vec<f64> = Vec::new();
 
     for v in 0..g.n {
-        let c = labels[v];
-        *size.entry(c).or_insert(0.0) += 1.0;
-        *deg_sum.entry(c).or_insert(0.0) += g.deg[v];
+        let lab = labels[v] as usize;
+        if compact[lab] < 0 {
+            compact[lab] = size.len() as i32;
+            size.push(0.0);
+            l_in.push(0.0);
+            deg_sum.push(0.0);
+        }
+        let c = compact[lab] as usize;
+        size[c] += 1.0;
+        deg_sum[c] += g.deg[v];
         let mut internal = 0.0;
         for &u in &g.adj[v] {
-            if labels[u] == c {
+            if labels[u] == labels[v] {
                 internal += 1.0;
             }
         }
-        *l_in.entry(c).or_insert(0.0) += internal;
+        l_in[c] += internal;
     }
 
     let n = g.n as f64;
@@ -32,14 +39,10 @@ pub fn kkm_rc(g: &Graph, labels: &Labels) -> (f64, f64) {
 
     let mut kkm_internal = 0.0;
     let mut rc = 0.0;
-    for (c, &sz) in size.iter() {
-        if sz == 0.0 {
-            continue;
-        }
-        let li = l_in[c];
-        let ds = deg_sum[c];
-        kkm_internal += li / sz;
-        rc += (ds - li) / sz;
+    for c in 0..size.len() {
+        let sz = size[c]; // every compacted id has ≥1 member
+        kkm_internal += l_in[c] / sz;
+        rc += (deg_sum[c] - l_in[c]) / sz;
     }
 
     (2.0 * (n - k) - kkm_internal, rc)
@@ -53,25 +56,33 @@ pub fn modularity(g: &Graph, labels: &Labels) -> f64 {
     }
     let m = m2 / 2.0;
 
-    let mut l_in: HashMap<i32, f64> = HashMap::new();
-    let mut deg_sum: HashMap<i32, f64> = HashMap::new();
+    // Labels are node-index-valued (< n); compact first-seen over ascending v for deterministic sums.
+    let mut compact: Vec<i32> = vec![-1; g.n];
+    let mut l_in: Vec<f64> = Vec::new();
+    let mut deg_sum: Vec<f64> = Vec::new();
 
     for v in 0..g.n {
-        let c = labels[v];
-        *deg_sum.entry(c).or_insert(0.0) += g.deg[v];
+        let lab = labels[v] as usize;
+        if compact[lab] < 0 {
+            compact[lab] = l_in.len() as i32;
+            l_in.push(0.0);
+            deg_sum.push(0.0);
+        }
+        let c = compact[lab] as usize;
+        deg_sum[c] += g.deg[v];
         let mut internal = 0.0;
         for &u in &g.adj[v] {
-            if labels[u] == c {
+            if labels[u] == labels[v] {
                 internal += 1.0;
             }
         }
-        *l_in.entry(c).or_insert(0.0) += internal;
+        l_in[c] += internal;
     }
 
     let mut q = 0.0;
-    for (c, &ds) in deg_sum.iter() {
+    for c in 0..deg_sum.len() {
         let lc = l_in[c] / 2.0; // l_in counts each internal edge twice
-        q += lc / m - (ds / m2).powi(2);
+        q += lc / m - (deg_sum[c] / m2).powi(2);
     }
     q
 }

@@ -60,6 +60,7 @@ Issues = "https://github.com/oliveira-sh/pymocd/issues"
 
 [tool.maturin]
 module-name = "pymocd"
+features = ["pyo3/extension-module"]
 include = [
     { path = "pymocd.pyi", format = ["sdist", "wheel"] },
     { path = "py.typed", format = ["sdist", "wheel"] },

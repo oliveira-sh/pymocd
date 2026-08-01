@@ -8,6 +8,8 @@ use rustc_hash::FxHashMap;
 
 /// Modularity Q of `partition` on `graph`:
 /// `Q = Σ_c l_c/m − (d_c/2m)²` (each community's internal edges counted once).
+// Test-only since the detectors grew label-array Q variants; kept as the reference implementation.
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn modularity(graph: &Graph, partition: &Partition) -> f64 {
     let m = graph.edges.len() as f64;
     if m == 0.0 {

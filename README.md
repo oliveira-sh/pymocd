@@ -53,11 +53,11 @@ published baselines (the original authors released no code).
 | `scale` | **SCALE** (Santos, in prep.) | KKM / ratio-cut bi-objective, sparse macro–micro co-evolutionary NSGA-II (near-linear, no dense kernel) | label-free **SBM/MDL** description length | 2026 |
 | `hpmocd` | **HP-MOCD** ([Santos et al.](https://doi.org/10.1007/s13278-025-01519-7)) | decomposed modularity, parallel NSGA-II | max modularity *Q* | 2025 |
 | `mmcomo` | **MMCoMO** ([Zhang et al.](https://ieeexplore.ieee.org/document/10188453)) | kernel *k*-means + ratio cut, macro/micro co-evolutionary NSGA-II | max *Q* (front via `mmcomo_fronts`) | 2023 |
-| `ccm` | **CCM** ([Shaik et al.](https://doi.org/10.1007/s42979-020-00382-x)) | score + fitness + modularity, NSGA-III | max *Q* | 2021 |
-| `krm` | **KRM** ([Shaik et al.](https://doi.org/10.1007/s42979-020-00382-x)) | kernel *k*-means + ratio cut + modularity, NSGA-III | max *Q* | 2021 |
+| `ccm` | **CCM** ([Shaik et al.](https://doi.org/10.1007/s42979-020-00382-x)) | score + fitness + modularity, NSGA-III | max *Q* (front via `ccm_fronts`) | 2021 |
+| `krm` | **KRM** ([Shaik et al.](https://doi.org/10.1007/s42979-020-00382-x)) | kernel *k*-means + ratio cut + modularity, NSGA-III | max *Q* (front via `krm_fronts`) | 2021 |
 | `mocd_q` | **Shi-MOCD** ([Shi et al.](https://doi.org/10.1016/j.asoc.2011.10.005)) | decomposed modularity, PESA-II | max *Q* | 2012 |
 | `mocd_d` | **Shi-MOCD** ([Shi et al.](https://doi.org/10.1016/j.asoc.2011.10.005)) | decomposed modularity, PESA-II | max-min distance to random nets | 2012 |
-| `moga_net` | **MOGA-Net** ([Pizzuti](https://doi.org/10.1109/ICTAI.2009.58)) | community score + fitness, NSGA-II | max *Q* | 2009 |
+| `moga_net` | **MOGA-Net** ([Pizzuti](https://doi.org/10.1109/ICTAI.2009.58)) | community score + fitness, NSGA-II | max *Q* (front via `moga_net_fronts`) | 2009 |
 
 ### Usage
 

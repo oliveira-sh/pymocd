@@ -1,7 +1,8 @@
 //! Kernel-K-Means (KKM) and Ratio-Cut (RC) community objectives — the bi-objective
 //! used by NSGA-III-KRM (Shaik, Ravi & Deb, SN Computer Science 2:13, 2021) and
-//! by MODPSO. Both are **minimized**. For a partition `C = {V_1..V_k}` on `n`
-//! nodes, with `L(V_a,V_b) = Σ_{i∈V_a, j∈V_b} A_ij`:
+//! by MODPSO — plus in-module Newman modularity Q, all evaluated directly on
+//! per-position label arrays. KKM and RC are **minimized**. For a partition
+//! `C = {V_1..V_k}` on `n` nodes, with `L(V_a,V_b) = Σ_{i∈V_a, j∈V_b} A_ij`:
 //! ```text
 //!   KKM = 2(n − k) − Σ_i L(V_i, V_i)/|V_i|      (denser communities ⇒ lower KKM)
 //!   RC  =            Σ_i L(V_i, V̄_i)/|V_i|      (fewer inter-links ⇒ lower RC)
@@ -15,50 +16,75 @@
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use crate::core::graph::{CommunityId, Graph, NodeId, Partition};
-use rustc_hash::FxHashMap;
+use super::locus::Locus;
+use crate::core::graph::Graph;
 
-/// Returns `(KKM, RC)`, both **minimized**. Mirrors
-/// `objectives::decomposed_modularity::calculate_objectives`: build communities
-/// from `partition`, accumulate internal degree (`L_in`) via `graph.neighbors`
-/// and total degree via `graph.degree`.
-pub fn kkm_ratiocut(graph: &Graph, partition: &Partition) -> (f64, f64) {
-    let mut comms: FxHashMap<CommunityId, Vec<NodeId>> = FxHashMap::default();
-    for (&node, &c) in partition.iter() {
-        comms.entry(c).or_default().push(node);
+/// Per-community accumulators over `labels` (raw ids must be `< n`, as decode
+/// guarantees): `L(V_i,V_i)`, total degree, and size, indexed by community id
+/// compacted in ascending position order (deterministic summation order).
+fn community_stats(locus: &Locus, labels: &[i32]) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+    let n = labels.len();
+    let mut compact = vec![-1i32; n];
+    let mut l_in: Vec<f64> = Vec::new(); // Σ_{v∈V_i} #neighbours inside = 2·internal edges
+    let mut deg_sum: Vec<f64> = Vec::new();
+    let mut size: Vec<f64> = Vec::new();
+    for p in 0..n {
+        let raw = labels[p] as usize;
+        if compact[raw] < 0 {
+            compact[raw] = l_in.len() as i32;
+            l_in.push(0.0);
+            deg_sum.push(0.0);
+            size.push(0.0);
+        }
+        let c = compact[raw] as usize;
+        let cand = &locus.candidates[p]; // [p, neighbour positions...]
+        size[c] += 1.0;
+        deg_sum[c] += (cand.len() - 1) as f64;
+        for &q in &cand[1..] {
+            if labels[q] == labels[p] {
+                l_in[c] += 1.0;
+            }
+        }
     }
+    (l_in, deg_sum, size)
+}
 
-    let n = partition.len() as f64;
-    let k = comms.len() as f64;
+/// Returns `(KKM, RC)`, both **minimized**, from the per-community stats:
+/// `KKM = 2(n−k) − Σ L_in/|V_i|`, `RC = Σ (deg_sum − L_in)/|V_i|` (the cut).
+pub fn kkm_ratiocut(locus: &Locus, labels: &[i32]) -> (f64, f64) {
+    let (l_in, deg_sum, size) = community_stats(locus, labels);
+    let n = labels.len() as f64;
+    let k = size.len() as f64;
 
     let mut kkm_internal = 0.0; // Σ L(V_i,V_i)/|V_i|
     let mut rc = 0.0; // Σ L(V_i,V̄_i)/|V_i|
-    for (&c, nodes) in comms.iter() {
-        let size = nodes.len() as f64;
-        if size == 0.0 {
-            continue;
-        }
-        let mut l_in = 0.0; // = 2·internal edges
-        let mut deg_sum = 0.0;
-        for &v in nodes {
-            deg_sum += graph.degree(&v) as f64;
-            for &u in graph.neighbors(&v) {
-                if partition.get(&u) == Some(&c) {
-                    l_in += 1.0;
-                }
-            }
-        }
-        kkm_internal += l_in / size;
-        rc += (deg_sum - l_in) / size; // cut = total degree − internal degree
+    for c in 0..size.len() {
+        kkm_internal += l_in[c] / size[c];
+        rc += (deg_sum[c] - l_in[c]) / size[c];
     }
 
     (2.0 * (n - k) - kkm_internal, rc)
 }
 
+/// Newman modularity `Q = Σ_c l_c/m − (d_c/2m)²` on a label array — same
+/// formula as `metrics::modularity`, kept in-module so the evolutionary loop
+/// never builds a shared `Partition`.
+pub fn modularity(graph: &Graph, locus: &Locus, labels: &[i32]) -> f64 {
+    let m = graph.num_edges() as f64;
+    if m == 0.0 {
+        return 0.0;
+    }
+    let (l_in, deg_sum, _size) = community_stats(locus, labels);
+    let mut q = 0.0;
+    for c in 0..l_in.len() {
+        q += l_in[c] / (2.0 * m) - (deg_sum[c] / (2.0 * m)).powi(2);
+    }
+    q
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::graph::{CommunityId, NodeId};
 
     // Triangle {0,1,2}, triangle {3,4,5}, single bridge edge (2,3).
     fn two_triangles() -> Graph {
@@ -70,20 +96,17 @@ mod tests {
         g
     }
 
-    fn part(pairs: &[(NodeId, CommunityId)]) -> Partition {
-        pairs.iter().copied().collect()
-    }
-
     #[test]
     fn split_sits_between_the_degenerate_extremes() {
         let g = two_triangles();
-        let split = part(&[(0, 0), (1, 0), (2, 0), (3, 1), (4, 1), (5, 1)]);
-        let one = part(&[(0, 0), (1, 0), (2, 0), (3, 0), (4, 0), (5, 0)]);
-        let singletons = part(&[(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5)]);
+        let locus = Locus::build(&g); // sorted nodes 0..5 → position == node id
+        let split = vec![0, 0, 0, 1, 1, 1];
+        let one = vec![0, 0, 0, 0, 0, 0];
+        let singletons = vec![0, 1, 2, 3, 4, 5];
 
-        let (kkm_split, rc_split) = kkm_ratiocut(&g, &split);
-        let (kkm_one, rc_one) = kkm_ratiocut(&g, &one);
-        let (kkm_sing, rc_sing) = kkm_ratiocut(&g, &singletons);
+        let (kkm_split, rc_split) = kkm_ratiocut(&locus, &split);
+        let (kkm_one, rc_one) = kkm_ratiocut(&locus, &one);
+        let (kkm_sing, rc_sing) = kkm_ratiocut(&locus, &singletons);
         assert_eq!(kkm_sing, 0.0, "singletons are KKM's fragmentation extreme");
 
         // Exact values for the good split: each community has L_in=6, |V|=3,
@@ -104,5 +127,9 @@ mod tests {
             "RC split {rc_split} !< singletons {rc_sing}"
         );
         assert_eq!(rc_one, 0.0, "all-in-one has no cut");
+
+        // Q for the split: m=7, each community l=3, d=7 → 2(3/7 − (7/14)²).
+        let q = modularity(&g, &locus, &split);
+        assert!((q - (6.0 / 7.0 - 0.5)).abs() < 1e-12, "Q={q}");
     }
 }

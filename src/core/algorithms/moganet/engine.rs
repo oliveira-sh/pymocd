@@ -9,21 +9,20 @@
 
 use super::individual::{Individual, calculate_crowding_distance, fast_non_dominated_sort};
 use super::locus::{Genome, Locus};
-use super::operators::{crossover, mutate};
-use crate::core::graph::Graph;
 use super::objectives::community_objectives;
+use super::operators::{crossover, mutate};
 use rand::rngs::ThreadRng;
 use rand::{RngExt, rng}; // rand 0.10: random_range/random_bool live on RngExt
 use std::cmp::Ordering;
 
 /// Decode + evaluate a genome. Objectives are `[-CS, -CF]` (both maximized in
 /// the paper, so both negated for a minimizing dominance rule).
-fn make_individual(graph: &Graph, locus: &Locus, genome: Genome, r: f64, alpha: f64) -> Individual {
-    let partition = locus.decode(&genome);
-    let (cs, cf) = community_objectives(graph, &partition, r, alpha);
+fn make_individual(locus: &Locus, genome: Genome, r: f64, alpha: f64) -> Individual {
+    let labels = locus.decode(&genome);
+    let (cs, cf) = community_objectives(locus, &labels, r, alpha);
     Individual {
         genome,
-        partition,
+        labels,
         objectives: vec![-cs, -cf],
         rank: usize::MAX,
         crowding_distance: 0.0,
@@ -50,7 +49,6 @@ fn roulette_pick(order: &[usize], fitness: &[f64], total: f64, rng: &mut ThreadR
 /// population; the caller applies the max-modularity rank-1 decision rule.
 #[allow(clippy::too_many_arguments)]
 pub fn run(
-    graph: &Graph,
     locus: &Locus,
     pop_size: usize,
     num_gens: usize,
@@ -62,7 +60,7 @@ pub fn run(
     let mut rng = rng();
 
     let mut pop: Vec<Individual> = (0..pop_size)
-        .map(|_| make_individual(graph, locus, locus.random_genome(&mut rng), r, alpha))
+        .map(|_| make_individual(locus, locus.random_genome(&mut rng), r, alpha))
         .collect();
 
     // "elite reproduction 10% of the population size".
@@ -100,6 +98,8 @@ pub fn run(
         while next_gen.len() < pop_size {
             let pa = roulette_pick(&order, &fitness, total, &mut rng);
             let pb = roulette_pick(&order, &fitness, total, &mut rng);
+            // Crossover then mutate; MATLAB gamultiobj's crossoverFraction can
+            // also be read as either/or -- the composed reading is kept.
             let mut child_genome = if rng.random_bool(cross_rate) {
                 crossover(&pop[pa].genome, &pop[pb].genome, &mut rng)
             } else if rng.random_bool(0.5) {
@@ -108,7 +108,7 @@ pub fn run(
                 pop[pb].genome.clone()
             };
             mutate(&mut child_genome, locus, mut_rate, &mut rng);
-            next_gen.push(make_individual(graph, locus, child_genome, r, alpha));
+            next_gen.push(make_individual(locus, child_genome, r, alpha));
         }
 
         pop = next_gen;

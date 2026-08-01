@@ -2,18 +2,18 @@
 //! PESA-II (Corne et al. 2001) community detector over Shi's locus-based
 //! adjacency genome (`locus.rs`, Park & Song scheme, §3.1.3) and
 //! decomposed-modularity objectives, with both model selectors — MOCD-Q (max
-//! modularity, Eq. 3.8) and MOCD-D (max-min distance to degree-preserving
+//! modularity, Eq. 3.8) and MOCD-D (max-min distance to random-network
 //! control fronts, Eqs. 3.9–3.11). Deliberately avoids the shared PESA-II
-//! engine and Rayon so cost tracks the paper; the only shared piece is the
-//! pure objective formula (`decomposed_modularity::calculate_objectives`).
+//! engine and Rayon so cost tracks the paper; hot-path state is dense
+//! Vec-indexed, with the shared `Partition` built only at this boundary.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2024 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 mod defaults;
 mod locus;
-mod objectives;
 mod model_selection;
+mod objectives;
 mod pesa2;
 pub use defaults::*;
 
@@ -33,9 +33,22 @@ pub struct Mocd {
     debug_level: i8,
     rand_networks: usize,
     pop_size: usize,
+    // EP capacity; not Python-visible, defaults to `min(pop_size, EPSIZE_CAP)`.
+    ep_size: usize,
     num_gens: usize,
     cross_rate: f64,
     mut_rate: f64,
+}
+
+/// Boundary conversion: dense labels (positions follow `graph.nodes_vec()`
+/// order, the same order `NodeIndex::build` uses) -> shared `Partition`.
+fn labels_to_partition(graph: &Graph, labels: &[i32]) -> Partition {
+    graph
+        .nodes_vec()
+        .iter()
+        .enumerate()
+        .map(|(i, &node)| (node, labels[i]))
+        .collect()
 }
 
 impl Mocd {
@@ -49,9 +62,9 @@ impl Mocd {
             self.debug_level,
             self.num_gens,
             self.pop_size,
+            self.ep_size,
             self.cross_rate,
             self.mut_rate,
-            self.graph.precompute_degrees(),
         )
     }
 }
@@ -83,6 +96,7 @@ impl Mocd {
             debug_level,
             rand_networks,
             pop_size,
+            ep_size: pop_size.clamp(1, EPSIZE_CAP),
             num_gens,
             cross_rate,
             mut_rate,
@@ -97,7 +111,10 @@ impl Mocd {
             .into_iter()
             .map(|ind| {
                 (
-                    normalize_community_ids(&self.graph, ind.partition),
+                    normalize_community_ids(
+                        &self.graph,
+                        labels_to_partition(&self.graph, &ind.labels),
+                    ),
                     ind.objectives,
                 )
             })
@@ -114,8 +131,6 @@ impl Mocd {
             let random_archives: Vec<Vec<Solution>> = random_networks
                 .iter()
                 .map(|random_graph| {
-                    let random_degrees = random_graph.precompute_degrees();
-
                     // Control fronts need the FULL budget (Shi 2012, §3.2): an
                     // under-evolved random front misses the fragmented region,
                     // making the real fragmented extreme spuriously "most
@@ -125,9 +140,9 @@ impl Mocd {
                         self.debug_level,
                         self.num_gens,
                         self.pop_size,
+                        self.ep_size,
                         self.cross_rate,
                         self.mut_rate,
-                        random_degrees,
                     )
                 })
                 .collect();
@@ -136,7 +151,7 @@ impl Mocd {
 
         Ok(normalize_community_ids(
             &self.graph,
-            best_solution.partition.clone(),
+            labels_to_partition(&self.graph, &best_solution.labels),
         ))
     }
 }
@@ -145,7 +160,7 @@ impl Mocd {
 mod tests {
     use super::pesa2::evolutionary_phase;
     use crate::core::graph::Graph;
-    use rustc_hash::FxHashSet;
+    use std::collections::HashSet;
 
     // Triangle {0,1,2}, triangle {3,4,5}, single bridge edge (2,3).
     fn two_triangles() -> Graph {
@@ -160,7 +175,7 @@ mod tests {
     #[test]
     fn shi_mocd_max_q_is_two_community_split() {
         let g = two_triangles();
-        let archive = evolutionary_phase(&g, 0, 100, 100, 0.6, 0.4, g.precompute_degrees());
+        let archive = evolutionary_phase(&g, 0, 100, 100, 100, 0.6, 0.4);
         assert!(!archive.is_empty(), "empty PESA-II archive");
         // MOCD-Q (Shi Eq. 3.8): argmin(intra + inter) = argmax Q.
         let best = archive
@@ -174,11 +189,9 @@ mod tests {
         // Q = 1 - intra - inter (Shi Eq. 3.7); objectives = [intra, inter].
         let q = 1.0 - best.objectives[0] - best.objectives[1];
         assert!(q > 0.0, "Q = {q}");
-        assert_ne!(
-            best.partition[&0], best.partition[&3],
-            "triangles not split"
-        );
-        let comms: FxHashSet<i32> = best.partition.values().copied().collect();
+        // Dense labels follow g.nodes_vec() (sorted), so position == node id here.
+        assert_ne!(best.labels[0], best.labels[3], "triangles not split");
+        let comms: HashSet<i32> = best.labels.iter().copied().collect();
         assert_eq!(comms.len(), 2, "communities = {comms:?}");
     }
 }

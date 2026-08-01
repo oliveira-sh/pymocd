@@ -48,56 +48,39 @@ pub fn min_max_selection<'a>(
 
 use crate::core::graph::{Graph, NodeId};
 use rand::{RngExt, rng};
-use rustc_hash::FxHashSet;
+use std::collections::HashSet;
 
-/// Generates `num_networks` DEGREE-PRESERVING random networks (double-edge
-/// swaps) as MOCD-D control fronts (Shi 2012, §3.2). Degree preservation is
-/// required: the `inter` objective Σ(d_c/2m)² is degree-dependent, so an
-/// Erdős–Rényi null shifts the whole control front on degree-heterogeneous
-/// graphs and breaks the max-min selector.
+/// Generates `num_networks` Erdős–Rényi `G(n, m)` random networks — same node
+/// and edge counts as `original`, uniformly random simple edges — as MOCD-D
+/// control fronts ("random networks with the same scale", Shi 2012 §3.2).
+/// A degree-preserving (double-edge-swap) null was considered but is not what
+/// Shi describes.
 pub fn generate_random_networks(original: &Graph, num_networks: usize) -> Vec<Graph> {
-    let norm = |a: NodeId, b: NodeId| if a <= b { (a, b) } else { (b, a) };
+    let nodes: Vec<NodeId> = original.nodes_vec().clone();
+    let n = nodes.len();
+    let m = original.edges.len();
     (0..num_networks)
         .map(|_| {
-            let mut edges: Vec<(NodeId, NodeId)> = original.edges.clone();
-            let m = edges.len();
-            let mut present: FxHashSet<(NodeId, NodeId)> =
-                edges.iter().map(|&(a, b)| norm(a, b)).collect();
             let mut r = rng();
-            // ~10 sweeps of attempted swaps mixes the topology while keeping
-            // every node's degree exactly fixed.
-            if m >= 2 {
-                for _ in 0..(10 * m) {
-                    let i = r.random_range(0..m);
-                    let j = r.random_range(0..m);
-                    if i == j {
-                        continue;
-                    }
-                    let (a, b) = edges[i];
-                    let (c, d) = edges[j];
-                    // rewire (a-b),(c-d) -> (a-d),(c-b)
-                    if a == d || c == b {
-                        continue; // self-loop
-                    }
-                    let n1 = norm(a, d);
-                    let n2 = norm(c, b);
-                    if n1 == n2 || present.contains(&n1) || present.contains(&n2) {
-                        continue; // multi-edge
-                    }
-                    present.remove(&norm(a, b));
-                    present.remove(&norm(c, d));
-                    present.insert(n1);
-                    present.insert(n2);
-                    edges[i] = (a, d);
-                    edges[j] = (c, b);
-                }
-            }
-
+            let mut present: HashSet<(NodeId, NodeId)> = HashSet::with_capacity(m);
             // Build through the real constructor so every derived field
-            // (node_vec, degrees, adjacency_list, edge_lookup) is populated.
+            // (node_vec, degrees, adjacency_list, edge_lookup) is populated;
+            // pre-insert all nodes so the node count matches `original`.
             let mut random_graph = Graph::new();
-            for &(src, dst) in &edges {
-                random_graph.add_edge(src, dst);
+            for &node in &nodes {
+                random_graph.nodes.insert(node);
+                random_graph.adjacency_list.entry(node).or_default();
+            }
+            while present.len() < m {
+                let a = nodes[r.random_range(0..n)];
+                let b = nodes[r.random_range(0..n)];
+                if a == b {
+                    continue; // self-loop
+                }
+                let key = if a <= b { (a, b) } else { (b, a) };
+                if present.insert(key) {
+                    random_graph.add_edge(key.0, key.1);
+                }
             }
             random_graph.finalize();
             random_graph

@@ -7,41 +7,32 @@
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use crate::core::graph::{Graph, NodeId, Partition};
+use crate::core::graph::{Graph, NodeId};
 use rand::{Rng, RngExt}; // rand 0.10: random_range lives on RngExt
-use rustc_hash::FxHashMap;
+use std::collections::HashMap;
 
-pub type Genome = Vec<NodeId>;
+/// Position-valued alleles: gene `p` holds a *position* in `0..n-1`.
+pub type Genome = Vec<usize>;
 
-/// Precomputed locus bookkeeping: stable node ordering, reverse
-/// `NodeId -> position` map, and per-position "safe" allele sets
-/// (`{node itself} ∪ neighbours`, Pizzuti 2009, Sec. 4; a degree-0 node can
-/// only take itself, decoding to a singleton).
+/// Precomputed locus bookkeeping: stable node ordering (position -> `NodeId`,
+/// used only at the module boundary) and per-position neighbour-position
+/// lists (allele domain + adjacency for evaluation).
 pub struct Locus {
     pub nodes: Vec<NodeId>,
-    pub index_of: FxHashMap<NodeId, usize>,
-    pub candidates: Vec<Vec<NodeId>>,
+    pub neighbors: Vec<Vec<usize>>,
 }
 
 impl Locus {
     pub fn build(graph: &Graph) -> Self {
         let nodes = graph.nodes_vec().clone();
-        let index_of: FxHashMap<NodeId, usize> =
+        // NodeId -> position boundary map: built once per run (cold path).
+        let index_of: HashMap<NodeId, usize> =
             nodes.iter().enumerate().map(|(p, &v)| (v, p)).collect();
-        let candidates: Vec<Vec<NodeId>> = nodes
+        let neighbors: Vec<Vec<usize>> = nodes
             .iter()
-            .map(|&v| {
-                let mut c = Vec::with_capacity(graph.degree(&v) + 1);
-                c.push(v);
-                c.extend_from_slice(graph.neighbors(&v));
-                c
-            })
+            .map(|v| graph.neighbors(v).iter().map(|u| index_of[u]).collect())
             .collect();
-        Locus {
-            nodes,
-            index_of,
-            candidates,
-        }
+        Locus { nodes, neighbors }
     }
 
     #[inline]
@@ -49,19 +40,30 @@ impl Locus {
         self.nodes.len()
     }
 
-    /// "Biased"/safe initialization (Pizzuti 2009, Sec. 4): gene `i` is a
-    /// uniform pick from `{i itself} ∪ neighbours(i)` -- safe by
-    /// construction, so no repair pass is needed anywhere in the pipeline.
-    pub fn random_genome(&self, rng: &mut impl Rng) -> Genome {
-        self.candidates
-            .iter()
-            .map(|c| c[rng.random_range(0..c.len())])
-            .collect()
+    /// Safe allele for position `p` (Pizzuti 2009, Sec. 4): a uniform pick
+    /// from neighbours(p); the self-allele exists only for isolated nodes
+    /// (the paper's repair maps invalid genes to "one of the neighbors of i").
+    #[inline]
+    pub fn random_allele(&self, p: usize, rng: &mut impl Rng) -> usize {
+        let nb = &self.neighbors[p];
+        if nb.is_empty() {
+            p
+        } else {
+            nb[rng.random_range(0..nb.len())]
+        }
     }
 
-    /// Decode genome -> Partition via union-find over positions: for each
-    /// position `p` holding value `v`, union `p` with `index_of[v]`.
-    pub fn decode(&self, genome: &Genome) -> Partition {
+    /// "Biased"/safe initialization (Pizzuti 2009, Sec. 4): every gene is a
+    /// safe allele by construction, so no repair pass is needed anywhere in
+    /// the pipeline.
+    pub fn random_genome(&self, rng: &mut impl Rng) -> Genome {
+        (0..self.n()).map(|p| self.random_allele(p, rng)).collect()
+    }
+
+    /// Decode genome -> compact community labels indexed by position, via
+    /// union-find over positions (labels assigned in ascending-position
+    /// first-visit order, so equal partitions get identical label arrays).
+    pub fn decode(&self, genome: &Genome) -> Vec<i32> {
         let n = self.n();
         let mut parent: Vec<usize> = (0..n).collect();
 
@@ -79,16 +81,21 @@ impl Locus {
             }
         }
 
-        for (p, &v) in genome.iter().enumerate() {
-            let q = self.index_of[&v];
+        for (p, &q) in genome.iter().enumerate() {
             union(&mut parent, p, q);
         }
 
-        let mut partition = Partition::default();
-        for p in 0..n {
+        let mut labels = vec![0i32; n];
+        let mut root_label = vec![-1i32; n];
+        let mut next = 0i32;
+        for (p, label) in labels.iter_mut().enumerate() {
             let root = find(&mut parent, p);
-            partition.insert(self.nodes[p], root as i32);
+            if root_label[root] < 0 {
+                root_label[root] = next;
+                next += 1;
+            }
+            *label = root_label[root];
         }
-        partition
+        labels
     }
 }

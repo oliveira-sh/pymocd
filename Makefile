@@ -21,10 +21,10 @@ $(VENV)/bin/activate: res/requirements.txt
 dependencies: $(VENV)/bin/activate
 
 stubs:
-	cargo run --no-default-features --bin stub_gen
+	cargo run --bin stub_gen
 
 build: dependencies
-	cargo run --no-default-features --bin stub_gen
+	cargo run --bin stub_gen
 	$(VENV)/bin/maturin develop --release
 	@rm -f pymocd.pyi
 

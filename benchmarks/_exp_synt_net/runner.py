@@ -82,8 +82,16 @@ class ExperimentRunner:
     ):
         parallel_args, sequential_args = [], []
         for name, info in ALGORITHM_REGISTRY.items():
+            max_nodes = info.get("max_nodes")
+            skipped = sorted(
+                {int(n) for n in n_nodes_list if max_nodes and int(n) > max_nodes}
+            )
+            for n in skipped:
+                print(f"[skip] {name} at n={n} (max_nodes={max_nodes})")
             for mu in mus:
                 for n in n_nodes_list:
+                    if max_nodes is not None and int(n) > max_nodes:
+                        continue
                     entry = (
                         name,
                         info["function"],
@@ -160,7 +168,9 @@ class ExperimentRunner:
         if mus is None:
             mus = np.arange(MIN_MU, MAX_MU + STP_MU, STP_MU)
         if n_nodes_list is None:
-            n_nodes_list = [500, 1000, 2000]
+            # Exactly one node count: two varying axes would switch plot_results
+            # to facets and drop the per-metric SVGs the docs embed.
+            n_nodes_list = [1000]
         csv_file = os.path.join(SAVE_PATH, "lfr_mu.csv")
         plot_subdir = os.path.join(SAVE_PATH, "mu") + "/"
         return self._run_sweep(list(mus), list(n_nodes_list), csv_file, plot_subdir)
@@ -171,9 +181,10 @@ class ExperimentRunner:
         mus: Iterable[float] | None = None,
     ) -> pd.DataFrame:
         if n_list is None:
-            n_list = [500, 1000, 2000, 5000]
+            n_list = [250, 500, 1000, 2000]
         if mus is None:
-            mus = [0.3, 0.5]
+            # Exactly one mu, same reason as above.
+            mus = [0.3]
         csv_file = os.path.join(SAVE_PATH, "lfr_nodes.csv")
         plot_subdir = os.path.join(SAVE_PATH, "nodes") + "/"
         return self._run_sweep(list(mus), list(n_list), csv_file, plot_subdir)

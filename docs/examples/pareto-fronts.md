@@ -64,18 +64,25 @@ target = 2
 best, _ = min(front, key=lambda sol: abs(len(set(sol[0].values())) - target))
 ```
 
-## `scale_fronts` and `mmcomo_fronts`
+## The `*_fronts` functions
 
-`scale` and `mmcomo` expose their candidate sets as a plain `list[dict]` of partitions — no objective values attached. Each list is exactly what the corresponding detector selects from:
+`scale`, `mmcomo`, `ccm`, `krm` and `moga_net` expose their candidate sets as a plain `list[dict]` of partitions — no objective values attached. Each list is exactly what the corresponding detector selects from:
 
 ```python
 candidates = pymocd.scale_fronts(G)
 best = max(candidates, key=lambda p: pymocd.ari(p, gt))
 ```
 
-`scale_fronts` takes the same kwargs as `scale`, plus two of its own: `refine` (apply union-refinement to the merged front, on by default) and `topo_mode` (topology-handling mode, integer).
+Each takes the same kwargs as its detector; `scale_fronts` adds two of its own: `refine` (apply union-refinement to the merged front, on by default) and `topo_mode` (topology-handling mode, integer).
+
+The baseline fronts exist because the original papers report the best-NMI solution *of the front*, not the max-modularity one their detectors return — reproducing those tables needs the full candidate set:
+
+```python
+front = pymocd.moga_net_fronts(G, r=1.5)   # Pizzuti Table 1 protocol
+best_nmi = max(pymocd.nmi(p, gt) for p in front)
+```
 
 ## See also
 
 - [Plotting](plotting.md) — visualize the front in objective space and draw the selected partition.
-- [Fronts API](../api/fronts.md) — full signatures for `generate_pareto_front`, `scale_fronts`, and `mmcomo_fronts`.
+- [Fronts API](../api/fronts.md) — full signatures for `generate_pareto_front` and the `*_fronts` functions.

@@ -3,10 +3,9 @@
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use crate::core::graph::{CommunityId, Graph, NodeId, Partition};
-use rustc_hash::FxHashMap;
+use super::locus::Locus;
 
-/// MOGA-Net bi-objective on a decoded label partition (Pizzuti 2012, Sec. V-A).
+/// MOGA-Net bi-objective on a decoded label array (Pizzuti 2012, Sec. V-A).
 /// Returns `(community_score, community_fitness)` = `(CS, CF)`, **both maximized**
 /// (Pizzuti maximizes CS and the community fitness — the latter peaks when no
 /// edges leave a community, i.e. maximizing it minimizes inter-module links). For
@@ -18,43 +17,45 @@ use rustc_hash::FxHashMap;
 ///   score(S) = M(S) · v_S ; CS = Σ_S score(S)
 ///   CF     = Σ_S Σ_{i∈S} k_in / deg(i)^α        (deg(i)=0 → term 0)
 /// ```
-/// An NSGA-II that minimizes feeds `(−CS, −CF)`.
-pub fn community_objectives(
-    graph: &Graph,
-    partition: &Partition,
-    r: f64,
-    alpha: f64,
-) -> (f64, f64) {
-    let mut comms: FxHashMap<CommunityId, Vec<NodeId>> = FxHashMap::default();
-    for (&node, &c) in partition.iter() {
-        comms.entry(c).or_default().push(node);
+/// An NSGA-II that minimizes feeds `(−CS, −CF)`. `labels` is indexed by
+/// position with compact community ids; sums run in ascending position /
+/// community-id order so floating-point summation is deterministic.
+pub fn community_objectives(locus: &Locus, labels: &[i32], r: f64, alpha: f64) -> (f64, f64) {
+    let n_comms = labels.iter().map(|&c| c as usize + 1).max().unwrap_or(0);
+    let mut size = vec![0usize; n_comms];
+    for &c in labels {
+        size[c as usize] += 1;
+    }
+
+    let mut m_num = vec![0.0f64; n_comms]; // Σ mu_i^r
+    let mut v_s = vec![0.0f64; n_comms]; // Σ k_in = 2·internal edges
+    let mut p_s = vec![0.0f64; n_comms]; // Σ k_in / deg^α
+    for (p, &lab) in labels.iter().enumerate() {
+        let c = lab as usize;
+        let mut k_in = 0usize;
+        for &q in &locus.neighbors[p] {
+            if labels[q] == lab {
+                k_in += 1;
+            }
+        }
+        let k = k_in as f64;
+        v_s[c] += k;
+        let mu = k / size[c] as f64;
+        m_num[c] += mu.powf(r);
+        let deg = locus.neighbors[p].len() as f64;
+        if deg > 0.0 {
+            p_s[c] += k / deg.powf(alpha);
+        }
     }
 
     let mut cs = 0.0;
     let mut cf = 0.0;
-    for (&c, nodes) in comms.iter() {
-        let s_size = nodes.len() as f64;
-        let mut m_num = 0.0; // Σ mu_i^r
-        let mut v_s = 0.0; // Σ k_in = 2·internal edges
-        let mut p_s = 0.0; // Σ k_in / deg^α
-        for &i in nodes {
-            let mut k_in = 0usize;
-            for &j in graph.neighbors(&i) {
-                if partition.get(&j) == Some(&c) {
-                    k_in += 1;
-                }
-            }
-            let k = k_in as f64;
-            v_s += k;
-            let mu = k / s_size;
-            m_num += mu.powf(r);
-            let deg = graph.degree(&i) as f64;
-            if deg > 0.0 {
-                p_s += k / deg.powf(alpha);
-            }
+    for c in 0..n_comms {
+        if size[c] == 0 {
+            continue;
         }
-        cs += (m_num / s_size) * v_s;
-        cf += p_s;
+        cs += (m_num[c] / size[c] as f64) * v_s[c];
+        cf += p_s[c];
     }
     (cs, cf)
 }

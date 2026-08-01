@@ -98,7 +98,7 @@ Each metric is also available on its own: `pymocd.nmi`, `pymocd.ami`, `pymocd.ar
 
 ## Inspecting Pareto fronts
 
-`scale` and `mmcomo` each pick one partition from a Pareto front of candidates. To see the whole candidate set, use `scale_fronts` / `mmcomo_fronts`, which accept the same evolutionary kwargs (`scale_fronts` adds `refine` and `topo_mode`) and return a `list[dict[node, community]]`:
+`scale`, `mmcomo`, `ccm`, `krm` and `moga_net` each pick one partition from a Pareto front of candidates. To see the whole candidate set, use `scale_fronts`, `mmcomo_fronts`, `ccm_fronts`, `krm_fronts` or `moga_net_fronts`, which accept the same evolutionary kwargs as their detector (`scale_fronts` adds `refine` and `topo_mode`) and return a `list[dict[node, community]]`:
 
 ```python
 front = pymocd.scale_fronts(G)

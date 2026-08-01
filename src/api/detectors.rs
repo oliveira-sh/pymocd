@@ -44,8 +44,9 @@ pub fn hpmocd_fn(py: Python<'_>, graph: &Bound<'_, PyAny>) -> PyResult<Partition
 /// decomposed-modularity objectives (intra/inter). Returns the
 /// **max-modularity** member of the Pareto front (MOCD-Q selection, Shi Eq. 3.8).
 ///
-/// Defaults: pop=100, gen=100, C_R=0.9, M_R=0.1; pass Shi's own
-/// (e.g. ``cross_rate=0.6, mut_rate=0.4``) via kwargs.
+/// Defaults (pop=100, gen=100, C_R=0.9, M_R=0.1) are the repo's HP-MOCD-parity
+/// benchmark budget, NOT Shi's published configuration — that is pc=0.6,
+/// pm=0.4 with per-graph ip/ep/gen from Table 1; pass those via kwargs.
 ///
 /// Args:
 ///     graph: networkx.Graph or igraph.Graph (integer node ids).
@@ -84,7 +85,11 @@ pub fn mocd_q_fn(
 
 /// Shi-MOCD with the **Max-Min Distance (MOCD-D)** model selector (Shi et al.
 /// 2012, Eqs. 3.9–3.11): returns the Pareto-front member whose (intra, inter)
-/// deviates most from ``rand_networks`` degree-preserving random control fronts.
+/// deviates most from ``rand_networks`` same-scale Erdős–Rényi control fronts.
+///
+/// Defaults (pop=100, gen=100, C_R=0.9, M_R=0.1) are the repo's HP-MOCD-parity
+/// benchmark budget, NOT Shi's published configuration — that is pc=0.6,
+/// pm=0.4 with per-graph ip/ep/gen from Table 1; pass those via kwargs.
 ///
 /// Returns:
 ///     ``dict[node, community]``. Isolated nodes get community ``-1``.
@@ -118,7 +123,8 @@ pub fn mocd_d_fn(
 /// Args:
 ///     graph: networkx.Graph or igraph.Graph (integer node ids).
 ///     r: Community Score power-mean exponent (resolution knob; higher helps at
-///         high mixing). Pizzuti default 2.
+///         high mixing). The paper never fixes it; 1.5 reproduces its
+///         real-world tables.
 ///     alpha: Community Fitness exponent (larger → smaller communities).
 ///         Pizzuti default 1.
 ///
@@ -202,6 +208,103 @@ pub fn krm_fn(
     let g = Graph::from_python(graph);
     Ok(krm::krm(
         &g, pop_size, num_gens, cross_rate, mut_rate, divisions,
+    ))
+}
+
+/// The rank-1 Pareto front ``ccm`` selects from, as a list of partitions.
+///
+/// ``ccm`` returns only the max-modularity member; Shaik et al. report the
+/// best-NMI *and* best-modularity solutions of the front, so reproducing their
+/// Tables 1–2 needs the whole candidate set.
+///
+/// Args:
+///     graph: networkx.Graph or igraph.Graph (integer node ids).
+///     r: Community Score power-mean exponent (Shaik default 1).
+///     alpha: Community Fitness exponent (Shaik default 1).
+///     divisions: Das–Dennis reference-point granularity ``p`` (default 12 →
+///         91 reference points for the 3 objectives).
+///
+/// Returns:
+///     ``list[dict[node, community]]``. Isolated nodes get community ``-1``.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "ccm_fronts", signature = (graph, pop_size = ccm::DEFAULT_POP_SIZE, num_gens = ccm::DEFAULT_NUM_GENS, cross_rate = ccm::DEFAULT_CROSS_RATE, mut_rate = ccm::DEFAULT_MUT_RATE, r = ccm::DEFAULT_R, alpha = ccm::DEFAULT_ALPHA, divisions = ccm::DEFAULT_DIVISIONS))]
+#[allow(clippy::too_many_arguments)]
+pub fn ccm_fronts_fn(
+    graph: &Bound<'_, PyAny>,
+    pop_size: usize,
+    num_gens: usize,
+    cross_rate: f64,
+    mut_rate: f64,
+    r: f64,
+    alpha: f64,
+    divisions: usize,
+) -> PyResult<Vec<Partition>> {
+    let g = Graph::from_python(graph);
+    Ok(ccm::ccm_fronts(
+        &g, pop_size, num_gens, cross_rate, mut_rate, r, alpha, divisions,
+    ))
+}
+
+/// The rank-1 Pareto front ``krm`` selects from, as a list of partitions.
+///
+/// ``krm`` returns only the max-modularity member; Shaik et al. report the
+/// best-NMI *and* best-modularity solutions of the front, so reproducing their
+/// Tables 1–2 needs the whole candidate set.
+///
+/// Args:
+///     graph: networkx.Graph or igraph.Graph (integer node ids).
+///     divisions: Das–Dennis reference-point granularity ``p`` (default 12 →
+///         91 reference points for the 3 objectives).
+///
+/// Returns:
+///     ``list[dict[node, community]]``. Isolated nodes get community ``-1``.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "krm_fronts", signature = (graph, pop_size = krm::DEFAULT_POP_SIZE, num_gens = krm::DEFAULT_NUM_GENS, cross_rate = krm::DEFAULT_CROSS_RATE, mut_rate = krm::DEFAULT_MUT_RATE, divisions = krm::DEFAULT_DIVISIONS))]
+pub fn krm_fronts_fn(
+    graph: &Bound<'_, PyAny>,
+    pop_size: usize,
+    num_gens: usize,
+    cross_rate: f64,
+    mut_rate: f64,
+    divisions: usize,
+) -> PyResult<Vec<Partition>> {
+    let g = Graph::from_python(graph);
+    Ok(krm::krm_fronts(
+        &g, pop_size, num_gens, cross_rate, mut_rate, divisions,
+    ))
+}
+
+/// The rank-1 Pareto front ``moga_net`` selects from, as a list of partitions.
+///
+/// ``moga_net`` returns only the max-modularity member; Pizzuti's Table 1
+/// reports the best-NMI solution of the front, so reproducing it needs the
+/// whole candidate set.
+///
+/// Args:
+///     graph: networkx.Graph or igraph.Graph (integer node ids).
+///     r: Community Score power-mean exponent. The paper never fixes it; 1.5
+///         reproduces its real-world tables.
+///     alpha: Community Fitness exponent (Pizzuti default 1).
+///
+/// Returns:
+///     ``list[dict[node, community]]``. Isolated nodes get community ``-1``.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "moga_net_fronts", signature = (graph, pop_size = moganet::DEFAULT_POP_SIZE, num_gens = moganet::DEFAULT_NUM_GENS, cross_rate = moganet::DEFAULT_CROSS_RATE, mut_rate = moganet::DEFAULT_MUT_RATE, r = moganet::DEFAULT_R, alpha = moganet::DEFAULT_ALPHA))]
+pub fn moga_net_fronts_fn(
+    graph: &Bound<'_, PyAny>,
+    pop_size: usize,
+    num_gens: usize,
+    cross_rate: f64,
+    mut_rate: f64,
+    r: f64,
+    alpha: f64,
+) -> PyResult<Vec<Partition>> {
+    let g = Graph::from_python(graph);
+    Ok(moganet::moga_net_fronts(
+        &g, pop_size, num_gens, cross_rate, mut_rate, r, alpha,
     ))
 }
 
