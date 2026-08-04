@@ -8,7 +8,7 @@ use std::collections::HashSet;
 
 use super::Labels;
 use super::nsga2::fast_nondominated_sort;
-use super::objectives::kkm_rc;
+use super::objectives::{ObjSet, evaluate};
 
 /// Merge tiny communities (size `<= max_size`) into the neighbouring community
 /// they share the most edges with, while preserving internally cohesive small
@@ -69,9 +69,9 @@ pub(crate) fn refine_tiny(g: &CsrGraph, part: &[i32], max_size: usize) -> Vec<i3
 }
 
 /// Each member gets a tiny-community-merge copy (`refine_tiny`, max tiny size 2);
-/// originals ∪ refined are deduplicated and non-dominated-sorted on (KKM, RC),
-/// and the rank-1 front is returned.
-pub fn refine_front(g: &CsrGraph, front: Vec<Labels>) -> Vec<Labels> {
+/// originals ∪ refined are deduplicated and non-dominated-sorted on the SAME
+/// objective vector the search used, and the rank-1 front is returned.
+pub fn refine_front(g: &CsrGraph, front: Vec<Labels>, objset: ObjSet) -> Vec<Labels> {
     if front.len() <= 1 {
         // A single member still benefits from its refined alternative.
         if front.is_empty() {
@@ -89,7 +89,7 @@ pub fn refine_front(g: &CsrGraph, front: Vec<Labels>) -> Vec<Labels> {
     if all.len() == front.len() {
         return front;
     }
-    let objs: Vec<(f64, f64)> = all.iter().map(|p| kkm_rc(g, p)).collect();
+    let objs: Vec<Vec<f64>> = all.iter().map(|p| evaluate(g, p, objset)).collect();
     let ranks = fast_nondominated_sort(&objs);
     all.into_iter()
         .zip(ranks)
@@ -127,7 +127,7 @@ mod tests {
         // Front member with node 6 as its own singleton community (label 6).
         let part: Labels = vec![0, 0, 0, 3, 3, 3, 6];
         let front = vec![part.clone()];
-        let refined = refine_front(&g, front);
+        let refined = refine_front(&g, front, ObjSet::default());
         assert!(!refined.is_empty());
         // The union front must contain a member where node 6 is no longer a
         // singleton (it merged into community 0, its only neighbour's community).
@@ -143,6 +143,6 @@ mod tests {
     #[test]
     fn refine_front_empty_is_empty() {
         let g = graph_with_pendant();
-        assert!(refine_front(&g, Vec::new()).is_empty());
+        assert!(refine_front(&g, Vec::new(), ObjSet::default()).is_empty());
     }
 }

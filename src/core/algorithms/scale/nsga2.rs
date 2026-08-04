@@ -1,15 +1,16 @@
-use rand::RngExt; // rand 0.10: random_range/random_bool live on RngExt
+// All objectives minimized. Objective vectors are M-dimensional (M >= 2);
+// `Obj` is the per-individual vector. NSGA-II Pareto domination.
+pub type Obj = Vec<f64>;
 
-// Both objectives minimized, stored as (KKM, RC). NSGA-II domination.
 #[inline]
-fn dominates(a: (f64, f64), b: (f64, f64)) -> bool {
-    let le = a.0 <= b.0 && a.1 <= b.1;
-    let lt = a.0 < b.0 || a.1 < b.1;
+fn dominates(a: &[f64], b: &[f64]) -> bool {
+    let le = a.iter().zip(b).all(|(x, y)| x <= y);
+    let lt = a.iter().zip(b).any(|(x, y)| x < y);
     le && lt
 }
 
 /// Fast non-dominated sort. Returns a 1-based rank per individual.
-pub fn fast_nondominated_sort(objs: &[(f64, f64)]) -> Vec<usize> {
+pub fn fast_nondominated_sort(objs: &[Obj]) -> Vec<usize> {
     let n = objs.len();
     let mut rank = vec![0usize; n];
     if n == 0 {
@@ -24,9 +25,9 @@ pub fn fast_nondominated_sort(objs: &[(f64, f64)]) -> Vec<usize> {
             if p == q {
                 continue;
             }
-            if dominates(objs[p], objs[q]) {
+            if dominates(&objs[p], &objs[q]) {
                 dominated[p].push(q);
-            } else if dominates(objs[q], objs[p]) {
+            } else if dominates(&objs[q], &objs[p]) {
                 dom_count[p] += 1;
             }
         }
@@ -53,8 +54,8 @@ pub fn fast_nondominated_sort(objs: &[(f64, f64)]) -> Vec<usize> {
     rank
 }
 
-/// Crowding distance, computed per front, summed over both objectives.
-pub fn crowding_distance(objs: &[(f64, f64)], ranks: &[usize]) -> Vec<f64> {
+/// Crowding distance, computed per front, summed over all objectives.
+pub fn crowding_distance(objs: &[Obj], ranks: &[usize]) -> Vec<f64> {
     let n = objs.len();
     let mut dist = vec![0.0f64; n];
     if n == 0 {
@@ -77,8 +78,12 @@ pub fn crowding_distance(objs: &[(f64, f64)], ranks: &[usize]) -> Vec<f64> {
             continue;
         }
 
-        for obj in 0..2 {
-            let key = |idx: usize| -> f64 { if obj == 0 { objs[idx].0 } else { objs[idx].1 } };
+        let m = objs[group[0]].len();
+        // `obj` indexes the INNER vector of `objs[idx]` for an `idx` that varies
+        // inside the closure below, so there is no single slice to iterate over.
+        #[allow(clippy::needless_range_loop)]
+        for obj in 0..m {
+            let key = |idx: usize| -> f64 { objs[idx][obj] };
 
             let mut order = group.clone();
             order.sort_by(|&a, &b| {
@@ -111,7 +116,7 @@ pub fn crowding_distance(objs: &[(f64, f64)], ranks: &[usize]) -> Vec<f64> {
 
 /// Environment selection: fill survivors by ascending rank, truncating the last
 /// overflowing front by descending crowding distance. Size min(keep, len).
-pub fn environment_selection(objs: &[(f64, f64)], keep: usize) -> Vec<usize> {
+pub fn environment_selection(objs: &[Obj], keep: usize) -> Vec<usize> {
     let n = objs.len();
     let target = keep.min(n);
     if target == 0 {
@@ -153,33 +158,6 @@ pub fn environment_selection(objs: &[(f64, f64)], keep: usize) -> Vec<usize> {
     survivors
 }
 
-/// Binary tournament: lower rank wins, ties broken by higher crowding distance.
-/// Unused by the operators (they carry their own copy); kept for completeness.
-#[allow(dead_code)]
-pub fn tournament(ranks: &[usize], crowd: &[f64], r: &mut impl rand::Rng) -> usize {
-    let n = ranks.len();
-    debug_assert!(n > 0, "tournament on empty population");
-    if n == 1 {
-        return 0;
-    }
-
-    let a = r.random_range(0..n);
-    let mut b = r.random_range(0..n);
-    while b == a {
-        b = r.random_range(0..n);
-    }
-
-    if ranks[a] < ranks[b] {
-        a
-    } else if ranks[b] < ranks[a] {
-        b
-    } else if crowd[a] >= crowd[b] {
-        a
-    } else {
-        b
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -187,7 +165,12 @@ mod tests {
     #[test]
     fn test_nondominated_sort_two_fronts() {
         // (1,4),(2,2),(4,1) mutually non-dominating; (3,3) dominated by (2,2).
-        let objs = vec![(1.0, 4.0), (2.0, 2.0), (4.0, 1.0), (3.0, 3.0)];
+        let objs = vec![
+            vec![1.0, 4.0],
+            vec![2.0, 2.0],
+            vec![4.0, 1.0],
+            vec![3.0, 3.0],
+        ];
         let ranks = fast_nondominated_sort(&objs);
         assert_eq!(ranks[0], 1);
         assert_eq!(ranks[1], 1);
@@ -197,7 +180,7 @@ mod tests {
 
     #[test]
     fn test_crowding_boundaries_infinite() {
-        let objs = vec![(1.0, 4.0), (2.0, 2.0), (4.0, 1.0)];
+        let objs = vec![vec![1.0, 4.0], vec![2.0, 2.0], vec![4.0, 1.0]];
         let ranks = fast_nondominated_sort(&objs);
         let crowd = crowding_distance(&objs, &ranks);
         assert!(crowd[0].is_infinite());
@@ -207,7 +190,12 @@ mod tests {
 
     #[test]
     fn test_environment_selection_size_and_rank1_priority() {
-        let objs = vec![(1.0, 4.0), (2.0, 2.0), (4.0, 1.0), (3.0, 3.0)];
+        let objs = vec![
+            vec![1.0, 4.0],
+            vec![2.0, 2.0],
+            vec![4.0, 1.0],
+            vec![3.0, 3.0],
+        ];
         let surv = environment_selection(&objs, 3);
         assert_eq!(surv.len(), 3);
         assert!(!surv.contains(&3));
@@ -216,29 +204,9 @@ mod tests {
 
     #[test]
     fn test_environment_selection_clamps_to_len() {
-        let objs = vec![(1.0, 1.0), (2.0, 2.0)];
+        let objs = vec![vec![1.0, 1.0], vec![2.0, 2.0]];
         assert_eq!(environment_selection(&objs, 10).len(), 2);
         assert_eq!(environment_selection(&objs, 0).len(), 0);
         assert!(environment_selection(&[], 5).is_empty());
-    }
-
-    #[test]
-    fn test_tournament_prefers_lower_rank() {
-        let ranks = vec![1usize, 2usize];
-        let crowd = vec![0.0f64, 100.0f64];
-        let mut r = rand::rng();
-        for _ in 0..50 {
-            assert_eq!(tournament(&ranks, &crowd, &mut r), 0);
-        }
-    }
-
-    #[test]
-    fn test_tournament_tiebreak_crowding() {
-        let ranks = vec![1usize, 1usize];
-        let crowd = vec![5.0f64, 1.0f64];
-        let mut r = rand::rng();
-        for _ in 0..50 {
-            assert_eq!(tournament(&ranks, &crowd, &mut r), 0);
-        }
     }
 }

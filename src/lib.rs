@@ -22,6 +22,7 @@ fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // detectors -> partition
     m.add_function(wrap_pyfunction!(hpmocd_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(hpmocd_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mocd_q_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mocd_d_fn, m)?)?;
     m.add_function(wrap_pyfunction!(moga_net_fn, m)?)?;

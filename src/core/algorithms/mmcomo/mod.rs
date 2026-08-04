@@ -270,7 +270,6 @@ fn influence(
 }
 
 /// Algorithm 1. Returns the rank-1 front of the merged populations.
-#[allow(clippy::too_many_arguments)]
 fn run_fronts(
     g: &Graph,
     pop: usize,

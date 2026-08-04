@@ -40,6 +40,49 @@ pub fn hpmocd_fn(py: Python<'_>, graph: &Bound<'_, PyAny>) -> PyResult<Partition
     instance.run(py)
 }
 
+/// HP-MOCD's full Pareto front, the candidate set `hpmocd` selects from.
+///
+/// `hpmocd` applies max-modularity selection to this front and returns one
+/// partition; this returns every member, so HP-MOCD can be compared against
+/// other detectors on the SAME footing (best-in-front, i.e. selector-free).
+/// Without it, comparing `hpmocd`'s single selected partition against another
+/// detector's front oracle silently handicaps HP-MOCD.
+///
+/// Note the `HpMocd` class is NOT registered with PyO3, so
+/// `HpMocd.generate_pareto_front` is unreachable from Python. This function is
+/// the supported route to the front.
+///
+/// Args:
+///     graph: networkx.Graph or DiGraph (integer node ids).
+///
+/// Returns:
+///     ``list[dict[node, community]]``. Isolated nodes get community ``-1``.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "hpmocd_fronts", signature = (graph))]
+pub fn hpmocd_fronts_fn(py: Python<'_>, graph: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+    let instance = HpMocd::new(
+        py,
+        graph,
+        HPMOCD_DEFAULT_DEBUG_LEVEL,
+        DEFAULT_POP_SIZE,
+        HPMOCD_DEFAULT_NUM_GENS,
+        HPMOCD_DEFAULT_CROSS_RATE,
+        HPMOCD_DEFAULT_MUT_RATE,
+        None,
+    )?;
+    let front = instance.generate_pareto_front(py)?;
+    let out = PyList::empty(py);
+    for (part, _objs) in front {
+        let d = PyDict::new(py);
+        for (node, comm) in part {
+            d.set_item(node, comm)?;
+        }
+        out.append(d)?;
+    }
+    Ok(out.into_any().unbind())
+}
+
 /// Run Shi-MOCD (Shi, Yan, Cai, Wu 2012) — PESA-II over Shi's
 /// decomposed-modularity objectives (intra/inter). Returns the
 /// **max-modularity** member of the Pareto front (MOCD-Q selection, Shi Eq. 3.8).
@@ -313,7 +356,6 @@ pub fn moga_net_fronts_fn(
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(name = "mmcomo", signature = (graph, pop_size = mmcomo::DEFAULT_POP_SIZE, num_gens = mmcomo::DEFAULT_NUM_GENS, cross_rate = mmcomo::DEFAULT_CROSS_RATE, mut_rate = mmcomo::DEFAULT_MUT_RATE, gap = mmcomo::DEFAULT_GAP, beta = mmcomo::DEFAULT_BETA))]
-#[allow(clippy::too_many_arguments)]
 pub fn mmcomo_fn(
     graph: &Bound<'_, PyAny>,
     pop_size: usize,
@@ -341,7 +383,6 @@ pub fn mmcomo_fn(
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(name = "mmcomo_fronts", signature = (graph, pop_size = mmcomo::DEFAULT_POP_SIZE, num_gens = mmcomo::DEFAULT_NUM_GENS, cross_rate = mmcomo::DEFAULT_CROSS_RATE, mut_rate = mmcomo::DEFAULT_MUT_RATE, gap = mmcomo::DEFAULT_GAP, beta = mmcomo::DEFAULT_BETA))]
-#[allow(clippy::too_many_arguments)]
 pub fn mmcomo_fronts_fn(
     graph: &Bound<'_, PyAny>,
     pop_size: usize,
@@ -371,9 +412,23 @@ pub fn mmcomo_fronts_fn(
 /// `scale` — optimized MMCoMO variant (sparse-CSR similarity, Rayon-parallel,
 /// union-refined Pareto front). Returns the label-free-selected member of the
 /// merged rank-1 front. Isolated nodes get -1.
+///
+/// Args:
+///     macro_cap: multiplier on the macro population's centre ceiling, which is
+///         ``ceil(macro_cap * sqrt(n))`` communities (still hard-capped at
+///         ``n``). ``1.0`` is the historical ``ceil(sqrt(n))`` and is exactly
+///         behaviour-preserving. Raise it when the true community count exceeds
+///         ``sqrt(n)``: the heterogeneous-objective gain measured on LFR holds
+///         while ``cap/k_true >= 1`` (+0.016 ARI at n <= 1000, +0.019 at
+///         n = 2000) and disappears once the ceiling can no longer express
+///         ``k_true`` (n = 5000/10000, ``cap/k_true`` 0.64/0.45).
+///
+/// Note: the published algorithm's local-search step (a Louvain-first-phase
+/// modularity ascent on the rank-1 micro members) is intentionally NOT
+/// implemented. It was removed outright, so there is no parameter to enable it.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(name = "scale", signature = (graph, pop_size = scale::DEFAULT_POP_SIZE, num_gens = scale::DEFAULT_NUM_GENS, cross_rate = scale::DEFAULT_CROSS_RATE, mut_rate = scale::DEFAULT_MUT_RATE, gap = scale::DEFAULT_GAP, beta = scale::DEFAULT_BETA, adaptive_stop = false, conv_pval = scale::CONV_PVAL))]
+#[pyo3(name = "scale", signature = (graph, pop_size = scale::DEFAULT_POP_SIZE, num_gens = scale::DEFAULT_NUM_GENS, cross_rate = scale::DEFAULT_CROSS_RATE, mut_rate = scale::DEFAULT_MUT_RATE, gap = scale::DEFAULT_GAP, beta = scale::DEFAULT_BETA, macro_cap = scale::DEFAULT_MACRO_CAP, micro_mut = scale::DEFAULT_MICRO_MUT))]
 #[allow(clippy::too_many_arguments)]
 pub fn scale_fn(
     graph: &Bound<'_, PyAny>,
@@ -383,23 +438,14 @@ pub fn scale_fn(
     mut_rate: f64,
     gap: usize,
     beta: f64,
-    adaptive_stop: bool,
-    conv_pval: f64,
+    macro_cap: f64,
+    micro_mut: f64,
 ) -> PyResult<Py<PyAny>> {
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
-    let part = scale::scale(
-        &nodes,
-        &edges,
-        pop_size,
-        num_gens,
-        cross_rate,
-        mut_rate,
-        gap,
-        beta,
-        adaptive_stop,
-        conv_pval,
+    let part = scale::scale_capped(
+        &nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, beta, macro_cap, micro_mut,
     );
     let d = PyDict::new(py);
     for (node, comm) in part {
@@ -410,9 +456,45 @@ pub fn scale_fn(
 
 /// `scale`'s merged rank-1 front (after union-refinement), the candidate set
 /// `scale` selects from. Isolated nodes get -1.
+///
+/// Args:
+///     macro_cap: multiplier on the macro population's centre ceiling, which is
+///         ``ceil(macro_cap * sqrt(n))`` communities (still hard-capped at
+///         ``n``). ``1.0`` is the historical ``ceil(sqrt(n))`` and is exactly
+///         behaviour-preserving. Raise it when the true community count exceeds
+///         ``sqrt(n)``: the heterogeneous-objective gain measured on LFR holds
+///         while ``cap/k_true >= 1`` (+0.016 ARI at n <= 1000, +0.019 at
+///         n = 2000) and disappears once the ceiling can no longer express
+///         ``k_true`` (n = 5000/10000, ``cap/k_true`` 0.64/0.45).
+///     topo_mode: operator bitmask. Two bits remain: ``2`` neighbour-majority
+///         micro mutation and ``128`` faithful HP-MOCD ensemble crossover (4
+///         distinct parents). They combine freely, and the shipped default is
+///         ``130 = 128 | 2``. ``0`` is the historical operator set.
+///
+///         Every other bit is DELETED and silently inert. Bits ``1``, ``4``,
+///         ``8``, ``16``, ``32`` and ``64`` used to select a 3-parent ensemble
+///         crossover, a k-aware macro mutation, a community-split mutation, a
+///         multi-community graft, the ``wadj``-weighted local search and a
+///         2-hop-exclusion macro centre init respectively. None of them beat the
+///         shipped mask, so the code is gone; the bits are deliberately not
+///         reused, so old benchmark rows recording them cannot be confused with
+///         a new operator.
+///
+///     obj_mode: objective placement. Two objective sets remain, at their
+///         original ids: ``0`` = ``(KKM, RC)`` and ``6`` = ``(intra, inter)``.
+///         Values under ``100`` are homogeneous; ``100 <= v < 1000`` is
+///         heterogeneous with one decimal digit per side (``micro =
+///         (v-100)//10``, ``macro = (v-100)%10``), so the shipped default
+///         ``160`` is micro ``(intra, inter)`` / macro ``(KKM, RC)``. Ids
+///         ``1..=5`` and ``7..=12`` were losing objective sets and now decode to
+///         the default, exactly as any out-of-range id always did.
+///
+/// Note: the published algorithm's local-search step (a Louvain-first-phase
+/// modularity ascent on the rank-1 micro members) is intentionally NOT
+/// implemented. It was removed outright, so there is no parameter to enable it.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(name = "scale_fronts", signature = (graph, pop_size = scale::DEFAULT_POP_SIZE, num_gens = scale::DEFAULT_NUM_GENS, cross_rate = scale::DEFAULT_CROSS_RATE, mut_rate = scale::DEFAULT_MUT_RATE, gap = scale::DEFAULT_GAP, beta = scale::DEFAULT_BETA, adaptive_stop = false, conv_pval = scale::CONV_PVAL, refine = true, topo_mode = 0))]
+#[pyo3(name = "scale_fronts", signature = (graph, pop_size = scale::DEFAULT_POP_SIZE, num_gens = scale::DEFAULT_NUM_GENS, cross_rate = scale::DEFAULT_CROSS_RATE, mut_rate = scale::DEFAULT_MUT_RATE, gap = scale::DEFAULT_GAP, beta = scale::DEFAULT_BETA, refine = true, topo_mode = scale::DEFAULT_TOPO_MODE, obj_mode = scale::DEFAULT_OBJ_MODE, macro_cap = scale::DEFAULT_MACRO_CAP, micro_mut = scale::DEFAULT_MICRO_MUT))]
 #[allow(clippy::too_many_arguments)]
 pub fn scale_fronts_fn(
     graph: &Bound<'_, PyAny>,
@@ -422,27 +504,18 @@ pub fn scale_fronts_fn(
     mut_rate: f64,
     gap: usize,
     beta: f64,
-    adaptive_stop: bool,
-    conv_pval: f64,
     refine: bool,
     topo_mode: u8,
+    obj_mode: u16,
+    macro_cap: f64,
+    micro_mut: f64,
 ) -> PyResult<Py<PyAny>> {
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
-    let fronts = scale::scale_fronts(
-        &nodes,
-        &edges,
-        pop_size,
-        num_gens,
-        cross_rate,
-        mut_rate,
-        gap,
-        beta,
-        adaptive_stop,
-        conv_pval,
-        refine,
-        topo_mode,
+    let fronts = scale::scale_fronts_capped(
+        &nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, beta, refine, topo_mode,
+        obj_mode, macro_cap, micro_mut,
     );
     let out = PyList::empty(py);
     for part in fronts {

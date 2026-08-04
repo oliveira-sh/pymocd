@@ -1,5 +1,3 @@
-use rand::RngExt; // rand 0.10: random_range/random_bool live on RngExt
-
 // Both objectives minimized, stored as (KKM, RC).
 #[inline]
 fn dominates(a: (f64, f64), b: (f64, f64)) -> bool {
@@ -153,33 +151,6 @@ pub fn environment_selection(objs: &[(f64, f64)], keep: usize) -> Vec<usize> {
     survivors
 }
 
-/// Binary tournament: lower rank wins, ties broken by higher crowding distance.
-/// Unused by the operators (they carry their own copy); kept for completeness.
-#[allow(dead_code)]
-pub fn tournament(ranks: &[usize], crowd: &[f64], r: &mut impl rand::Rng) -> usize {
-    let n = ranks.len();
-    debug_assert!(n > 0, "tournament on empty population");
-    if n == 1 {
-        return 0;
-    }
-
-    let a = r.random_range(0..n);
-    let mut b = r.random_range(0..n);
-    while b == a {
-        b = r.random_range(0..n);
-    }
-
-    if ranks[a] < ranks[b] {
-        a
-    } else if ranks[b] < ranks[a] {
-        b
-    } else if crowd[a] >= crowd[b] {
-        a
-    } else {
-        b
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -220,25 +191,5 @@ mod tests {
         assert_eq!(environment_selection(&objs, 10).len(), 2);
         assert_eq!(environment_selection(&objs, 0).len(), 0);
         assert!(environment_selection(&[], 5).is_empty());
-    }
-
-    #[test]
-    fn test_tournament_prefers_lower_rank() {
-        let ranks = vec![1usize, 2usize];
-        let crowd = vec![0.0f64, 100.0f64];
-        let mut r = rand::rng();
-        for _ in 0..50 {
-            assert_eq!(tournament(&ranks, &crowd, &mut r), 0);
-        }
-    }
-
-    #[test]
-    fn test_tournament_tiebreak_crowding() {
-        let ranks = vec![1usize, 1usize];
-        let crowd = vec![5.0f64, 1.0f64];
-        let mut r = rand::rng();
-        for _ in 0..50 {
-            assert_eq!(tournament(&ranks, &crowd, &mut r), 0);
-        }
     }
 }
