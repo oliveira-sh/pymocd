@@ -47,15 +47,7 @@ communities = pymocd.scale(
 )
 ```
 
-`gap` is the macro/micro co-evolution interval and `beta` the micro-stage perturbation strength.
-
-`scale` additionally supports an adaptive stopping rule:
-
-```python
-communities = pymocd.scale(G, adaptive_stop=True, conv_pval=0.1)
-```
-
-With `adaptive_stop=True`, a Welch t-test detects when the front has plateaued and stops early; `num_gens` then acts as a safety ceiling rather than a fixed budget.
+`gap` is the macro/micro co-evolution interval and `beta` the micro-stage perturbation strength. `num_gens` is the generation count: the search always runs all of them.
 
 For tuned HP-MOCD runs, use the `HpMocd` class — it exposes custom objectives, a per-generation callback, and the raw Pareto front:
 
