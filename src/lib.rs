@@ -5,7 +5,7 @@
 
 use pyo3::prelude::*;
 mod api;
-mod core;
+pub mod core;
 use api::detectors::*;
 use api::max_cores;
 use api::metrics::*;
