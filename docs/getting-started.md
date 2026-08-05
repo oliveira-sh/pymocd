@@ -18,14 +18,14 @@ make build
 
 ## First detection
 
-`pymocd.scale` is the recommended entry point:
+`pymocd.smocc` is the recommended entry point:
 
 ```python
 import networkx as nx
 import pymocd
 
 G = nx.karate_club_graph()
-communities = pymocd.scale(G)
+communities = pymocd.smocc(G)
 ```
 
 !!! important "Graph format"
@@ -33,10 +33,10 @@ communities = pymocd.scale(G)
 
 ## Tuning
 
-`scale` and `mmcomo` share the same evolutionary knobs:
+`smocc` and `mmcomo` share the same evolutionary knobs:
 
 ```python
-communities = pymocd.scale(
+communities = pymocd.smocc(
     G,
     pop_size=100,
     num_gens=50,
@@ -90,10 +90,10 @@ Each metric is also available on its own: `pymocd.nmi`, `pymocd.ami`, `pymocd.ar
 
 ## Inspecting Pareto fronts
 
-`scale`, `mmcomo`, `ccm`, `krm` and `moga_net` each pick one partition from a Pareto front of candidates. To see the whole candidate set, use `scale_fronts`, `mmcomo_fronts`, `ccm_fronts`, `krm_fronts` or `moga_net_fronts`, which accept the same evolutionary kwargs as their detector (`scale_fronts` adds `refine` and `topo_mode`) and return a `list[dict[node, community]]`:
+`smocc`, `mmcomo`, `ccm`, `krm` and `moga_net` each pick one partition from a Pareto front of candidates. To see the whole candidate set, use `smocc_fronts`, `mmcomo_fronts`, `ccm_fronts`, `krm_fronts` or `moga_net_fronts`, which accept the same evolutionary kwargs as their detector (`smocc_fronts` adds `refine` and `topo_mode`) and return a `list[dict[node, community]]`:
 
 ```python
-front = pymocd.scale_fronts(G)
+front = pymocd.smocc_fronts(G)
 best = max(front, key=lambda p: pymocd.ari(p, gt))
 ```
 

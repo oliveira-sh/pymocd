@@ -14,7 +14,7 @@ use crate::core::algorithms::krm;
 use crate::core::algorithms::mmcomo;
 use crate::core::algorithms::mocd;
 use crate::core::algorithms::moganet;
-use crate::core::algorithms::scale;
+use crate::core::algorithms::smocc;
 use crate::core::graph::{Graph, Partition, get_edges, get_nodes};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
@@ -409,7 +409,7 @@ pub fn mmcomo_fronts_fn(
     Ok(out.into_any().unbind())
 }
 
-/// `scale` — optimized MMCoMO variant (sparse-CSR similarity, Rayon-parallel,
+/// `smocc` — optimized MMCoMO variant (sparse-CSR similarity, Rayon-parallel,
 /// union-refined Pareto front). Returns the label-free-selected member of the
 /// merged rank-1 front. Isolated nodes get -1.
 ///
@@ -428,9 +428,9 @@ pub fn mmcomo_fronts_fn(
 /// implemented. It was removed outright, so there is no parameter to enable it.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(name = "scale", signature = (graph, pop_size = scale::DEFAULT_POP_SIZE, num_gens = scale::DEFAULT_NUM_GENS, cross_rate = scale::DEFAULT_CROSS_RATE, mut_rate = scale::DEFAULT_MUT_RATE, gap = scale::DEFAULT_GAP, beta = scale::DEFAULT_BETA, macro_cap = scale::DEFAULT_MACRO_CAP, micro_mut = scale::DEFAULT_MICRO_MUT))]
+#[pyo3(name = "smocc", signature = (graph, pop_size = smocc::DEFAULT_POP_SIZE, num_gens = smocc::DEFAULT_NUM_GENS, cross_rate = smocc::DEFAULT_CROSS_RATE, mut_rate = smocc::DEFAULT_MUT_RATE, gap = smocc::DEFAULT_GAP, beta = smocc::DEFAULT_BETA, macro_cap = smocc::DEFAULT_MACRO_CAP, micro_mut = smocc::DEFAULT_MICRO_MUT))]
 #[allow(clippy::too_many_arguments)]
-pub fn scale_fn(
+pub fn smocc_fn(
     graph: &Bound<'_, PyAny>,
     pop_size: usize,
     num_gens: usize,
@@ -444,7 +444,7 @@ pub fn scale_fn(
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
-    let part = scale::scale_capped(
+    let part = smocc::smocc_capped(
         &nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, beta, macro_cap, micro_mut,
     );
     let d = PyDict::new(py);
@@ -454,8 +454,8 @@ pub fn scale_fn(
     Ok(d.into_any().unbind())
 }
 
-/// `scale`'s merged rank-1 front (after union-refinement), the candidate set
-/// `scale` selects from. Isolated nodes get -1.
+/// `smocc`'s merged rank-1 front (after union-refinement), the candidate set
+/// `smocc` selects from. Isolated nodes get -1.
 ///
 /// Args:
 ///     macro_cap: multiplier on the macro population's centre ceiling, which is
@@ -494,9 +494,9 @@ pub fn scale_fn(
 /// implemented. It was removed outright, so there is no parameter to enable it.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(name = "scale_fronts", signature = (graph, pop_size = scale::DEFAULT_POP_SIZE, num_gens = scale::DEFAULT_NUM_GENS, cross_rate = scale::DEFAULT_CROSS_RATE, mut_rate = scale::DEFAULT_MUT_RATE, gap = scale::DEFAULT_GAP, beta = scale::DEFAULT_BETA, refine = true, topo_mode = scale::DEFAULT_TOPO_MODE, obj_mode = scale::DEFAULT_OBJ_MODE, macro_cap = scale::DEFAULT_MACRO_CAP, micro_mut = scale::DEFAULT_MICRO_MUT))]
+#[pyo3(name = "smocc_fronts", signature = (graph, pop_size = smocc::DEFAULT_POP_SIZE, num_gens = smocc::DEFAULT_NUM_GENS, cross_rate = smocc::DEFAULT_CROSS_RATE, mut_rate = smocc::DEFAULT_MUT_RATE, gap = smocc::DEFAULT_GAP, beta = smocc::DEFAULT_BETA, refine = true, topo_mode = smocc::DEFAULT_TOPO_MODE, obj_mode = smocc::DEFAULT_OBJ_MODE, macro_cap = smocc::DEFAULT_MACRO_CAP, micro_mut = smocc::DEFAULT_MICRO_MUT))]
 #[allow(clippy::too_many_arguments)]
-pub fn scale_fronts_fn(
+pub fn smocc_fronts_fn(
     graph: &Bound<'_, PyAny>,
     pop_size: usize,
     num_gens: usize,
@@ -513,7 +513,7 @@ pub fn scale_fronts_fn(
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
-    let fronts = scale::scale_fronts_capped(
+    let fronts = smocc::smocc_fronts_capped(
         &nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, beta, refine, topo_mode,
         obj_mode, macro_cap, micro_mut,
     );

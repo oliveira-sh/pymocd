@@ -37,5 +37,5 @@ path = "src/bin/stub_gen.rs"
 name = "pymocd"
 
 [[bin]]
-name = "profile_scale"
-path = "src/bin/profile_scale.rs"
+name = "profile_smocc"
+path = "src/bin/profile_smocc.rs"

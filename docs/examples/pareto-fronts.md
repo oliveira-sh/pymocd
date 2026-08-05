@@ -66,14 +66,14 @@ best, _ = min(front, key=lambda sol: abs(len(set(sol[0].values())) - target))
 
 ## The `*_fronts` functions
 
-`scale`, `mmcomo`, `ccm`, `krm` and `moga_net` expose their candidate sets as a plain `list[dict]` of partitions — no objective values attached. Each list is exactly what the corresponding detector selects from:
+`smocc`, `mmcomo`, `ccm`, `krm` and `moga_net` expose their candidate sets as a plain `list[dict]` of partitions — no objective values attached. Each list is exactly what the corresponding detector selects from:
 
 ```python
-candidates = pymocd.scale_fronts(G)
+candidates = pymocd.smocc_fronts(G)
 best = max(candidates, key=lambda p: pymocd.ari(p, gt))
 ```
 
-Each takes the same kwargs as its detector; `scale_fronts` adds two of its own: `refine` (apply union-refinement to the merged front, on by default) and `topo_mode` (topology-handling mode, integer).
+Each takes the same kwargs as its detector; `smocc_fronts` adds two of its own: `refine` (apply union-refinement to the merged front, on by default) and `topo_mode` (topology-handling mode, integer).
 
 The baseline fronts exist because the original papers report the best-NMI solution *of the front*, not the max-modularity one their detectors return — reproducing those tables needs the full candidate set:
 

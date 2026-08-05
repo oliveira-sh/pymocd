@@ -17,8 +17,14 @@ pub fn max_cores(num_threads: usize) -> PyResult<()> {
             .num_threads(num_threads)
             .build_global()
             .unwrap();
-        debug!(warn, "Global thread pool initialized initialized with {} threads", num_threads);
-        debug!(warn, "Using max_cores again has no effect, due to static ThreadPoolBuilder initialization")
+        debug!(
+            warn,
+            "Global thread pool initialized initialized with {} threads", num_threads
+        );
+        debug!(
+            warn,
+            "Using max_cores again has no effect, due to static ThreadPoolBuilder initialization"
+        )
     });
     Ok(())
 }

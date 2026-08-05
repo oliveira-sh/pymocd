@@ -8,12 +8,12 @@ class TestDeterminism(unittest.TestCase):
     def setUp(self):
         self.graph = nx.karate_club_graph()
 
-    def test_scale_is_deterministic(self):
-        self.assertEqual(pymocd.scale(self.graph), pymocd.scale(self.graph))
+    def test_smocc_is_deterministic(self):
+        self.assertEqual(pymocd.smocc(self.graph), pymocd.smocc(self.graph))
 
-    def test_scale_fronts_is_deterministic(self):
+    def test_smocc_fronts_is_deterministic(self):
         self.assertEqual(
-            pymocd.scale_fronts(self.graph), pymocd.scale_fronts(self.graph)
+            pymocd.smocc_fronts(self.graph), pymocd.smocc_fronts(self.graph)
         )
 
     def test_hpmocd_repeated_runs_are_valid(self):

@@ -1,6 +1,7 @@
-//! SCALE — sparse macro-micro co-evolutionary multi-objective community
-//! detection (Zhang et al., IEEE CIM), reformulated over a CSR graph and a
-//! sparse edge similarity for near-linear memory/time.
+//! SMOCC — Sparse Multi-Objective Co-evolutionary Community detection,
+//! a macro-micro co-evolutionary detector (Zhang et al., IEEE CIM lineage)
+//! reformulated over a CSR graph and a sparse edge similarity for
+//! near-linear memory/time.
 //!
 //! The paper's Louvain local-search step is deliberately deleted, not
 //! feature-flagged: re-adding it is a change of algorithm and must be
@@ -375,7 +376,7 @@ fn to_output(g: &CsrGraph, labels: &Labels) -> Vec<(i32, i32)> {
 
 #[cfg_attr(not(test), allow(dead_code))]
 #[allow(clippy::too_many_arguments)]
-pub fn scale(
+pub fn smocc(
     nodes: &[i32],
     edges: &[(i32, i32)],
     pop: usize,
@@ -385,7 +386,7 @@ pub fn scale(
     gap: usize,
     beta: f64,
 ) -> Vec<(i32, i32)> {
-    scale_capped(
+    smocc_capped(
         nodes,
         edges,
         pop,
@@ -400,7 +401,7 @@ pub fn scale(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn scale_capped(
+pub fn smocc_capped(
     nodes: &[i32],
     edges: &[(i32, i32)],
     pop: usize,
@@ -485,7 +486,7 @@ fn select_best(g: &CsrGraph, front: Vec<Labels>) -> Labels {
 
 #[cfg_attr(not(test), allow(dead_code))]
 #[allow(clippy::too_many_arguments)]
-pub fn scale_fronts(
+pub fn smocc_fronts(
     nodes: &[i32],
     edges: &[(i32, i32)],
     pop: usize,
@@ -498,7 +499,7 @@ pub fn scale_fronts(
     topo_mode: u8,
     obj_mode: u16,
 ) -> Vec<Vec<(i32, i32)>> {
-    scale_fronts_capped(
+    smocc_fronts_capped(
         nodes,
         edges,
         pop,
@@ -516,7 +517,7 @@ pub fn scale_fronts(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn scale_fronts_capped(
+pub fn smocc_fronts_capped(
     nodes: &[i32],
     edges: &[(i32, i32)],
     pop: usize,
@@ -619,7 +620,7 @@ mod tests {
     #[test]
     fn finds_two_community_split() {
         let nodes: Vec<i32> = (0..10).collect();
-        let out = scale(
+        let out = smocc(
             &nodes,
             &two_clique_edges(),
             60,
@@ -642,7 +643,7 @@ mod tests {
     #[test]
     fn isolated_node_gets_minus_one() {
         let nodes: Vec<i32> = (0..7).collect();
-        let out = scale(
+        let out = smocc(
             &nodes,
             &two_triangle_edges(),
             40,
@@ -659,7 +660,7 @@ mod tests {
     #[test]
     fn fronts_are_nonempty() {
         let nodes: Vec<i32> = (0..6).collect();
-        let fronts = scale_fronts(
+        let fronts = smocc_fronts(
             &nodes,
             &two_triangle_edges(),
             40,
@@ -680,7 +681,7 @@ mod tests {
     fn fronts_are_deterministic() {
         let nodes: Vec<i32> = (0..6).collect();
         let run = || {
-            scale_fronts(
+            smocc_fronts(
                 &nodes,
                 &two_triangle_edges(),
                 40,
@@ -703,7 +704,7 @@ mod tests {
         let edges = two_clique_edges();
         for obj_mode in [106u16, 160, 166, 100] {
             let run = || {
-                scale_fronts(
+                smocc_fronts(
                     &nodes,
                     &edges,
                     40,
@@ -729,7 +730,7 @@ mod tests {
         let nodes: Vec<i32> = (0..10).collect();
         let edges = two_clique_edges();
         let run = |obj_mode: u16| {
-            scale_fronts(
+            smocc_fronts(
                 &nodes,
                 &edges,
                 40,
@@ -755,7 +756,7 @@ mod tests {
         let (nodes, edges) = grid(10, 10);
         let n = nodes.len();
         let run = |obj_mode: u16| {
-            scale_fronts(
+            smocc_fronts(
                 &nodes,
                 &edges,
                 40,
@@ -823,7 +824,7 @@ mod tests {
         let edges = two_clique_edges();
         for obj_mode in [0u16, 160] {
             let legacy = || {
-                scale_fronts(
+                smocc_fronts(
                     &nodes,
                     &edges,
                     40,
@@ -838,7 +839,7 @@ mod tests {
                 )
             };
             let capped = |cap: f64| {
-                scale_fronts_capped(
+                smocc_fronts_capped(
                     &nodes,
                     &edges,
                     40,
@@ -867,7 +868,7 @@ mod tests {
             );
             assert_eq!(legacy(), legacy());
         }
-        let selected = scale_capped(
+        let selected = smocc_capped(
             &nodes,
             &edges,
             40,
@@ -879,7 +880,7 @@ mod tests {
             DEFAULT_MACRO_CAP,
             DEFAULT_MICRO_MUT,
         );
-        let legacy = scale(
+        let legacy = smocc(
             &nodes,
             &edges,
             40,
@@ -891,7 +892,7 @@ mod tests {
         );
         assert_eq!(
             selected, legacy,
-            "scale/scale_capped diverged at the default"
+            "smocc/smocc_capped diverged at the default"
         );
     }
 
@@ -902,7 +903,7 @@ mod tests {
         for obj_mode in [0u16, 160] {
             for cap in [1.0f64, 2.0, 4.0] {
                 let run = || {
-                    scale_fronts_capped(
+                    smocc_fronts_capped(
                         &nodes,
                         &edges,
                         40,
@@ -936,7 +937,7 @@ mod tests {
         assert_eq!(macro_cmax(n, 1.0), 8);
         assert_eq!(macro_cmax(n, 4.0), 31);
         let run = |cap: f64| {
-            scale_fronts_capped(
+            smocc_fronts_capped(
                 &nodes,
                 &edges,
                 40,
@@ -965,7 +966,7 @@ mod tests {
         let n = nodes.len();
         for topo_mode in [0u8, 2, 128, 130] {
             let run = || {
-                scale_fronts_capped(
+                smocc_fronts_capped(
                     &nodes,
                     &edges,
                     40,
@@ -995,7 +996,7 @@ mod tests {
     fn only_the_two_live_topo_bits_change_the_front() {
         let (nodes, edges) = grid(10, 10);
         let run = |topo_mode: u8| {
-            scale_fronts_capped(
+            smocc_fronts_capped(
                 &nodes,
                 &edges,
                 40,

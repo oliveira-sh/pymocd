@@ -22,12 +22,12 @@ def _restore_labels(part, inverse):
     return {inverse[n]: c for n, c in part.items()}
 
 
-@algorithm("Scale", needs_conversion=False, parallel=False)
+@algorithm("SMOCC", needs_conversion=False, parallel=False)
 @_safe
 @_with_seed
-def scale_algorithm(G):
+def smocc_algorithm(G):
     H, inverse = _ensure_int_nodes(G)
-    return _restore_labels(pymocd.scale(H), inverse)
+    return _restore_labels(pymocd.smocc(H), inverse)
 
 
 @algorithm("HPMOCD", needs_conversion=False, parallel=False)

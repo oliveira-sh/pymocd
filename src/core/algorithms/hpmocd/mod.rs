@@ -9,9 +9,9 @@ mod objectives;
 mod operators;
 mod utils;
 
+use crate::core::graph::normalize_community_ids;
 use crate::core::graph::{Graph, Partition};
 use individual::{Individual, TOURNAMENT_SIZE};
-use crate::core::graph::normalize_community_ids;
 use utils::max_q_selection;
 
 use pyo3::prelude::*;

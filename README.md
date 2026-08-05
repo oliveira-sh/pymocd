@@ -33,7 +33,7 @@ import networkx as nx
 import pymocd
 
 G = nx.karate_club_graph()          # any NetworkX / igraph graph, integer node ids
-communities = pymocd.scale(G)       # -> dict[node, community]
+communities = pymocd.smocc(G)       # -> dict[node, community]
 ```
 
 > [!IMPORTANT]
@@ -44,13 +44,13 @@ Every detector returns a single crisp partition as `dict[node, community]`.
 
 ### Algorithms
 
-`pymocd` ships eight detectors. **SCALE** and **HP-MOCD** are the library's
+`pymocd` ships eight detectors. **SMOCC** and **HP-MOCD** are the library's
 own contributions; the remaining six are faithful re-implementations of
 published baselines (the original authors released no code).
 
 | API | Algorithm | Objectives & engine | Solution selection | Year |
 |---|---|---|---|---|
-| `scale` | **SCALE** (Santos, in prep.) | KKM / ratio-cut bi-objective, sparse macro–micro co-evolutionary NSGA-II (near-linear, no dense kernel) | label-free **SBM/MDL** description length | 2026 |
+| `smocc` | **SMOCC** (Santos, in prep.) | heterogeneous intra/inter + KKM/ratio-cut objectives, sparse macro–micro co-evolutionary NSGA-II (near-linear, no dense kernel) | label-free normalised scalarisation | 2026 |
 | `hpmocd` | **HP-MOCD** ([Santos et al.](https://doi.org/10.1007/s13278-025-01519-7)) | decomposed modularity, parallel NSGA-II | max modularity *Q* | 2025 |
 | `mmcomo` | **MMCoMO** ([Zhang et al.](https://ieeexplore.ieee.org/document/10188453)) | kernel *k*-means + ratio cut, macro/micro co-evolutionary NSGA-II | max *Q* (front via `mmcomo_fronts`) | 2023 |
 | `ccm` | **CCM** ([Shaik et al.](https://doi.org/10.1007/s42979-020-00382-x)) | score + fitness + modularity, NSGA-III | max *Q* (front via `ccm_fronts`) | 2021 |
@@ -65,7 +65,7 @@ published baselines (the original authors released no code).
 import pymocd
 
 # Recommended detectors (defaults work out of the box)
-part = pymocd.scale(G)            # SCALE
+part = pymocd.smocc(G)            # SMOCC
 part = pymocd.hpmocd(G)           # HP-MOCD
 
 # Baselines (sensible defaults; pop_size / num_gens / rates are tunable kwargs)
@@ -82,7 +82,7 @@ part = pymocd.mmcomo(G)           # MMCoMO (Zhang et al.), macro/micro co-evolut
 The Pareto frontier of some algorithms is exposed for inspection:
 
 ```python
-fronts = pymocd.scale_fronts(G)      # list[dict[node, community]]
+fronts = pymocd.smocc_fronts(G)      # list[dict[node, community]]
 fronts = pymocd.mmcomo_fronts(G)     # list[dict[node, community]]
 ```
 

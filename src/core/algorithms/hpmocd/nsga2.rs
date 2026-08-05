@@ -7,11 +7,9 @@
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use crate::core::graph::Graph;
-use super::individual::{
-    Individual, create_offspring, fast_non_dominated_sort,
-};
+use super::individual::{Individual, create_offspring, fast_non_dominated_sort};
 use super::operators;
+use crate::core::graph::Graph;
 use rustc_hash::FxHashMap as HashMap;
 use std::cmp::Ordering;
 

@@ -12,9 +12,9 @@ pub type CommunityId = i32;
 pub type Partition = FxHashMap<NodeId, CommunityId>;
 
 mod adj;
+mod csr;
 #[cfg(test)]
 pub mod karate;
-mod csr;
 
 pub use adj::{Graph, get_edges, get_nodes};
 pub use csr::CsrGraph;

@@ -28,7 +28,7 @@ for n in network_sizes:
                 )
 
                 start = time.time()
-                rdict = pymocd.scale(G, pop_size=pop_size, num_gens=num_gens)
+                rdict = pymocd.smocc(G, pop_size=pop_size, num_gens=num_gens)
                 elapsed = time.time() - start
 
                 metrics = evaluate_communities(G, rdict, ground_truth, convert=False)

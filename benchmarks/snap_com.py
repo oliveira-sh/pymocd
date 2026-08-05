@@ -1,4 +1,4 @@
-"""SCALE vs Leiden on the SNAP com- networks with ground-truth communities.
+"""SMOCC vs Leiden on the SNAP com- networks with ground-truth communities.
 
 Ground truth is the top-5000 quality communities per network; they overlap and
 cover only part of the graph, so NMI/AMI are computed on the nodes that belong
@@ -128,13 +128,13 @@ def main():
         )
 
         t0 = time.time()
-        part = pymocd.scale(Shim(n, e))
+        part = pymocd.smocc(Shim(n, e))
         t_scale = time.time() - t0
         lab = np.zeros(n, dtype=np.int64)
         for k, v in part.items():
             lab[k] = v
         append_row(
-            {"network": f"com-{name}", "algorithm": "Scale", "n": n, "m": m,
+            {"network": f"com-{name}", "algorithm": "SMOCC", "n": n, "m": m,
              "coverage": cov, "time": t_scale,
              **evaluate(lab, g_ig, eval_nodes, eval_labels)}
         )
