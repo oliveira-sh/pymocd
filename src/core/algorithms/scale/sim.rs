@@ -42,12 +42,27 @@ pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
     let mut vote = vec![0.0f64; n];
     let mut touched: Vec<usize> = Vec::with_capacity(64);
 
+    // Active set. A node's next label is a pure function of its own label and
+    // of the labels/weights on its incident edges (`wadj` is fixed for the
+    // whole decode), and that function is idempotent: it re-selects the label
+    // it just wrote. A node none of whose inputs moved since its last
+    // evaluation therefore recomputes the same label and cannot set `changed`,
+    // so skipping it is observationally identical to rescanning it. The visit
+    // order stays ascending `0..n`, keeping the Gauss-Seidel trajectory
+    // intact - a neighbour `v > u` dirtied while evaluating `u` is still
+    // reached later in the same sweep. Centres are fixed seeds, so they are
+    // permanently clean. Requires a symmetric adjacency (CsrGraph::from_edges
+    // pushes both directions), so every reader of a label that moved is
+    // reachable from the node that moved it.
+    let mut dirty: Vec<bool> = is_center.iter().map(|&c| !c).collect();
+
     for _ in 0..n {
         let mut changed = false;
         for u in 0..n {
-            if is_center[u] {
+            if !dirty[u] {
                 continue;
             }
+            dirty[u] = false;
             touched.clear();
             let start = g.xadj[u] as usize;
             let end = g.xadj[u + 1] as usize;
@@ -79,6 +94,12 @@ pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
             if best != lab[u] {
                 lab[u] = best;
                 changed = true;
+                for &v in &g.adj[start..end] {
+                    let v = v as usize;
+                    if !is_center[v] {
+                        dirty[v] = true;
+                    }
+                }
             }
         }
         if !changed {
