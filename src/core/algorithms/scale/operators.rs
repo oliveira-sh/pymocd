@@ -2,7 +2,6 @@ use crate::core::graph::CsrGraph;
 use rand::rngs::StdRng;
 use rand::{Rng, RngExt, SeedableRng};
 use rayon::prelude::*;
-use rustc_hash::FxHashMap;
 
 use super::{Genome, Labels};
 
@@ -184,33 +183,57 @@ pub fn micro_offspring_topo(
                         tries += 1;
                     }
                     child = Vec::with_capacity(n);
-                    let mut counts: FxHashMap<i32, u32> = FxHashMap::default();
-                    let mut tied: Vec<i32> = Vec::with_capacity(ENSEMBLE);
+                    let pr: Vec<&Labels> = idx.iter().map(|&pi| &parents[pi]).collect();
+                    // At most ENSEMBLE distinct labels per node, so a linear scan
+                    // over a fixed array replaces the hash map exactly; the tie
+                    // set is emitted in ascending order, as map+sort produced it.
+                    let mut labs = [0i32; ENSEMBLE];
+                    let mut cnts = [0u32; ENSEMBLE];
+                    let mut tied = [0i32; ENSEMBLE];
                     #[allow(clippy::needless_range_loop)]
                     for i in 0..n {
-                        counts.clear();
+                        let mut nd = 0usize;
                         let mut max_c = 0u32;
-                        for &pi in &idx {
-                            let l = parents[pi][i];
-                            let e = counts.entry(l).or_insert(0);
-                            *e += 1;
-                            if *e > max_c {
-                                max_c = *e;
+                        for p in &pr {
+                            let l = p[i];
+                            let mut hit = nd;
+                            for s in 0..nd {
+                                if labs[s] == l {
+                                    hit = s;
+                                    break;
+                                }
+                            }
+                            if hit == nd {
+                                labs[nd] = l;
+                                cnts[nd] = 1;
+                                nd += 1;
+                            } else {
+                                cnts[hit] += 1;
+                            }
+                            if cnts[hit] > max_c {
+                                max_c = cnts[hit];
                             }
                         }
-                        tied.clear();
-                        for (&l, &c) in counts.iter() {
-                            if c == max_c {
-                                tied.push(l);
+                        let mut tn = 0usize;
+                        for s in 0..nd {
+                            if cnts[s] == max_c {
+                                tied[tn] = labs[s];
+                                tn += 1;
                             }
                         }
-                        // FxHashMap iteration order is unstable across runs;
-                        // sorting keeps the fronts byte-reproducible.
-                        tied.sort_unstable();
-                        let lab = if tied.len() == 1 {
+                        for q in 1..tn {
+                            let v = tied[q];
+                            let mut w = q;
+                            while w > 0 && tied[w - 1] > v {
+                                tied[w] = tied[w - 1];
+                                w -= 1;
+                            }
+                            tied[w] = v;
+                        }
+                        let lab = if tn == 1 {
                             tied[0]
                         } else {
-                            tied[r.random_range(0..tied.len())]
+                            tied[r.random_range(0..tn)]
                         };
                         child.push(lab);
                     }
@@ -229,22 +252,33 @@ pub fn micro_offspring_topo(
             } else {
                 child = parents[a].clone();
             }
-            let mut freq: FxHashMap<i32, u32> = FxHashMap::default();
+            // Micro labels are always node ids in 0..n, so a dense counter with an
+            // O(touched) reset replaces the hash map exactly: same neighbour scan
+            // order, same strict `>` first-to-the-max tie-break.
+            let mut freq: Vec<u32> = if topo_mut { vec![0u32; n] } else { Vec::new() };
+            let mut touched: Vec<usize> = Vec::new();
             for i in 0..n {
                 let nbrs = g.neighbors(i);
                 if !nbrs.is_empty() && r.random_bool(p_mut) {
                     if topo_mut {
-                        freq.clear();
+                        touched.clear();
                         let mut best = child[i];
                         let mut bestc = 0u32;
                         for &v in nbrs {
                             let l = child[v as usize];
-                            let e = freq.entry(l).or_insert(0);
+                            let li = l as usize;
+                            let e = &mut freq[li];
+                            if *e == 0 {
+                                touched.push(li);
+                            }
                             *e += 1;
                             if *e > bestc {
                                 bestc = *e;
                                 best = l;
                             }
+                        }
+                        for &t in &touched {
+                            freq[t] = 0;
                         }
                         child[i] = best;
                     } else {
