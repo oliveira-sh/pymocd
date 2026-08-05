@@ -348,7 +348,7 @@ fn run_fronts(
     };
 
     if do_refine {
-        refine::refine_front(g, front, cfg.micro)
+        refine::refine_front(g, &wadj, front, cfg.micro)
     } else {
         front
     }

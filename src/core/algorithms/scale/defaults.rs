@@ -1,12 +1,9 @@
-//! Measured defaults, not the MMCoMO paper's (which under-mutate and starve
-//! recombination). Changing any constant changes the shipped algorithm:
-//! re-measure before shipping.
-
 pub const DEFAULT_POP_SIZE: usize = 100;
 
 pub const DEFAULT_NUM_GENS: usize = 100;
 
 pub const DEFAULT_CROSS_RATE: f64 = 0.7;
+
 pub const DEFAULT_MUT_RATE: f64 = 0.5;
 
 pub const DEFAULT_MICRO_MUT: f64 = 0.5;
