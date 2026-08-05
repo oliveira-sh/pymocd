@@ -1,4 +1,5 @@
 use crate::core::graph::CsrGraph;
+use rand::distr::Bernoulli;
 use rand::rngs::StdRng;
 use rand::{Rng, RngExt, SeedableRng};
 use rayon::prelude::*;
@@ -38,6 +39,20 @@ pub(super) fn slot_rng(salt: u64, slot: usize) -> StdRng {
     )
 }
 
+// `random_bool(p)` rebuilds a `Bernoulli` on every call: a reload of `p`, a
+// multiply, a saturating cast and a range check per draw. Every `p` below is
+// loop-invariant, so the distribution is built once and sampled instead.
+// `Bernoulli::sample` pulls the same single `u64` and compares it against the
+// same `p_int`, so the RNG stream is unchanged draw for draw — including
+// `p == 1.0`, which consumes nothing in either form.
+#[inline]
+fn bernoulli(p: f64) -> Bernoulli {
+    match Bernoulli::new(p) {
+        Ok(d) => d,
+        Err(_) => panic!("p={p:?} is outside range [0.0, 1.0]"),
+    }
+}
+
 #[inline]
 fn tournament(ranks: &[usize], crowd: &[f64], r: &mut impl Rng) -> usize {
     let len = ranks.len();
@@ -70,10 +85,15 @@ pub fn macro_offspring(
             let b = tournament(ranks, crowd, &mut r);
             let (pa, pb) = (&parents[a], &parents[b]);
 
+            let d_half = bernoulli(0.5);
+            // an empty genome draws nothing, so an invalid `p_m` must not be
+            // rejected here any earlier than `random_bool` would have
+            let d_m = if n > 0 { bernoulli(p_m) } else { d_half };
+
             let mut child: Genome = Vec::with_capacity(n);
             for i in 0..n {
-                let mut bit = if r.random_bool(0.5) { pa[i] } else { pb[i] };
-                if r.random_bool(p_m) {
+                let mut bit = if r.sample(d_half) { pa[i] } else { pb[i] };
+                if r.sample(d_m) {
                     bit ^= 1;
                 }
                 child.push(bit);
@@ -133,9 +153,10 @@ pub fn micro_offspring(
                 }
             }
 
+            let d_mut = bernoulli(p_mut);
             for i in 0..n {
                 let nbrs = g.neighbors(i);
-                if !nbrs.is_empty() && r.random_bool(p_mut) {
+                if !nbrs.is_empty() && r.sample(d_mut) {
                     let t = nbrs[r.random_range(0..nbrs.len())] as usize;
                     child[i] = child[t];
                 }
@@ -257,9 +278,10 @@ pub fn micro_offspring_topo(
             // order, same strict `>` first-to-the-max tie-break.
             let mut freq: Vec<u32> = if topo_mut { vec![0u32; n] } else { Vec::new() };
             let mut touched: Vec<usize> = Vec::new();
+            let d_mut = bernoulli(p_mut);
             for i in 0..n {
                 let nbrs = g.neighbors(i);
-                if !nbrs.is_empty() && r.random_bool(p_mut) {
+                if !nbrs.is_empty() && r.sample(d_mut) {
                     if topo_mut {
                         touched.clear();
                         let mut best = child[i];
