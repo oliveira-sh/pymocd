@@ -1,8 +1,15 @@
+import os
+
 import numpy as np
 from functools import wraps
 from typing import Callable
 
 ALGORITHM_REGISTRY = {}
+
+# Comma-separated algorithm names; empty means "register everything".
+_ALG_FILTER = {
+    s.strip() for s in os.environ.get("PYMOCD_BENCH_ALGS", "").split(",") if s.strip()
+}
 
 
 def algorithm(
@@ -18,6 +25,9 @@ def algorithm(
     """
 
     def decorator(func: Callable):
+        if _ALG_FILTER and name not in _ALG_FILTER:
+            return func
+
         @wraps(func)
         def wrapper(*args, **kwargs):
             return func(*args, **kwargs)

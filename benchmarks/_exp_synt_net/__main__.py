@@ -15,6 +15,11 @@ def _env_list(name, default, cast):
 
 
 if __name__ == "__main__":
+    cores = os.environ.get("PYMOCD_MAX_CORES")
+    if cores:
+        import pymocd
+
+        pymocd.max_cores(int(cores))
     runner = ExperimentRunner(n_runs=NUM_RUNS)
     # A sweep that varies both mu and nodes is plotted as facets; varying exactly
     # one axis gets the per-metric plots instead.

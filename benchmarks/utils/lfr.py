@@ -10,17 +10,24 @@ from sklearn.metrics.cluster import (
 def generate_lfr_benchmark(
     n=1000, tau1=2.5, tau2=1.5, mu=0.3, average_degree=20, min_community=20, seed=0
 ):
-    G = nx.generators.community.LFR_benchmark_graph(
-        n=n,
-        tau1=tau1,
-        tau2=tau2,
-        mu=mu,
-        average_degree=average_degree,
-        min_community=min_community,
-        max_degree=50,
-        seed=seed,
-        max_community=100,
-    )
+    # High mu occasionally fails to converge; retry on shifted seeds.
+    for attempt in range(5):
+        try:
+            G = nx.generators.community.LFR_benchmark_graph(
+                n=n,
+                tau1=tau1,
+                tau2=tau2,
+                mu=mu,
+                average_degree=average_degree,
+                min_community=min_community,
+                max_degree=50,
+                seed=seed + 1000 * attempt,
+                max_community=100,
+            )
+            break
+        except Exception:
+            if attempt == 4:
+                raise
     communities = {node: frozenset(G.nodes[node]["community"]) for node in G}
     G = nx.Graph(G)
     return G, communities
