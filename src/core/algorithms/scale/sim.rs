@@ -17,29 +17,15 @@ fn max_degree_node(g: &CsrGraph) -> usize {
     best
 }
 
-pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
+/// Asynchronous weighted multi-source label propagation over centre SLOTS.
+/// `lab` enters and leaves in slot space; `n_slots` is the number of centres.
+/// Kept out of line so the slot bookkeeping in `decode` cannot steal the
+/// register holding `vote`'s base pointer - inlining it costs more than the
+/// smaller vote table saves.
+#[inline(never)]
+fn propagate(g: &CsrGraph, wadj: &[f64], is_center: &[bool], lab: &mut [i32], n_slots: usize) {
     let n = g.n;
-    if n == 0 {
-        return Vec::new();
-    }
-
-    let mut is_center = vec![false; n];
-    let mut any = false;
-    for (flag, &gene) in is_center.iter_mut().zip(genome) {
-        if gene != 0 {
-            *flag = true;
-            any = true;
-        }
-    }
-    if !any {
-        is_center[max_degree_node(g)] = true;
-    }
-
-    let mut lab: Vec<i32> = (0..n)
-        .map(|i| if is_center[i] { i as i32 } else { UNSET })
-        .collect();
-
-    let mut vote = vec![0.0f64; n];
+    let mut vote = vec![0.0f64; n_slots];
     let mut touched: Vec<usize> = Vec::with_capacity(64);
 
     // Active set. A node's next label is a pure function of its own label and
@@ -104,6 +90,55 @@ pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
         }
         if !changed {
             break;
+        }
+    }
+}
+
+pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
+    let n = g.n;
+    if n == 0 {
+        return Vec::new();
+    }
+
+    let mut is_center = vec![false; n];
+    let mut n_centers = 0usize;
+    for (flag, &gene) in is_center.iter_mut().zip(genome) {
+        if gene != 0 {
+            *flag = true;
+            n_centers += 1;
+        }
+    }
+    if n_centers == 0 {
+        is_center[max_degree_node(g)] = true;
+        n_centers = 1;
+    }
+
+    // Centres are numbered 0..c in ascending node-id order and `lab` carries
+    // those slot ids for the duration of the propagation, so the vote table is
+    // only c wide (c ~ sqrt(n) under the macro centre cap) instead of n, and
+    // stays cache- and TLB-resident. Slots are an order-preserving bijection
+    // with the centre node ids, so every vote sum, every first-touch position
+    // and every comparison is unchanged. They are mapped back to node ids
+    // before the leftover pass, which reads labels as node ids.
+    let mut center_node: Vec<i32> = Vec::with_capacity(n_centers);
+    let mut lab: Labels = vec![UNSET; n];
+    for i in 0..n {
+        if is_center[i] {
+            lab[i] = center_node.len() as i32;
+            center_node.push(i as i32);
+        }
+    }
+
+    propagate(g, wadj, &is_center, &mut lab, n_centers);
+
+    debug_assert!(
+        lab.iter()
+            .all(|&l| l == UNSET || (l as usize) < center_node.len()),
+        "propagate left a non-slot label behind"
+    );
+    for l in lab.iter_mut() {
+        if *l != UNSET {
+            *l = center_node[*l as usize];
         }
     }
 
