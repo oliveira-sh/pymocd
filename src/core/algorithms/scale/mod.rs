@@ -1,32 +1,10 @@
 //! SCALE — sparse macro-micro co-evolutionary multi-objective community
-//! detection (Zhang, Yang, Yang & Zhang, IEEE CIM), reformulated for
-//! near-linear memory/time: sparse-CSR graph plus a sparse local similarity
-//! (`sim`) in place of the dense n×n diffusion kernel.
+//! detection (Zhang et al., IEEE CIM), reformulated over a CSR graph and a
+//! sparse edge similarity for near-linear memory/time.
 //!
-//! # Deliberate divergence from the published algorithm
-//!
-//! **The local-search step is intentionally NOT implemented.** Algorithm 1 of
-//! the paper runs a Louvain-first-phase modularity ascent (line 11, ref [38]) on
-//! the rank-1 micro members at every co-evolution step. This implementation
-//! removed it outright — the code is deleted, not feature-flagged off.
-//!
-//! This is a design decision, NOT an oversight or an unfinished port. Do not
-//! "restore" it on the assumption that something was missed. Anyone re-adding it
-//! is proposing a change of algorithm and owns re-measuring the result. The
-//! `topo_mode` bit that selected its `wadj`-weighted variant (bit 5) is deleted
-//! along with every other losing operator; see the `operators` module header.
-//!
-//! # Shipped configuration
-//!
-//! The no-keyword-argument call runs a MEASURED configuration, not the paper's:
-//! `obj_mode = 160` (micro (intra, inter) / macro (KKM, RC)), `topo_mode = 130`
-//! (HP-MOCD 4-distinct-parent ensemble crossover + neighbour-majority micro
-//! mutation), `cross_rate = 0.7`, `num_gens = 100`, `mut_rate = 0.5`,
-//! `micro_mut = 0.5`. Evidence: beats HP-MOCD on 26/33 LFR cells
-//! (p = 0.00021) and 8/10 SNAP networks, best arm at mu = 0.3/0.4/0.5 (ARI
-//! 0.9997/0.9891/0.8618), beats both pure-objective arms at mu <= 0.5
-//! (p < 0.01); only pure (KKM, RC) wins at mu >= 0.6. See the `defaults` module
-//! for the per-constant rationale — these values are not free parameters.
+//! The paper's Louvain local-search step is deliberately deleted, not
+//! feature-flagged: re-adding it is a change of algorithm and must be
+//! re-measured. Shipped defaults are the measured winners; see `defaults`.
 //!
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
@@ -54,8 +32,8 @@ use objectives::{ObjSet, evaluate};
 use operators::{MicroOps, macro_offspring, micro_offspring, micro_offspring_topo};
 use sim::{decode, encode, init_weights, update_weights};
 
-pub type Labels = Vec<i32>; // micro vector representation
-pub type Genome = Vec<u8>; // macro medoid representation
+pub type Labels = Vec<i32>;
+pub type Genome = Vec<u8>;
 
 #[derive(Clone)]
 struct Mic {
@@ -70,18 +48,6 @@ struct Mac {
     obj: Obj,
 }
 
-/// Search configuration: which objective vector each population optimizes.
-///
-/// The two sides may carry DIFFERENT objective vectors (see
-/// `objectives::split_mode`). Every crossing of the co-evolutionary boundary
-/// re-evaluates the migrant under the receiving population's vector, so the two
-/// fronts stay internally consistent: `guidance` scores macro elites with
-/// `micro`, `influence` scores micro elites with `macro_`.
-///
-/// Survivor selection is NSGA-II crowding on both sides. An NSGA-III
-/// reference-point alternative was measured across the whole objective grid and
-/// deleted: every winning run used NSGA-II, and with both surviving sets at
-/// M = 2 the reference-point machinery had nothing to buy.
 #[derive(Clone, Copy)]
 struct Cfg {
     micro: ObjSet,
@@ -132,7 +98,6 @@ fn select_macro(pool: Vec<Mac>, keep: usize) -> Vec<Mac> {
         .collect()
 }
 
-/// Micro init (Alg. 1 line 1): each node's label = a random neighbour's id.
 fn init_micro(g: &CsrGraph, pop: usize, cfg: &Cfg) -> Vec<Mic> {
     (0..pop)
         .into_par_iter()
@@ -154,49 +119,20 @@ fn init_micro(g: &CsrGraph, pop: usize, cfg: &Cfg) -> Vec<Mic> {
         .collect()
 }
 
-/// Default `macro_cap`: the historical hardcoded ⌈√n⌉ ceiling. Chosen so that
-/// every pre-existing call reproduces its old front bit-for-bit (`1.0 * x` is
-/// exact in IEEE-754, so the multiplier vanishes).
 pub const DEFAULT_MACRO_CAP: f64 = 1.0;
 
-/// Sanity bounds on the `macro_cap` multiplier. The lower bound only has to be
-/// positive — `macro_cmax` floors the result at 1 anyway — and the upper bound
-/// keeps `mult * √n` far from the f64→usize saturation edge; `n` is the real
-/// ceiling regardless.
 const MACRO_CAP_MIN: f64 = 1e-6;
 const MACRO_CAP_MAX: f64 = 1e6;
 
-/// Ceiling on the number of centres a macro genome may express: `⌈cap·√n⌉`,
-/// still hard-capped at `n` (a genome cannot have more centres than nodes) and
-/// floored at 1 (a genome with zero centres decodes to nothing).
-///
-/// `cap` is clamped to `[MACRO_CAP_MIN, MACRO_CAP_MAX]` and NaN falls back to
-/// the default, so a nonsense value degrades to a usable cap instead of 0.
-///
-/// WHY THIS IS TUNABLE. Heterogeneous objective placement (micro (KKM,RC) /
-/// macro (intra,inter,RC)) beats its mirror only while the cap can still
-/// express the true community count: measured cap/k_true 2.9→1.0 gives
-/// +0.016/+0.019 ARI (p = 1.8e-6 / 0.014) at n ≤ 2000, and the effect vanishes
-/// at cap/k_true 0.64/0.45 (+0.004/−0.003, p = 1.0 / 0.70) for n = 5000/10000,
-/// where ⌈√n⌉ is below k_true. Raising `cap` restores expressiveness on large
-/// graphs at the cost of a coarser initial search.
 fn macro_cmax(n: usize, macro_cap: f64) -> usize {
     let mult = if macro_cap.is_nan() {
         DEFAULT_MACRO_CAP
     } else {
         macro_cap.clamp(MACRO_CAP_MIN, MACRO_CAP_MAX)
     };
-    // f64→usize saturates, so an extreme product lands on usize::MAX and the
-    // clamp below reduces it to n.
     ((mult * (n as f64).sqrt()).ceil() as usize).clamp(1, n.max(1))
 }
 
-/// Macro init (Alg. 1 line 2; ref [46]): half high-degree seeded, half random.
-/// Centre count in `[1, ⌈macro_cap·√n⌉]` (see `macro_cmax`), high-degree half
-/// sampled from the top-`3c`.
-///
-/// A 2-hop-exclusion alternative (topo bit 6, `A2`) was measured here and
-/// deleted: it placed provably better-spread centres and bought +0.0011 ARI.
 fn init_macro(g: &CsrGraph, wadj: &[f64], pop: usize, cfg: &Cfg, macro_cap: f64) -> Vec<Mac> {
     let n = g.n;
     let mut by_deg: Vec<usize> = (0..n).collect();
@@ -238,8 +174,6 @@ fn init_macro(g: &CsrGraph, wadj: &[f64], pop: usize, cfg: &Cfg, macro_cap: f64)
         .collect()
 }
 
-/// Guidance (Alg. 2): macro rank-1 elites are freshly decoded with the current
-/// edge weights (line 5), then environment-selected with micro + offspring.
 fn guidance(
     g: &CsrGraph,
     wadj: &[f64],
@@ -265,9 +199,6 @@ fn guidance(
     select_micro(pool, pop)
 }
 
-/// Influence (Alg. 3): micro-elite consensus updates the sparse edge weights
-/// (`sim::update_weights`, Eq. 7 analogue), then each elite is re-encoded to a
-/// medoid genome and decoded, and environment-selected with macro + offspring.
 #[allow(clippy::too_many_arguments)]
 fn influence(
     g: &CsrGraph,
@@ -288,11 +219,9 @@ fn influence(
         .map(|(_, m)| &m.labels)
         .collect();
 
-    // Eq. 7: SM* = (1-rho)*SM + rho*SM^v, rho = 0.5*t/gen — sparse, edge-restricted.
     let rho = 0.5 * t as f64 / n_gens as f64;
     update_weights(g, wadj, &elites, rho);
 
-    // wadj is now fixed for this step; each elite's encode→decode is independent.
     let wadj_ro: &[f64] = wadj;
     let mut pool: Vec<Mac> = elites
         .par_iter()
@@ -312,32 +241,20 @@ fn influence(
     select_macro(pool, pop)
 }
 
-/// Algorithm 1, MINUS its local-search line. Returns the rank-1 front of the
-/// merged populations, then adds the union-based refinement
-/// (`refine::refine_front`).
-///
-/// Each generation runs macro/micro variation, then either a co-evolution step
-/// (`guidance` → `influence`, every `gap` generations) or an ordinary
-/// environment selection on each side.
-///
-/// The published Algorithm 1 additionally runs a Louvain-first-phase modularity
-/// ascent on the rank-1 micro members inside the co-evolution step (line 11).
-/// That step is intentionally absent here and its code is deleted — see the
-/// module header. There is deliberately NO parameter to switch it back on.
 #[allow(clippy::too_many_arguments)]
 fn run_fronts(
     g: &CsrGraph,
     pop: usize,
-    num_gens: usize, // number of generations the search runs; always run in full
+    num_gens: usize,
     p_c: f64,
     p_m: f64,
     gap: usize,
-    _beta: f64, // inert in the sparse path (the dense diffusion β); kept for API parity
-    do_refine: bool, // apply the union-based tiny-community refinement to the front
-    topo_mode: u8, // operator bitmask; see the `operators` module bit table
-    obj_mode: u16, // objective set (see `objectives::ObjSet::from_u8`)
-    macro_cap: f64, // multiplier on the macro genome's ⌈√n⌉ centre ceiling (see `macro_cmax`)
-    micro_mut: f64, // per-node micro mutation probability; <= 0 selects the 1/n default
+    _beta: f64,
+    do_refine: bool,
+    topo_mode: u8,
+    obj_mode: u16,
+    macro_cap: f64,
+    micro_mut: f64,
 ) -> Vec<Labels> {
     if g.n == 0 {
         return vec![Vec::new()];
@@ -401,12 +318,6 @@ fn run_fronts(
         }
     }
 
-    // Mergence: rank-1 of micro ∪ macro. When the two populations optimize
-    // DIFFERENT vectors their objective values are not commensurable (they need
-    // not even share a length), so the macro members are re-scored under the
-    // micro vector — one extra pass over `pop` individuals, once per run. The
-    // merged front is then a front in a single well-defined objective space, and
-    // its size stays comparable to the homogeneous arms.
     let het = cfg.micro != cfg.macro_;
     let mut labels: Vec<Labels> = Vec::with_capacity(micro.len() + macro_pop.len());
     let mut objs: Vec<Obj> = Vec::with_capacity(micro.len() + macro_pop.len());
@@ -443,8 +354,6 @@ fn run_fronts(
     }
 }
 
-/// Map index-space `labels` to `(node_id, community)`: isolated nodes (`deg == 0`)
-/// get `-1`, remaining community ids renumbered to `0..k`.
 fn to_output(g: &CsrGraph, labels: &Labels) -> Vec<(i32, i32)> {
     let mut remap: FxHashMap<i32, i32> = FxHashMap::default();
     let mut next = 0i32;
@@ -464,14 +373,6 @@ fn to_output(g: &CsrGraph, labels: &Labels) -> Vec<(i32, i32)> {
     out
 }
 
-/// Single selected partition from the merged (refined) rank-1 front, via the
-/// label-free normalised-scalarisation selector (`select_best`). Fixed
-/// `macro_cap`; see `scale_capped` to tune it.
-///
-/// Arity-stable shim: every caller that does not care about `macro_cap` keeps
-/// this signature, which is also the reference the default-preservation tests
-/// compare against. The PyO3 layer goes straight to `scale_capped`, so nothing
-/// outside `cfg(test)` calls this today.
 #[cfg_attr(not(test), allow(dead_code))]
 #[allow(clippy::too_many_arguments)]
 pub fn scale(
@@ -498,9 +399,6 @@ pub fn scale(
     )
 }
 
-/// `scale` with a tunable macro centre ceiling: `macro_cap` multiplies the
-/// `⌈√n⌉` bound on how many communities a macro genome may express (see
-/// `macro_cmax`). `DEFAULT_MACRO_CAP` reproduces `scale` exactly.
 #[allow(clippy::too_many_arguments)]
 pub fn scale_capped(
     nodes: &[i32],
@@ -518,8 +416,6 @@ pub fn scale_capped(
     if g.n == 0 {
         return Vec::new();
     }
-    // `scale` does not expose the mode knobs, so the shipped configuration's
-    // `obj_mode`/`topo_mode`/selection are applied here (see `defaults`).
     let front = run_fronts(
         &g,
         pop,
@@ -538,33 +434,6 @@ pub fn scale_capped(
     to_output(&g, &best)
 }
 
-/// Label-free selection: MIN-MAX-NORMALISED LINEAR SCALARISATION of all four
-/// SCALE objectives over the front.
-///
-/// 1. Score every member on all FOUR minimised objectives — `(kkm, rc)` from
-///    `objectives::kkm_rc` and `(intra, inter)` from `objectives::intra_inter`.
-///    All four are computed regardless of which `ObjSet` drove the search: the
-///    selector is deliberately independent of the search's objective vector,
-///    and that is exactly the form the benchmark validated.
-/// 2. Min-max normalise each column ACROSS THE FRONT,
-///    `v' = (v − min) / (max − min)`. A column that is constant over the front
-///    has zero range and carries no information about which member to pick, so
-///    it contributes 0 for every member instead of dividing by zero.
-/// 3. Return the member with the smallest sum of the four normalised values.
-///
-/// THE NORMALISATION IS THE WHOLE POINT and must not be dropped: raw KKM+RC run
-/// at magnitude 1e3–1e4 against intra+inter bounded in [0, 1], a 3e3–4e4×
-/// imbalance, and the raw variant scores 0.2643 mean gap-to-oracle AMI (30×
-/// worse) by collapsing to k = 1 at mu = 0.4.
-///
-/// Strictly label-free and deterministic; ties are broken by LOWEST INDEX,
-/// matching the `np.argmin` of the Python reference implementation.
-///
-/// Evidence: over a 42-cell selector benchmark on SCALE's own fronts this beats
-/// the previously deployed SBM/MDL selector on mean gap-to-oracle AMI (0.0089
-/// vs 0.0134, paired Wilcoxon p = 0.020) at 16× lower cost (0.18 s vs 2.91 s),
-/// and unlike the SBM/MDL rule it IMPROVES with graph size (n = 10000: 0.0067
-/// vs 0.0161).
 fn select_best(g: &CsrGraph, front: Vec<Labels>) -> Labels {
     if front.is_empty() {
         return vec![0; g.n];
@@ -595,7 +464,6 @@ fn select_best(g: &CsrGraph, front: Vec<Labels>) -> Labels {
         let mut s = 0.0;
         for c in 0..4 {
             let rng = hi[c] - lo[c];
-            // Guarded: a dead column contributes 0, never NaN.
             if rng > 0.0 {
                 s += (o[c] - lo[c]) / rng;
             }
@@ -607,7 +475,6 @@ fn select_best(g: &CsrGraph, front: Vec<Labels>) -> Labels {
     let mut best = score(&obj[0]);
     for (j, o) in obj.iter().enumerate().skip(1) {
         let s = score(o);
-        // Strict `<`: the FIRST minimum wins, as `np.argmin` does.
         if s < best {
             best = s;
             pick = j;
@@ -616,12 +483,6 @@ fn select_best(g: &CsrGraph, front: Vec<Labels>) -> Labels {
     front.into_iter().nth(pick).unwrap()
 }
 
-/// Full merged (refined) rank-1 front; the candidate set `scale` selects from.
-/// Fixed `macro_cap`; see `scale_fronts_capped` to tune it.
-///
-/// Arity-stable shim: the default-preservation tests use it as the "does not
-/// pass the parameter" reference. The PyO3 layer goes straight to
-/// `scale_fronts_capped`, so nothing outside `cfg(test)` calls this today.
 #[cfg_attr(not(test), allow(dead_code))]
 #[allow(clippy::too_many_arguments)]
 pub fn scale_fronts(
@@ -654,9 +515,6 @@ pub fn scale_fronts(
     )
 }
 
-/// `scale_fronts` with a tunable macro centre ceiling: `macro_cap` multiplies
-/// the `⌈√n⌉` bound on how many communities a macro genome may express (see
-/// `macro_cmax`). `DEFAULT_MACRO_CAP` reproduces `scale_fronts` exactly.
 #[allow(clippy::too_many_arguments)]
 pub fn scale_fronts_capped(
     nodes: &[i32],
@@ -690,19 +548,11 @@ pub fn scale_fronts_capped(
 mod tests {
     use super::*;
 
-    // ---- select_best -----------------------------------------------------
-    //
-    // The normalisation is the reason the selector works at all: without it the
-    // sum is decided by KKM+RC (1e3-1e4) against intra+inter (<= 1), and the raw
-    // variant measured 30x worse. This pins BOTH halves of the rule structurally
-    // -- normalise across the front, then argmin with a lowest-index tie-break.
     #[test]
     fn selector_normalises_and_breaks_ties_by_lowest_index() {
         let nodes: Vec<i32> = (0..10).collect();
         let g = CsrGraph::from_edges(&nodes, &two_clique_edges());
 
-        // Two IDENTICAL members: every column is constant, so every normalised
-        // sum is 0 and the first index must win.
         let split: Labels = (0..g.n).map(|i| if i < 5 { 0 } else { 1 }).collect();
         let one: Labels = vec![0; g.n];
         let sing: Labels = (0..g.n as i32).collect();
@@ -711,23 +561,16 @@ mod tests {
             split,
             "a constant column must contribute 0, not NaN"
         );
-        // ...including the degenerate one-member front.
         assert_eq!(select_best(&g, vec![one.clone()]), one);
 
-        // On two K5s bridged once, the planted split beats both degenerate
-        // partitions under the normalised sum. The RAW sum does not: KKM alone
-        // orders these the other way, so this fails if normalisation is dropped.
         let picked = select_best(&g, vec![one.clone(), sing.clone(), split.clone()]);
         assert_eq!(picked, split, "normalised scalarisation missed the split");
     }
 
-    // Triangle {0,1,2}, triangle {3,4,5}, bridge edge (2,3).
     fn two_triangle_edges() -> Vec<(i32, i32)> {
         vec![(0, 1), (1, 2), (0, 2), (3, 4), (4, 5), (3, 5), (2, 3)]
     }
 
-    // `k` cliques of size `s` wired into a ring by one bridge per adjacent pair.
-    // n = k*s, so the caps genuinely differ (k=12, s=5 -> n=60, cmax 8 vs 31).
     fn ring_of_cliques(k: i32, s: i32) -> (Vec<i32>, Vec<(i32, i32)>) {
         let nodes: Vec<i32> = (0..k * s).collect();
         let mut e = Vec::new();
@@ -743,10 +586,6 @@ mod tests {
         (nodes, e)
     }
 
-    // `w` x `h` 4-neighbour grid: no clean community structure, so the search is
-    // genuinely ambiguous and small operator changes move the front. (On a ring
-    // of cliques the cliques dominate whatever the operators do, and every bit
-    // looks correctly, but uninformatively, inert.)
     fn grid(w: i32, h: i32) -> (Vec<i32>, Vec<(i32, i32)>) {
         let nodes: Vec<i32> = (0..w * h).collect();
         let mut e = Vec::new();
@@ -764,9 +603,6 @@ mod tests {
         (nodes, e)
     }
 
-    // Two K5 cliques {0..4},{5..9} joined by a single bridge (4,5). Unambiguous
-    // 2-block structure that the SBM/MDL selector clearly prefers (the tiny
-    // two-triangle graph is MDL-borderline, so it is not used for split tests).
     fn two_clique_edges() -> Vec<(i32, i32)> {
         let mut e = Vec::new();
         for (lo, hi) in [(0, 5), (5, 10)] {
@@ -805,7 +641,7 @@ mod tests {
 
     #[test]
     fn isolated_node_gets_minus_one() {
-        let nodes: Vec<i32> = (0..7).collect(); // node 6 isolated
+        let nodes: Vec<i32> = (0..7).collect();
         let out = scale(
             &nodes,
             &two_triangle_edges(),
@@ -861,11 +697,6 @@ mod tests {
         assert_eq!(run(), run());
     }
 
-    // ---- obj_mode --------------------------------------------------------
-
-    // Heterogeneous modes (obj_mode >= 100) give the two populations different
-    // objective vectors, so they must survive the mergence step that re-scores
-    // macro under the micro vector. 160 is the SHIPPED pair and 106 its mirror.
     #[test]
     fn heterogeneous_objective_modes_are_deterministic_and_nonempty() {
         let nodes: Vec<i32> = (0..10).collect();
@@ -893,10 +724,6 @@ mod tests {
         }
     }
 
-    // A homogeneous mode must be reachable both ways: `v` and the heterogeneous
-    // encoding of (v, v) are the same configuration, so they must agree exactly.
-    // Runs over the whole single-digit range, not just the two live ids, because
-    // the deleted ids must still decode to the default on BOTH sides.
     #[test]
     fn heterogeneous_encoding_of_equal_sides_matches_homogeneous() {
         let nodes: Vec<i32> = (0..10).collect();
@@ -919,15 +746,10 @@ mod tests {
         for v in 0..10u16 {
             assert_eq!(run(v), run(100 + v * 10 + v), "mode {v} != het({v},{v})");
         }
-        // The wide range (v >= 1000) is an alias now that no two-digit set is
-        // left, so it must agree with the one-digit encoding member for member.
         assert_eq!(run(160), run(1600));
         assert_eq!(run(106), run(1006));
     }
 
-    // The two surviving sets must each drive a real search to a deterministic,
-    // non-empty, full-length front, and they must NOT produce the same front --
-    // an objective set that does not change the search is not an objective set.
     #[test]
     fn both_objective_sets_search_and_differ() {
         let (nodes, edges) = grid(10, 10);
@@ -959,18 +781,10 @@ mod tests {
             kkm_rc, intra_inter,
             "the two objective sets are the same arm"
         );
-        // ...and so is the heterogeneous pairing of them.
         assert_ne!(run(160), kkm_rc);
         assert_ne!(run(160), intra_inter);
     }
 
-    // ---- macro_cap -------------------------------------------------------
-    //
-    // REGRESSION GUARD. `macro_cap` is only safe to ship because its default
-    // reproduces the hardcoded `((n as f64).sqrt().ceil() as usize).clamp(1, n)`
-    // EXACTLY -- `1.0 * x` is exact in IEEE-754, so the multiplier must vanish
-    // for every n. The old code cannot be called, so this pins the arithmetic
-    // structurally against a literal restatement of it.
     #[test]
     fn macro_cmax_default_reproduces_hardcoded_sqrt_ceiling() {
         for n in (1..600usize).chain([1000, 1999, 2000, 5000, 9999, 10_000, 65_536]) {
@@ -984,19 +798,15 @@ mod tests {
         assert_eq!(DEFAULT_MACRO_CAP, 1.0);
     }
 
-    // The measured table this parameter exists for: cap 1.0 is ⌈√n⌉, the
-    // multiplier scales it, and `n` is still the hard ceiling.
     #[test]
     fn macro_cmax_table() {
         assert_eq!(macro_cmax(250, 1.0), 16);
         assert_eq!(macro_cmax(2000, 1.0), 45);
         assert_eq!(macro_cmax(10_000, 1.0), 100);
         assert_eq!(macro_cmax(10_000, 4.0), 400);
-        // Still capped at n, whatever the multiplier claims.
         assert_eq!(macro_cmax(10_000, 1e9), 10_000);
         assert_eq!(macro_cmax(10_000, f64::INFINITY), 10_000);
         assert_eq!(macro_cmax(100, 50.0), 100);
-        // Nonsense multipliers must never yield 0 centres.
         for bad in [0.0, -1.0, -1e30, f64::NEG_INFINITY, f64::NAN] {
             assert!(
                 macro_cmax(10_000, bad) >= 1,
@@ -1004,14 +814,9 @@ mod tests {
             );
             assert!(macro_cmax(1, bad) >= 1);
         }
-        // n = 0 must not panic on the clamp (min > max) even though the search
-        // early-returns before reaching it.
         assert_eq!(macro_cmax(0, 1.0), 1);
     }
 
-    // End-to-end half of the regression guard: `macro_cap = DEFAULT_MACRO_CAP`
-    // must agree with itself AND with the `scale_fronts` wrapper that never
-    // mentions the parameter.
     #[test]
     fn default_macro_cap_matches_the_unparameterized_wrapper() {
         let nodes: Vec<i32> = (0..10).collect();
@@ -1062,7 +867,6 @@ mod tests {
             );
             assert_eq!(legacy(), legacy());
         }
-        // Same for the selecting entry point.
         let selected = scale_capped(
             &nodes,
             &edges,
@@ -1091,9 +895,6 @@ mod tests {
         );
     }
 
-    // Every cap must still drive a real search to a deterministic, non-empty,
-    // full-length front -- homogeneous (0) and heterogeneous (160, the shipped
-    // arm).
     #[test]
     fn macro_cap_variants_deterministic_and_nonempty() {
         let nodes: Vec<i32> = (0..10).collect();
@@ -1128,9 +929,6 @@ mod tests {
         }
     }
 
-    // If raising the cap does not change the front, the parameter is not wired
-    // through init_macro and the whole experiment it exists for is void. Needs a
-    // graph where the ceilings actually differ: n = 60 -> 8 centres vs 31.
     #[test]
     fn macro_cap_changes_the_front() {
         let (nodes, edges) = ring_of_cliques(12, 5);
@@ -1161,11 +959,6 @@ mod tests {
         assert_ne!(one, four, "macro_cap is not wired through to init_macro");
     }
 
-    // ---- topo_mode operators ---------------------------------------------
-
-    // Both surviving bits, the shipped combination, and the baseline must drive
-    // a real search to a deterministic, non-empty, full-length front.
-    // `gap = 5` with 20 generations gives four co-evolution steps.
     #[test]
     fn every_topo_bit_is_deterministic_and_nonempty() {
         let (nodes, edges) = ring_of_cliques(12, 5);
@@ -1198,10 +991,6 @@ mod tests {
         }
     }
 
-    // A bit that is wired up but inert looks exactly like "the operator does not
-    // help", so every SURVIVING bit must be shown to move the end-to-end front,
-    // and every DELETED bit must be shown NOT to -- old benchmark rows recording
-    // those masks need them to stay no-ops rather than be quietly rebound.
     #[test]
     fn only_the_two_live_topo_bits_change_the_front() {
         let (nodes, edges) = grid(10, 10);
@@ -1240,10 +1029,6 @@ mod tests {
         }
     }
 
-    // The micro bits must NOT leak into the macro/init phases:
-    // `MicroOps::from_topo` is what routes micro through the topo body, so a
-    // mask with no live micro bit must leave the untouched `micro_offspring` in
-    // place.
     #[test]
     fn micro_routing_only_reacts_to_micro_bits() {
         for mask in [0u8, 1, 4, 8, 16, 32, 64] {

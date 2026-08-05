@@ -6,34 +6,18 @@ use rustc_hash::FxHashMap;
 
 use super::{Genome, Labels};
 
-/// bit 1 — mutated node takes the modal label of its neighbours.
 pub const TOPO_MAJORITY_MUT: u8 = 1 << 1;
-/// bit 7 — FAITHFUL HP-MOCD ensemble crossover (4 distinct parents, random
-/// tie-break). Exists so "SCALE running HP-MOCD's operators" is a real port
-/// rather than an approximation.
 pub const TOPO_HPMOCD_CROSS: u8 = 1 << 7;
 
-/// Bits that change the micro variation operators (and therefore its RNG
-/// consumption). `topo_mode & MICRO_BITS == 0` keeps the untouched
-/// `micro_offspring` body, so every deleted bit is inert by construction.
 pub const MICRO_BITS: u8 = TOPO_MAJORITY_MUT | TOPO_HPMOCD_CROSS;
 
-/// Which micro operators an arm enables. Grouped into a struct so the call site
-/// cannot transpose the two `bool`s.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MicroOps {
-    /// bit 1 — mutated node takes the modal label of its neighbours.
     pub majority_mut: bool,
-    /// bit 7 — HP-MOCD's own ensemble crossover: 4 DISTINCT tournament parents,
-    /// per-node plurality, uniform random tie-break among the tied labels.
-    /// A faithful port of `hpmocd::operators::ensemble_crossover`.
     pub hpmocd_cross: bool,
 }
 
 impl MicroOps {
-    /// Decode the micro half of a `topo_mode` mask. Every deleted bit is masked
-    /// off by `MICRO_BITS` first, so it cannot route micro through the topo
-    /// body; there is no collision left to normalize away.
     pub fn from_topo(topo_mode: u8) -> Self {
         let t = topo_mode & MICRO_BITS;
         MicroOps {
@@ -49,16 +33,12 @@ impl MicroOps {
 
 const RNG_BASE: u64 = 0x5CA1_E5EED;
 
-/// Deterministic per-(salt, slot) RNG: `scale` guarantees reproducible fronts
-/// (fixed internal seed), so every parallel slot derives its stream from the
-/// generation salt and its own index instead of thread-local entropy.
 pub(super) fn slot_rng(salt: u64, slot: usize) -> StdRng {
     StdRng::seed_from_u64(
         RNG_BASE ^ salt.rotate_left(32) ^ (slot as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15),
     )
 }
 
-// Binary tournament: lower Pareto rank wins, ties broken by larger crowding.
 #[inline]
 fn tournament(ranks: &[usize], crowd: &[f64], r: &mut impl Rng) -> usize {
     let len = ranks.len();
@@ -71,7 +51,6 @@ fn tournament(ranks: &[usize], crowd: &[f64], r: &mut impl Rng) -> usize {
     }
 }
 
-// Macro offspring (Alg. 1 line 5): uniform crossover + per-bit mutation.
 pub fn macro_offspring(
     parents: &[Genome],
     ranks: &[usize],
@@ -101,7 +80,6 @@ pub fn macro_offspring(
                 child.push(bit);
             }
 
-            // an all-zero genome decodes to no communities; force one center bit
             if child.iter().all(|&b| b == 0) && n > 0 {
                 let k = r.random_range(0..n);
                 child[k] = 1;
@@ -111,16 +89,6 @@ pub fn macro_offspring(
         .collect()
 }
 
-/// Per-node micro mutation probability.
-///
-/// `rate <= 0.0` selects the historical default of `1/n` — one expected mutated
-/// node per individual per generation. That default is *extremely* low: at
-/// n = 10000 it is a single node per individual per generation, so an individual
-/// receives ~50 mutations over a 50-generation run. HP-MOCD, which has no local
-/// search at all, mutates at 0.5 per node with a neighbour-majority rule, i.e.
-/// ~5000 greedy moves per individual per generation — four orders of magnitude
-/// more variation, and the measured reason its search is stronger here. The
-/// shipped default is therefore 0.5, not `1/n`; see `super::defaults`.
 pub(super) fn micro_mut_rate(n: usize, rate: f64) -> f64 {
     if n == 0 {
         return 0.0;
@@ -132,8 +100,6 @@ pub(super) fn micro_mut_rate(n: usize, rate: f64) -> f64 {
     }
 }
 
-// Micro offspring (Alg. 1 line 7): one-way crossover (prob p_c) + neighbour
-// mutation. The `topo_mode & MICRO_BITS == 0` path, kept byte-reproducible.
 pub fn micro_offspring(
     g: &CsrGraph,
     parents: &[Labels],
@@ -156,7 +122,6 @@ pub fn micro_offspring(
             let a = tournament(ranks, crowd, &mut r);
             let mut child: Labels = parents[a].clone();
 
-            // one-way crossover: graft b's community-of-j over a
             if r.random_bool(p_c) && n > 0 {
                 let b = tournament(ranks, crowd, &mut r);
                 let pb = &parents[b];
@@ -181,15 +146,7 @@ pub fn micro_offspring(
         .collect()
 }
 
-/// Topology-aware micro offspring, with each surviving operator independently
-/// switchable through `MicroOps` (see the module bit table):
-///
-/// * `hpmocd_cross` (bit 7) — per-node plurality over four DISTINCT tournament
-///   parents, else the baseline one-way community graft;
-/// * `majority_mut` (bit 1) — mutated node takes the modal label of its
-///   neighbours, else copies a random neighbour's label.
-#[allow(clippy::too_many_arguments)] // one arg per operator knob; bundling them
-// into a struct would only move the same list somewhere less visible.
+#[allow(clippy::too_many_arguments)]
 pub fn micro_offspring_topo(
     g: &CsrGraph,
     parents: &[Labels],
@@ -215,15 +172,9 @@ pub fn micro_offspring_topo(
             let mut child: Labels;
             if r.random_bool(p_c) && n > 0 {
                 if ops.hpmocd_cross {
-                    // FAITHFUL HP-MOCD ensemble crossover (bit 7): four DISTINCT
-                    // tournament parents, per-node plurality, uniform random
-                    // tie-break among the tied labels. Mirrors
-                    // `hpmocd::operators::ensemble_crossover` with ENSEMBLE_SIZE = 4.
                     const ENSEMBLE: usize = 4;
                     let mut idx: Vec<usize> = Vec::with_capacity(ENSEMBLE);
                     idx.push(a);
-                    // Bounded: a population smaller than ENSEMBLE cannot supply
-                    // four distinct parents, so stop trying rather than spin.
                     let mut tries = 0;
                     while idx.len() < ENSEMBLE.min(parents.len()) && tries < 64 {
                         let cand = tournament(ranks, crowd, &mut r);
@@ -235,9 +186,6 @@ pub fn micro_offspring_topo(
                     child = Vec::with_capacity(n);
                     let mut counts: FxHashMap<i32, u32> = FxHashMap::default();
                     let mut tied: Vec<i32> = Vec::with_capacity(ENSEMBLE);
-                    // `i` indexes the SAME position across several parents
-                    // (`parents[pi][i]` for each pi), so it is a shared cursor,
-                    // not an iterator over one slice.
                     #[allow(clippy::needless_range_loop)]
                     for i in 0..n {
                         counts.clear();
@@ -256,9 +204,8 @@ pub fn micro_offspring_topo(
                                 tied.push(l);
                             }
                         }
-                        // Deterministic order before the seeded pick: FxHashMap
-                        // iteration order is not stable across runs, and `scale`
-                        // guarantees byte-reproducible fronts.
+                        // FxHashMap iteration order is unstable across runs;
+                        // sorting keeps the fronts byte-reproducible.
                         tied.sort_unstable();
                         let lab = if tied.len() == 1 {
                             tied[0]
@@ -268,7 +215,6 @@ pub fn micro_offspring_topo(
                         child.push(lab);
                     }
                 } else {
-                    // baseline one-way crossover: graft b's community-of-j over a
                     child = parents[a].clone();
                     let b = tournament(ranks, crowd, &mut r);
                     let pb = &parents[b];
@@ -288,7 +234,6 @@ pub fn micro_offspring_topo(
                 let nbrs = g.neighbors(i);
                 if !nbrs.is_empty() && r.random_bool(p_mut) {
                     if topo_mut {
-                        // neighbour-majority mutation
                         freq.clear();
                         let mut best = child[i];
                         let mut bestc = 0u32;
@@ -303,7 +248,6 @@ pub fn micro_offspring_topo(
                         }
                         child[i] = best;
                     } else {
-                        // baseline: copy a random neighbour's label
                         let t = nbrs[r.random_range(0..nbrs.len())] as usize;
                         child[i] = child[t];
                     }
@@ -319,15 +263,8 @@ mod tests {
     use super::*;
     use crate::core::graph::CsrGraph;
 
-    /// Deliberately QUIET micro mutation: `0.0` selects the historical `1/n`
-    /// rate, i.e. one expected mutated node per child, so "how many nodes did
-    /// this child change" measures the CROSSOVER under test instead of the
-    /// mutation. These tests used to read `DEFAULT_MICRO_MUT` for this, which
-    /// now ships at 0.5 (half the nodes) and would swamp every signal they
-    /// assert on. The rate is pinned here rather than tracking the default.
     const QUIET_MICRO_MUT: f64 = 0.0;
 
-    // `k` cliques of size `s` wired into a ring by one bridge per adjacent pair.
     fn ring_of_cliques(k: i32, s: i32) -> CsrGraph {
         let nodes: Vec<i32> = (0..k * s).collect();
         let mut e = Vec::new();
@@ -343,10 +280,6 @@ mod tests {
         CsrGraph::from_edges(&nodes, &e)
     }
 
-    // Bit 7 must (a) actually change the offspring versus the baseline one-way
-    // graft it replaces and (b) be deterministic. A flag that is wired up but
-    // inert looks exactly like "the operator does not help", so this is asserted
-    // rather than assumed.
     #[test]
     fn hpmocd_crossover_is_distinct_and_deterministic() {
         let g = ring_of_cliques(8, 5);
@@ -376,9 +309,6 @@ mod tests {
         assert!(hp.iter().all(|c| c.len() == n));
     }
 
-    // Bit 1 must likewise move the offspring: neighbour-MAJORITY is not the
-    // same rule as copy-a-random-neighbour, and at a high mutation rate the two
-    // must diverge.
     #[test]
     fn majority_mutation_is_distinct_and_deterministic() {
         let g = ring_of_cliques(8, 5);
@@ -407,8 +337,6 @@ mod tests {
         assert!(maj.iter().all(|c| c.len() == n));
     }
 
-    // The bit table, pinned. Only bits 1 and 7 decode; every DELETED bit must
-    // stay inert, which is what old benchmark rows recording those masks need.
     #[test]
     fn micro_ops_decodes_only_the_two_live_bits() {
         assert_eq!(TOPO_MAJORITY_MUT, 1 << 1);
@@ -420,11 +348,9 @@ mod tests {
         assert!(MicroOps::from_topo(TOPO_MAJORITY_MUT).majority_mut);
         assert!(MicroOps::from_topo(TOPO_HPMOCD_CROSS).hpmocd_cross);
 
-        // The shipped mask decodes to exactly both operators.
         let shipped = MicroOps::from_topo(130);
         assert!(shipped.majority_mut && shipped.hpmocd_cross);
 
-        // Every deleted bit is a no-op, alone and in combination.
         for dead in [1u8, 4, 8, 16, 32, 64] {
             assert!(
                 !MicroOps::from_topo(dead).any(),

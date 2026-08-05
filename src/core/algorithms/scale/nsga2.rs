@@ -1,5 +1,3 @@
-// All objectives minimized. Objective vectors are M-dimensional (M >= 2);
-// `Obj` is the per-individual vector. NSGA-II Pareto domination.
 pub type Obj = Vec<f64>;
 
 #[inline]
@@ -9,7 +7,6 @@ fn dominates(a: &[f64], b: &[f64]) -> bool {
     le && lt
 }
 
-/// Fast non-dominated sort. Returns a 1-based rank per individual.
 pub fn fast_nondominated_sort(objs: &[Obj]) -> Vec<usize> {
     let n = objs.len();
     let mut rank = vec![0usize; n];
@@ -17,8 +14,8 @@ pub fn fast_nondominated_sort(objs: &[Obj]) -> Vec<usize> {
         return rank;
     }
 
-    let mut dominated: Vec<Vec<usize>> = vec![Vec::new(); n]; // S_p
-    let mut dom_count = vec![0usize; n]; // n_p
+    let mut dominated: Vec<Vec<usize>> = vec![Vec::new(); n];
+    let mut dom_count = vec![0usize; n];
 
     for p in 0..n {
         for q in 0..n {
@@ -54,7 +51,6 @@ pub fn fast_nondominated_sort(objs: &[Obj]) -> Vec<usize> {
     rank
 }
 
-/// Crowding distance, computed per front, summed over all objectives.
 pub fn crowding_distance(objs: &[Obj], ranks: &[usize]) -> Vec<f64> {
     let n = objs.len();
     let mut dist = vec![0.0f64; n];
@@ -79,8 +75,6 @@ pub fn crowding_distance(objs: &[Obj], ranks: &[usize]) -> Vec<f64> {
         }
 
         let m = objs[group[0]].len();
-        // `obj` indexes the INNER vector of `objs[idx]` for an `idx` that varies
-        // inside the closure below, so there is no single slice to iterate over.
         #[allow(clippy::needless_range_loop)]
         for obj in 0..m {
             let key = |idx: usize| -> f64 { objs[idx][obj] };
@@ -114,8 +108,6 @@ pub fn crowding_distance(objs: &[Obj], ranks: &[usize]) -> Vec<f64> {
     dist
 }
 
-/// Environment selection: fill survivors by ascending rank, truncating the last
-/// overflowing front by descending crowding distance. Size min(keep, len).
 pub fn environment_selection(objs: &[Obj], keep: usize) -> Vec<usize> {
     let n = objs.len();
     let target = keep.min(n);
@@ -164,7 +156,6 @@ mod tests {
 
     #[test]
     fn test_nondominated_sort_two_fronts() {
-        // (1,4),(2,2),(4,1) mutually non-dominating; (3,3) dominated by (2,2).
         let objs = vec![
             vec![1.0, 4.0],
             vec![2.0, 2.0],

@@ -12,8 +12,6 @@ pub enum ObjSet {
 }
 
 impl ObjSet {
-    /// Every id other than the two live ones maps to the default, exactly as
-    /// out-of-range ids always did.
     pub fn from_u8(v: u8) -> Self {
         match v {
             6 => ObjSet::HpIntraInter,
@@ -41,9 +39,6 @@ pub fn split_mode(v: u16) -> (ObjSet, ObjSet) {
     }
 }
 
-/// Evaluate the configured objective vector (all entries minimized).
-///
-/// The two sets share no axis, so neither arm pays for the other's pass.
 pub fn evaluate(g: &CsrGraph, labels: &Labels, set: ObjSet) -> Vec<f64> {
     match set {
         ObjSet::HpIntraInter => {
@@ -100,7 +95,6 @@ pub fn intra_inter(g: &CsrGraph, labels: &Labels) -> (f64, f64) {
     }
     let two_m = 2.0 * m;
 
-    // Dense-remap communities to 0..k so the volume sum has a fixed order.
     let mut remap: FxHashMap<i32, usize> = FxHashMap::default();
     let mut d_c: Vec<f64> = Vec::new();
     for (&c, &k) in labels.iter().zip(g.deg.iter()) {
@@ -111,7 +105,6 @@ pub fn intra_inter(g: &CsrGraph, labels: &Labels) -> (f64, f64) {
         d_c[b] += k as f64;
     }
 
-    // `g.edges` holds each undirected edge once, so this is Σ_c l_c directly.
     let mut l_intra = 0.0f64;
     for &(u, v) in &g.edges {
         if labels[u as usize] == labels[v as usize] {

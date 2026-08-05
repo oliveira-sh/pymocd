@@ -1,13 +1,3 @@
-//! Sparse, near-linear replacement for MMCoMO's dense n×n diffusion-kernel
-//! similarity `SM = exp(beta·(A−D))`: its decode, encode, and influence-update
-//! (Eq. 7) roles are reformulated over the graph's edges — O(n + m) space.
-//!
-//! The similarity is carried as a per-directed-adjacency-slot edge weight
-//! `wadj` (length 2m, parallel to `CsrGraph::adj`), initialised to 1 and updated
-//! by the influence step's co-membership consensus (`super::influence`). For the
-//! small beta the paper uses the dense kernel is local (short-path dominated),
-//! so weighted graph propagation preserves the partitions it would produce.
-
 use crate::core::graph::CsrGraph;
 use rayon::prelude::*;
 
@@ -15,7 +5,6 @@ use super::{Genome, Labels};
 
 const UNSET: i32 = -1;
 
-/// Max-degree node — the decode/encode fallback when a genome has no centre.
 fn max_degree_node(g: &CsrGraph) -> usize {
     let mut best = 0usize;
     let mut best_deg = 0u32;
@@ -28,16 +17,6 @@ fn max_degree_node(g: &CsrGraph) -> usize {
     best
 }
 
-/// Decode a medoid genome to a label vector — the sparse analogue of Eqs. 3-5.
-///
-/// Centres `CN = {i : genome[i] = 1}` keep their own id as label; every other
-/// node adopts, per sweep, the centre-label with the greatest summed incident
-/// edge weight among its already-assigned neighbours (weighted multi-source
-/// label propagation — the dense kernel's argmax_{c} SM[i][c] is dominated by
-/// exactly this short-path edge mass). Updates are asynchronous (in place), so
-/// the flood advances many hops per sweep and converges without oscillating.
-/// Connected components that contain no centre are each collapsed into a single
-/// community (their minimum node id), never per-node singletons.
 pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
     let n = g.n;
     if n == 0 {
@@ -53,7 +32,6 @@ pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
         }
     }
     if !any {
-        // Eq. 3 fallback (s = 0): seed the max-degree node as the sole centre.
         is_center[max_degree_node(g)] = true;
     }
 
@@ -61,18 +39,14 @@ pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
         .map(|i| if is_center[i] { i as i32 } else { UNSET })
         .collect();
 
-    // Dense vote table indexed by centre-id (labels are node ids < n), reset via
-    // a touched list so each sweep is O(degree) per node — no hashing.
     let mut vote = vec![0.0f64; n];
     let mut touched: Vec<usize> = Vec::with_capacity(64);
 
-    // The `n` bound is only a runaway guard; the `changed` break exits as soon
-    // as the partition is stable.
     for _ in 0..n {
         let mut changed = false;
         for u in 0..n {
             if is_center[u] {
-                continue; // centres are fixed seeds
+                continue;
             }
             touched.clear();
             let start = g.xadj[u] as usize;
@@ -90,7 +64,6 @@ pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
                 }
                 vote[li] += w;
             }
-            // Keep current label on ties (stability); otherwise strict argmax.
             if best != UNSET {
                 best_w = vote[best as usize];
             }
@@ -113,11 +86,6 @@ pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
         }
     }
 
-    // Any node still UNSET lies in a connected component that holds no centre
-    // (such a node's neighbours are all themselves UNSET, else the flood would
-    // have reached it). Collapse each such component into ONE community — its
-    // minimum node id — via an in-place min-id flood, restricted to the leftover
-    // nodes so reached nodes keep their centre label.
     if lab.contains(&UNSET) {
         let leftover: Vec<bool> = lab.iter().map(|&l| l == UNSET).collect();
         for u in 0..n {
@@ -150,13 +118,6 @@ pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
     lab
 }
 
-/// Encode a label vector to a medoid genome — the sparse analogue of Eq. 8.
-///
-/// The dense rule picks, per community, the member of maximal summed intra-block
-/// similarity. Its sparse counterpart is the member of maximal **weighted
-/// internal degree** (summed incident edge weight to same-community neighbours):
-/// the most internally-central node, computed in one O(m) pass. Singletons mark
-/// themselves as the centre.
 pub fn encode(g: &CsrGraph, wadj: &[f64], labels: &Labels) -> Genome {
     let n = g.n;
     let mut genome: Genome = vec![0u8; n];
@@ -164,7 +125,6 @@ pub fn encode(g: &CsrGraph, wadj: &[f64], labels: &Labels) -> Genome {
         return genome;
     }
 
-    // Weighted internal degree per node.
     let mut internal = vec![0.0f64; n];
     let mut size: rustc_hash::FxHashMap<i32, usize> = rustc_hash::FxHashMap::default();
     for u in 0..n {
@@ -181,7 +141,6 @@ pub fn encode(g: &CsrGraph, wadj: &[f64], labels: &Labels) -> Genome {
         internal[u] = acc;
     }
 
-    // Per community, the node of maximal internal weight is the medoid.
     let mut best_node: rustc_hash::FxHashMap<i32, (usize, f64)> = rustc_hash::FxHashMap::default();
     for u in 0..n {
         let c = labels[u];
@@ -199,28 +158,16 @@ pub fn encode(g: &CsrGraph, wadj: &[f64], labels: &Labels) -> Genome {
     genome
 }
 
-/// Initial edge weights: 1 for every directed adjacency slot (length 2m).
 pub fn init_weights(g: &CsrGraph) -> Vec<f64> {
     vec![1.0f64; g.adj.len()]
 }
 
-/// Influence-step weight update (Eq. 7 analogue, sparse).
-///
-/// Accumulates, per directed adjacency slot, the fraction of `elites` whose two
-/// endpoints share a community (the edge-restricted micro-elite voting matrix
-/// `SM^v`), then blends it into `wadj` with `wadj* = (1−rho)·wadj + rho·cov`.
-/// O(|elites|·m) time, O(m) extra space — the dense O(|PF|·n²) triple loop made
-/// near-linear. `cov` is symmetric across an edge's two slots, so `wadj` stays
-/// symmetric and `decode`/`encode` see a consistent similarity.
 pub fn update_weights(g: &CsrGraph, wadj: &mut [f64], elites: &[&Labels], rho: f64) {
     let two_m = g.adj.len();
     if two_m == 0 || elites.is_empty() {
         return;
     }
     let pf = elites.len() as f64;
-    // Build `cov` in parallel over source nodes. Slot p belongs to exactly one
-    // source node u (p ∈ [xadj[u], xadj[u+1])), and `flat_map_iter` emits slots in
-    // that same CSR order, so the parallel build is race-free and order-exact.
     let cov: Vec<f64> = (0..g.n)
         .into_par_iter()
         .flat_map_iter(|u| {
@@ -248,7 +195,6 @@ mod tests {
     use super::*;
     use crate::core::graph::CsrGraph;
 
-    // Two triangles {0,1,2},{3,4,5} joined by bridge (2,3).
     fn two_triangles() -> CsrGraph {
         let nodes: Vec<i32> = (0..6).collect();
         let edges = vec![(0, 1), (1, 2), (0, 2), (3, 4), (4, 5), (3, 5), (2, 3)];
@@ -263,7 +209,6 @@ mod tests {
         genome[0] = 1;
         genome[3] = 1;
         let lab = decode(&g, &w, &genome);
-        // Bridge node 2 follows triangle 1, node 3-region the other.
         assert_eq!(lab[0], lab[1]);
         assert_eq!(lab[1], lab[2]);
         assert_eq!(lab[3], lab[4]);
@@ -277,15 +222,12 @@ mod tests {
 
     #[test]
     fn decode_high_diameter_single_centre_no_singletons() {
-        // 200-node path with one centre at node 0: every node must join the
-        // centre's community, not fragment into distance-singletons.
         let n = 200i32;
         let nodes: Vec<i32> = (0..n).collect();
         let edges: Vec<(i32, i32)> = (0..n - 1).map(|i| (i, i + 1)).collect();
         let g = CsrGraph::from_edges(&nodes, &edges);
         let w = init_weights(&g);
         let mut genome = vec![0u8; g.n];
-        // CsrGraph interns nodes in `nodes` order, so dense id 0 == file id 0.
         genome[0] = 1;
         let lab = decode(&g, &w, &genome);
         let mut uniq = lab.clone();
@@ -301,14 +243,12 @@ mod tests {
 
     #[test]
     fn decode_centreless_component_is_one_community() {
-        // Two disjoint triangles; genome centres only the first. The second
-        // (centreless) component must collapse to ONE community, not 3 singletons.
         let nodes: Vec<i32> = (0..6).collect();
         let edges = vec![(0, 1), (1, 2), (0, 2), (3, 4), (4, 5), (3, 5)];
         let g = CsrGraph::from_edges(&nodes, &edges);
         let w = init_weights(&g);
         let mut genome = vec![0u8; g.n];
-        genome[0] = 1; // centre only in the first triangle
+        genome[0] = 1;
         let lab = decode(&g, &w, &genome);
         assert_eq!(lab[3], lab[4]);
         assert_eq!(lab[4], lab[5]);
@@ -362,7 +302,6 @@ mod tests {
         let mut w = init_weights(&g);
         let elite: Labels = vec![0, 0, 0, 1, 1, 1];
         update_weights(&g, &mut w, &[&elite], 1.0);
-        // With rho=1 and one elite, intra-edge slots → 1, bridge slots → 0.
         for u in 0..g.n {
             let start = g.xadj[u] as usize;
             let end = g.xadj[u + 1] as usize;
