@@ -26,7 +26,20 @@ fn max_degree_node(g: &CsrGraph) -> usize {
 fn propagate(g: &CsrGraph, wadj: &[f64], is_center: &[bool], lab: &mut [i32], n_slots: usize) {
     let n = g.n;
     let mut vote = vec![0.0f64; n_slots];
-    let mut touched: Vec<usize> = Vec::with_capacity(64);
+    // Pre-sized so the "push" is a store plus an increment. The `Vec::push` it
+    // replaces carried a reallocating call in the hot edge loop, and the
+    // possible call made the register allocator spill the incident weight and
+    // the vote cell to the stack and reload them on every single edge.
+    // The bound is the maximum degree, NOT `n_slots`: the `vote[li] == 0.0`
+    // guard below re-records a slot whose running sum is still exactly 0.0, so
+    // an incident weight of 0.0 makes entries repeat and one node can record up
+    // to `deg(u)` of them.
+    let max_deg = g.deg.iter().copied().max().unwrap_or(0) as usize;
+    let mut touched: Vec<u32> = vec![0u32; max_deg];
+    debug_assert!(
+        wadj.iter().all(|&w| w >= 0.0),
+        "the fused argmax/reset below relies on non-negative edge weights"
+    );
 
     // Active set. A node's next label is a pure function of its own label and
     // of the labels/weights on its incident edges (`wadj` is fixed for the
@@ -40,51 +53,69 @@ fn propagate(g: &CsrGraph, wadj: &[f64], is_center: &[bool], lab: &mut [i32], n_
     // permanently clean. Requires a symmetric adjacency (CsrGraph::from_edges
     // pushes both directions), so every reader of a label that moved is
     // reachable from the node that moved it.
-    let mut dirty: Vec<bool> = is_center.iter().map(|&c| !c).collect();
+    //
+    // The active flag and the centre flag live in ONE byte array: CLEAN(0) and
+    // DIRTY(1) for ordinary nodes, CENTER(2) for the permanently clean seeds.
+    // Marking a neighbour is then `(s >> 1) + 1`, which maps 0 -> 1, 1 -> 1 and
+    // 2 -> 2: it dirties ordinary nodes, leaves already-dirty ones alone and
+    // cannot wake a centre. That is exactly the old
+    // `if !is_center[v] { dirty[v] = true }` with one array instead of two -
+    // half the resident bytes, one scattered load per marked edge instead of
+    // two, and no branch to mispredict.
+    const CLEAN: u8 = 0;
+    const DIRTY: u8 = 1;
+    let mut state: Vec<u8> = is_center.iter().map(|&c| if c { 2 } else { DIRTY }).collect();
 
     for _ in 0..n {
         let mut changed = false;
         for u in 0..n {
-            if !dirty[u] {
+            if state[u] != DIRTY {
                 continue;
             }
-            dirty[u] = false;
-            touched.clear();
+            state[u] = CLEAN;
             let start = g.xadj[u] as usize;
             let end = g.xadj[u + 1] as usize;
-            let mut best = lab[u];
-            let mut best_w = if lab[u] != UNSET { 0.0 } else { -1.0 };
+            let cur = lab[u];
+            let mut nt = 0usize;
             for (&v, &w) in g.adj[start..end].iter().zip(&wadj[start..end]) {
-                let lv = lab[v as usize];
-                if lv == UNSET {
+                // `UNSET` is -1, whose u32 image is u32::MAX, and slot ids are
+                // dense in `0..n_slots` with `n_slots <= n < 2^32` (node ids are
+                // stored as u32 in `adj`). One unsigned range test therefore
+                // does the UNSET filter and the vote bound check at once, and
+                // leaves the indexing below provably in range.
+                let li = lab[v as usize] as u32 as usize;
+                if li >= vote.len() {
                     continue;
                 }
-                let li = lv as usize;
                 if vote[li] == 0.0 {
-                    touched.push(li);
+                    touched[nt] = li as u32;
+                    nt += 1;
                 }
                 vote[li] += w;
             }
-            if best != UNSET {
-                best_w = vote[best as usize];
-            }
-            for &c in &touched {
-                if vote[c] > best_w {
-                    best_w = vote[c];
+            let mut best = cur;
+            let mut best_w = if cur != UNSET { vote[cur as usize] } else { -1.0 };
+            // Argmax and reset are fused: same first-touch order, same strict
+            // `>` first-to-the-max tie-break. A repeated slot reads 0.0 on its
+            // second visit instead of the sum, which is equivalent exactly
+            // because weights are non-negative (asserted above): the sum then
+            // already beat `best_w` on the first visit, so the 0.0 cannot win
+            // and cannot displace it.
+            for &c in &touched[..nt] {
+                let ci = c as usize;
+                let vw = vote[ci];
+                vote[ci] = 0.0;
+                if vw > best_w {
+                    best_w = vw;
                     best = c as i32;
                 }
             }
-            for &c in &touched {
-                vote[c] = 0.0;
-            }
-            if best != lab[u] {
+            if best != cur {
                 lab[u] = best;
                 changed = true;
                 for &v in &g.adj[start..end] {
                     let v = v as usize;
-                    if !is_center[v] {
-                        dirty[v] = true;
-                    }
+                    state[v] = (state[v] >> 1) + 1;
                 }
             }
         }
