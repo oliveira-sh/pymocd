@@ -71,7 +71,6 @@ pub fn kkm_rc(g: &CsrGraph, labels: &Labels) -> (f64, f64) {
     let mut slot: Vec<u32> = vec![UNSEEN; g.n];
     let mut order: FxHashMap<i32, u64> = FxHashMap::default();
     let mut size: Vec<f64> = Vec::new();
-    let mut l_in: Vec<f64> = Vec::new();
     let mut deg_sum: Vec<f64> = Vec::new();
 
     for v in 0..g.n {
@@ -83,7 +82,6 @@ pub fn kkm_rc(g: &CsrGraph, labels: &Labels) -> (f64, f64) {
             slot[c as usize] = b;
             order.entry(c).or_insert(b as u64);
             size.push(0.0);
-            l_in.push(0.0);
             deg_sum.push(0.0);
             b
         } else {
@@ -91,13 +89,32 @@ pub fn kkm_rc(g: &CsrGraph, labels: &Labels) -> (f64, f64) {
         } as usize;
         size[b] += 1.0;
         deg_sum[b] += g.deg[v] as f64;
-        let mut internal = 0.0;
-        for &u in g.neighbors(v) {
-            if labels[u as usize] == c {
-                internal += 1.0;
-            }
+    }
+
+    // L(V_i, V_i) over the unique-edge list instead of over every node's
+    // neighbour list. `g.edges` holds each undirected edge exactly once as
+    // `(u, v)` with `u < v` and never a self-loop (`CsrGraph::from_edges`
+    // skips `du == dv`), while `adj` carries both directions of exactly those
+    // edges. The node scan added 1.0 per same-community half-edge, so its
+    // total for a community is 2 * (its intra-edge count) -- which is what
+    // `+= 2` per intra edge accumulates here, over the same multiset of edges.
+    //
+    // Reassociating is bit-exact. Every summand is a small non-negative
+    // integer, and a community's total is bounded by 2m = adj.len(), which is
+    // addressed by the u32 `xadj` and so is below 2^32. Every partial sum is
+    // therefore an integer below 2^53, where both integer addition and the
+    // final u64 -> f64 conversion are exact, and an exact integer sum does not
+    // depend on order. What is *not* reassociated is the reduction below:
+    // li/sz and (ds-li)/sz are inexact, and the node pass above still assigns
+    // every slot in node order, so `order`'s insertion sequence -- which pins
+    // that reduction -- is untouched.
+    let mut l_in: Vec<u64> = vec![0; size.len()];
+    for &(u, v) in &g.edges {
+        let cu = labels[u as usize];
+        if cu == labels[v as usize] {
+            debug_assert!(slot[cu as usize] != UNSEEN, "edge label {cu} has no slot");
+            l_in[slot[cu as usize] as usize] += 2;
         }
-        l_in[b] += internal;
     }
 
     let n = g.n as f64;
@@ -111,7 +128,7 @@ pub fn kkm_rc(g: &CsrGraph, labels: &Labels) -> (f64, f64) {
         if sz == 0.0 {
             continue;
         }
-        let li = l_in[b];
+        let li = l_in[b] as f64;
         let ds = deg_sum[b];
         kkm_internal += li / sz;
         rc += (ds - li) / sz;
