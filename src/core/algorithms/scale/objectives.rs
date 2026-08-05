@@ -3,6 +3,9 @@ use rustc_hash::FxHashMap;
 
 use super::Labels;
 
+/// Slot-array sentinel: this community label has not been seen yet.
+const UNSEEN: u32 = u32::MAX;
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum ObjSet {
     #[default]
@@ -53,34 +56,63 @@ pub fn evaluate(g: &CsrGraph, labels: &Labels, set: ObjSet) -> Vec<f64> {
 }
 
 pub fn kkm_rc(g: &CsrGraph, labels: &Labels) -> (f64, f64) {
-    let mut size: FxHashMap<i32, f64> = FxHashMap::default();
-    let mut l_in: FxHashMap<i32, f64> = FxHashMap::default();
-    let mut deg_sum: FxHashMap<i32, f64> = FxHashMap::default();
+    // Accumulate into dense slot-indexed vectors: labels are node ids in
+    // [0, n), so `slot` replaces three hash lookups per node.
+    //
+    // `order` exists only to fix the sequence of the final reduction: it sums
+    // li/sz and (ds-li)/sz, both inexact, so the order is observable in the
+    // front. Its keys are inserted on exactly the first-touch subsequence of
+    // the label stream (repeat `entry()` hits never mutate the table), and its
+    // value is u64 so that (K, V) has the same size and alignment as the
+    // `FxHashMap<i32, f64>` it replaced -- hashbrown sizes its buckets from the
+    // table layout, so identical layout plus identical key sequence gives
+    // identical iteration order. `order_map_iterates_like_the_f64_map_it_replaced`
+    // guards that; widening or shrinking this value type can move the fronts.
+    let mut slot: Vec<u32> = vec![UNSEEN; g.n];
+    let mut order: FxHashMap<i32, u64> = FxHashMap::default();
+    let mut size: Vec<f64> = Vec::new();
+    let mut l_in: Vec<f64> = Vec::new();
+    let mut deg_sum: Vec<f64> = Vec::new();
 
     for v in 0..g.n {
         let c = labels[v];
-        *size.entry(c).or_insert(0.0) += 1.0;
-        *deg_sum.entry(c).or_insert(0.0) += g.deg[v] as f64;
+        debug_assert!((c as usize) < g.n, "label {c} outside [0,{})", g.n);
+        let s = slot[c as usize];
+        let b = if s == UNSEEN {
+            let b = size.len() as u32;
+            slot[c as usize] = b;
+            order.entry(c).or_insert(b as u64);
+            size.push(0.0);
+            l_in.push(0.0);
+            deg_sum.push(0.0);
+            b
+        } else {
+            s
+        } as usize;
+        size[b] += 1.0;
+        deg_sum[b] += g.deg[v] as f64;
         let mut internal = 0.0;
         for &u in g.neighbors(v) {
             if labels[u as usize] == c {
                 internal += 1.0;
             }
         }
-        *l_in.entry(c).or_insert(0.0) += internal;
+        l_in[b] += internal;
     }
 
     let n = g.n as f64;
-    let k = size.len() as f64;
+    let k = order.len() as f64;
 
     let mut kkm_internal = 0.0;
     let mut rc = 0.0;
-    for (c, &sz) in size.iter() {
+    for (_, &b) in order.iter() {
+        let b = b as usize;
+        let sz = size[b];
         if sz == 0.0 {
             continue;
         }
-        let li = l_in[c];
-        let ds = deg_sum[c];
+        let li = l_in[b];
+        let ds = deg_sum[b];
         kkm_internal += li / sz;
         rc += (ds - li) / sz;
     }
@@ -95,13 +127,23 @@ pub fn intra_inter(g: &CsrGraph, labels: &Labels) -> (f64, f64) {
     }
     let two_m = 2.0 * m;
 
-    let mut remap: FxHashMap<i32, usize> = FxHashMap::default();
+    // Community labels are dense node ids in [0, n), so a slot array replaces
+    // the hash remap. First-touch order is unchanged, so `d_c` is
+    // element-for-element identical and the reduction below sums in the same
+    // sequence.
+    let mut slot: Vec<u32> = vec![UNSEEN; g.n];
     let mut d_c: Vec<f64> = Vec::new();
     for (&c, &k) in labels.iter().zip(g.deg.iter()) {
-        let b = *remap.entry(c).or_insert_with(|| {
+        debug_assert!((c as usize) < g.n, "label {c} outside [0,{})", g.n);
+        let s = slot[c as usize];
+        let b = if s == UNSEEN {
+            let b = d_c.len() as u32;
+            slot[c as usize] = b;
             d_c.push(0.0);
-            d_c.len() - 1
-        });
+            b
+        } else {
+            s
+        } as usize;
         d_c[b] += k as f64;
     }
 
@@ -114,4 +156,35 @@ pub fn intra_inter(g: &CsrGraph, labels: &Labels) -> (f64, f64) {
 
     let inter: f64 = d_c.iter().map(|&d| (d / two_m).powi(2)).sum();
     (1.0 - l_intra / m, inter)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `kkm_rc` reduces in `order`'s iteration order, and the fronts are only
+    /// byte-reproducible against pre-existing runs while that order matches the
+    /// `FxHashMap<i32, f64>` this map replaced. hashbrown derives its bucket
+    /// count from the table layout, so equal `(K, V)` size and alignment plus an
+    /// equal key sequence is what makes the two agree. Guard both halves.
+    #[test]
+    fn order_map_iterates_like_the_f64_map_it_replaced() {
+        assert_eq!(size_of::<(i32, u64)>(), size_of::<(i32, f64)>());
+        assert_eq!(align_of::<(i32, u64)>(), align_of::<(i32, f64)>());
+        let mut r = 0x9E37_79B9_7F4A_7C15u64;
+        for k in [1usize, 2, 3, 7, 8, 13, 16, 31, 64, 257] {
+            let mut slots: FxHashMap<i32, u64> = FxHashMap::default();
+            let mut sums: FxHashMap<i32, f64> = FxHashMap::default();
+            for _ in 0..k * 4 {
+                r = r.wrapping_mul(6364136223846793005).wrapping_add(1);
+                let key = ((r >> 33) % k as u64) as i32;
+                let next = slots.len() as u64;
+                slots.entry(key).or_insert(next);
+                *sums.entry(key).or_insert(0.0) += 1.0;
+            }
+            let a: Vec<i32> = slots.keys().copied().collect();
+            let b: Vec<i32> = sums.keys().copied().collect();
+            assert_eq!(a, b, "iteration order diverged for {k} distinct labels");
+        }
+    }
 }
