@@ -73,8 +73,7 @@ pub fn kkm_rc(g: &CsrGraph, labels: &Labels) -> (f64, f64) {
     let mut size: Vec<f64> = Vec::new();
     let mut deg_sum: Vec<f64> = Vec::new();
 
-    for v in 0..g.n {
-        let c = labels[v];
+    for (v, &c) in labels.iter().enumerate().take(g.n) {
         debug_assert!((c as usize) < g.n, "label {c} outside [0,{})", g.n);
         let s = slot[c as usize];
         let b = if s == UNSEEN {

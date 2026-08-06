@@ -8,6 +8,61 @@ fn dominates(a: &[f64], b: &[f64]) -> bool {
 }
 
 pub fn fast_nondominated_sort(objs: &[Obj]) -> Vec<usize> {
+    if objs.is_empty() {
+        return Vec::new();
+    }
+    if objs[0].len() == 2 {
+        two_objective_sort(objs)
+    } else {
+        generic_sort(objs)
+    }
+}
+
+// Jensen-style sweep for the two-objective case, O(n log n). Points are
+// processed in (f1 asc, f2 asc) order, so an earlier point q dominates the
+// current point p iff q.f2 <= p.f2; `front_min[k]` (the smallest f2 in front
+// k+1) is non-decreasing in k, so the first non-dominating front is found by
+// binary search. Exact duplicates do not dominate each other, so a duplicate
+// group is placed in one front together before `front_min` is consulted
+// again. Produces ranks identical to `generic_sort`.
+fn two_objective_sort(objs: &[Obj]) -> Vec<usize> {
+    let n = objs.len();
+    let mut idx: Vec<usize> = (0..n).collect();
+    idx.sort_by(|&a, &b| {
+        objs[a][0]
+            .partial_cmp(&objs[b][0])
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(
+                objs[a][1]
+                    .partial_cmp(&objs[b][1])
+                    .unwrap_or(std::cmp::Ordering::Equal),
+            )
+    });
+
+    let mut rank = vec![0usize; n];
+    let mut front_min: Vec<f64> = Vec::new();
+    let mut i = 0;
+    while i < n {
+        let (f1, f2) = (objs[idx[i]][0], objs[idx[i]][1]);
+        let mut j = i + 1;
+        while j < n && objs[idx[j]][0] == f1 && objs[idx[j]][1] == f2 {
+            j += 1;
+        }
+        let k = front_min.partition_point(|&m| m <= f2);
+        if k == front_min.len() {
+            front_min.push(f2);
+        } else {
+            front_min[k] = f2;
+        }
+        for &p in &idx[i..j] {
+            rank[p] = k + 1;
+        }
+        i = j;
+    }
+    rank
+}
+
+fn generic_sort(objs: &[Obj]) -> Vec<usize> {
     let n = objs.len();
     let mut rank = vec![0usize; n];
     if n == 0 {
@@ -191,6 +246,35 @@ mod tests {
         assert_eq!(surv.len(), 3);
         assert!(!surv.contains(&3));
         assert!(surv.contains(&0) && surv.contains(&1) && surv.contains(&2));
+    }
+
+    #[test]
+    fn two_objective_sort_matches_generic_on_random_data() {
+        // LCG so the test needs no rng dependency; values are drawn from a
+        // small lattice to force plenty of ties and exact duplicates.
+        let mut state = 0x9e3779b97f4a7c15u64;
+        let mut next = move || {
+            state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+            (state >> 33) as usize
+        };
+        for case in 0..200 {
+            let n = 1 + next() % 120;
+            let lattice = 1 + case % 12;
+            let objs: Vec<Obj> = (0..n)
+                .map(|_| vec![(next() % lattice) as f64, (next() % lattice) as f64])
+                .collect();
+            assert_eq!(
+                two_objective_sort(&objs),
+                generic_sort(&objs),
+                "diverged on {objs:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn two_objective_sort_keeps_exact_duplicates_in_one_front() {
+        let objs = vec![vec![1.0, 2.0], vec![1.0, 2.0], vec![0.5, 3.0]];
+        assert_eq!(fast_nondominated_sort(&objs), vec![1, 1, 1]);
     }
 
     #[test]
