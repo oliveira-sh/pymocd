@@ -1,4 +1,4 @@
-.PHONY: all dependencies stubs build test benchmark benchmark-params benchmark-synthetic benchmark-real benchmark-parallelism bump clean docs docs-serve
+.PHONY: all dependencies stubs build test benchmark benchmark-params benchmark-synthetic benchmark-real benchmark-parallelism hard-gen hard-run hard-report hard-smoke bump clean docs docs-serve
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -70,3 +70,16 @@ clean:
 	@cargo clean
 	@rm -rf $(VENV) target build dist *.egg-info pymocd.pyi
 	@find . -type d -name "__pycache__" -exec rm -rf {} +
+
+# --- hardened campaign (Threadripper): resumable, incremental, 12h timeout ---
+hard-gen: build
+	cd benchmarks && $(BENCH_PY) hardened/gen_graphs.py
+
+hard-run: build
+	cd benchmarks && $(BENCH_PY) hardened/run.py
+
+hard-report:
+	cd benchmarks/hardened && $(BENCH_PY) report.py $(METRIC)
+
+hard-smoke: build
+	cd benchmarks && HARD_SMOKE=1 $(BENCH_PY) hardened/run.py

@@ -422,3 +422,4 @@ pymocd.pyi
 # mkdocstrings stub shadow copy (docs/hooks.py)
 .docs-stub/
 docs/assets/
+benchmarks/data/lfr/
