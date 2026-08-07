@@ -11,10 +11,15 @@ BENCH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SMOKE = bool(os.environ.get("HARD_SMOKE"))
 RUNS = 2 if SMOKE else int(os.environ.get("HARD_RUNS", "20"))
 TIMEOUT = int(os.environ.get("HARD_TIMEOUT", "60" if SMOKE else "43200"))
-THREADS = int(os.environ.get("HARD_THREADS", "2" if SMOKE else "12"))
-WORKERS = int(os.environ.get("HARD_WORKERS", "2" if SMOKE else "4"))
-EXCLUSIVE_N = int(os.environ.get("HARD_EXCLUSIVE_N", "250000"))
-EXCLUSIVE_THREADS = int(os.environ.get("HARD_EXCLUSIVE_THREADS", "48"))
+WORKERS = int(os.environ.get("HARD_WORKERS", "2" if SMOKE else "48"))
+BIG_N = int(os.environ.get("HARD_BIG_N", "250000"))
+BIG_WORKERS = int(os.environ.get("HARD_BIG_WORKERS", "1" if SMOKE else "4"))
+ALL_THREADS = int(os.environ.get("HARD_ALL_THREADS", "2" if SMOKE else "48"))
+
+# Rayon-parallel detectors: run one at a time with the whole machine,
+# SMOCC first, then HP-MOCD. Everything else is single-threaded, so those
+# runs are parallelized across cores instead (one worker = one core).
+PARALLEL_ALGS = ("SMOCC", "HP-MOCD")
 
 LFR_DIR = os.path.join(BENCH, "data", "lfr")
 OUT = os.path.join(BENCH, "results", "hardened")
@@ -147,7 +152,6 @@ def run_task(task, threads):
 
 
 def run_campaign(tasks):
-    tasks.sort(key=lambda t: (t["_n"], t["kind"], t["alg"], t["seed"]))
     done, had_error = load_done()
     pending = [t for t in tasks if task_key(t) not in done]
     retries = sum(1 for t in pending if task_key(t) in had_error)
@@ -177,22 +181,32 @@ def run_campaign(tasks):
             msg += f" [{err[:200]}]"
         print(msg, flush=True)
 
-    parallel = [t for t in pending if t["_n"] < EXCLUSIVE_N]
-    exclusive = [t for t in pending if t["_n"] >= EXCLUSIVE_N]
-
-    with ThreadPoolExecutor(max_workers=WORKERS) as pool:
-        futs = set()
-        for t in parallel:
-            futs.add(pool.submit(dispatch, t, THREADS))
-            while len(futs) >= WORKERS * 2:
-                done_f, futs = wait(futs, return_when=FIRST_COMPLETED)
-                for f in done_f:
-                    f.result()
-        for f in futs:
-            f.result()
+    exclusive = [t for t in pending if t["alg"] in PARALLEL_ALGS]
+    exclusive.sort(key=lambda t: (PARALLEL_ALGS.index(t["alg"]), t["_n"],
+                                  task_key(t)))
+    serial = [t for t in pending if t["alg"] not in PARALLEL_ALGS]
+    serial.sort(key=lambda t: (t["_n"], task_key(t)))
 
     for t in exclusive:
-        dispatch(t, EXCLUSIVE_THREADS)
+        dispatch(t, ALL_THREADS)
+
+    def run_pool(batch, workers):
+        if not batch:
+            return
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futs = set()
+            for t in batch:
+                futs.add(pool.submit(dispatch, t, 1))
+                while len(futs) >= workers * 2:
+                    done_f, futs = wait(futs, return_when=FIRST_COMPLETED)
+                    for f in done_f:
+                        f.result()
+            for f in futs:
+                f.result()
+
+    run_pool([t for t in serial if t["_n"] < BIG_N], WORKERS)
+    # ponytail: few concurrent multi-GB graph loads; raise HARD_BIG_WORKERS if RAM allows
+    run_pool([t for t in serial if t["_n"] >= BIG_N], BIG_WORKERS)
 
 
 if __name__ == "__main__":
