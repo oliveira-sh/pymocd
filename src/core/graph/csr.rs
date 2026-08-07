@@ -4,7 +4,6 @@
 
 use rustc_hash::FxHashMap;
 
-
 /// Compressed sparse row undirected graph over dense ids `[0, n)`.
 pub struct CsrGraph {
     pub n: usize,

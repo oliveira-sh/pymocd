@@ -27,8 +27,8 @@ class TestPartitions(unittest.TestCase):
         for community, members in groups.items():
             self.assertTrue(members, f"community {community} is empty")
 
-    def test_scale(self):
-        self.assert_valid_partition(pymocd.scale(self.graph))
+    def test_smocc(self):
+        self.assert_valid_partition(pymocd.smocc(self.graph))
 
     def test_hpmocd(self):
         self.assert_valid_partition(pymocd.hpmocd(self.graph))
@@ -51,8 +51,8 @@ class TestPartitions(unittest.TestCase):
     def test_mmcomo(self):
         self.assert_valid_partition(pymocd.mmcomo(self.graph))
 
-    def test_scale_fronts(self):
-        front = pymocd.scale_fronts(self.graph)
+    def test_smocc_fronts(self):
+        front = pymocd.smocc_fronts(self.graph)
         self.assertIsInstance(front, list)
         self.assertTrue(front)
         for partition in front:
@@ -81,8 +81,8 @@ class TestTwoCliquePartition(unittest.TestCase):
     def test_hpmocd_recovers_exact_partition(self):
         self.assert_exact_two_clique_split(pymocd.hpmocd(self.graph))
 
-    def test_scale_recovers_exact_partition(self):
-        self.assert_exact_two_clique_split(pymocd.scale(self.graph))
+    def test_smocc_recovers_exact_partition(self):
+        self.assert_exact_two_clique_split(pymocd.smocc(self.graph))
 
 
 if __name__ == "__main__":

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import gzip
 import os
 import sys
 import time
+import urllib.request
+import zipfile
 from typing import Callable
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -44,10 +47,52 @@ def _florentine() -> tuple[nx.Graph, None]:
     return G, None
 
 
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
+
+
+def _fetch(url: str) -> str:
+    os.makedirs(DATA_DIR, exist_ok=True)
+    path = os.path.join(DATA_DIR, os.path.basename(url))
+    if not os.path.exists(path):
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req) as resp, open(path, "wb") as out:
+            out.write(resp.read())
+    return path
+
+
+def _newman_gml(name: str) -> tuple[nx.Graph, dict | None]:
+    path = _fetch(f"https://websites.umich.edu/~mejn/netdata/{name}.zip")
+    with zipfile.ZipFile(path) as z:
+        gml = z.read(f"{name}.gml").decode()
+    G = nx.Graph(nx.parse_gml(gml, label="id"))
+    values = nx.get_node_attributes(G, "value")
+    if len(values) == len(G):
+        ids = {v: i for i, v in enumerate(sorted(set(values.values()), key=str))}
+        return G, {n: ids[v] for n, v in values.items()}
+    return G, None
+
+
+def _email_eu() -> tuple[nx.Graph, dict]:
+    epath = _fetch("https://snap.stanford.edu/data/email-Eu-core.txt.gz")
+    lpath = _fetch(
+        "https://snap.stanford.edu/data/email-Eu-core-department-labels.txt.gz"
+    )
+    with gzip.open(epath, "rt") as f:
+        G = nx.Graph(nx.parse_edgelist(f, nodetype=int))
+    G.remove_edges_from(nx.selfloop_edges(G))
+    with gzip.open(lpath, "rt") as f:
+        gt = {int(a): int(b) for a, b in (line.split() for line in f)}
+    return G, gt
+
+
 NETWORKS: list[tuple[str, Callable[[], tuple[nx.Graph, dict | None]]]] = [
     ("Karate", _karate),
+    ("Dolphins", lambda: _newman_gml("dolphins")),
     ("Les Misérables", _les_miserables),
     ("Florentine", _florentine),
+    ("Pol. Books", lambda: _newman_gml("polbooks")),
+    ("Football", lambda: _newman_gml("football")),
+    ("Email-Eu", _email_eu),
 ]
 
 
@@ -76,7 +121,11 @@ def _evaluate(
 def run_all(n_runs: int = N_RUNS) -> pd.DataFrame:
     records: list[dict] = []
     for net_name, loader in NETWORKS:
-        G, gt = loader()
+        try:
+            G, gt = loader()
+        except Exception as e:
+            print(f"[{net_name}] skipped: {e}")
+            continue
         print(
             f"[{net_name}] n={G.number_of_nodes()} m={G.number_of_edges()} "
             f"gt={'yes' if gt is not None else 'no'}"
@@ -197,4 +246,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    cores = os.environ.get("PYMOCD_MAX_CORES")
+    if cores:
+        import pymocd
+
+        pymocd.max_cores(int(cores))
     main()

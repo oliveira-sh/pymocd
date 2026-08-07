@@ -47,7 +47,6 @@ fn roulette_pick(order: &[usize], fitness: &[f64], total: f64, rng: &mut ThreadR
 /// MOGA-Net generational loop. Mutation applies regardless of whether the
 /// child came from crossover or a clone. Returns the final rank-assigned
 /// population; the caller applies the max-modularity rank-1 decision rule.
-#[allow(clippy::too_many_arguments)]
 pub fn run(
     locus: &Locus,
     pop_size: usize,

@@ -1,30 +1,85 @@
-// Both objectives minimized, stored as (KKM, RC).
+pub type Obj = Vec<f64>;
+
 #[inline]
-fn dominates(a: (f64, f64), b: (f64, f64)) -> bool {
-    let le = a.0 <= b.0 && a.1 <= b.1;
-    let lt = a.0 < b.0 || a.1 < b.1;
+fn dominates(a: &[f64], b: &[f64]) -> bool {
+    let le = a.iter().zip(b).all(|(x, y)| x <= y);
+    let lt = a.iter().zip(b).any(|(x, y)| x < y);
     le && lt
 }
 
-/// Fast non-dominated sort. Returns a 1-based rank per individual.
-pub fn fast_nondominated_sort(objs: &[(f64, f64)]) -> Vec<usize> {
+pub fn fast_nondominated_sort(objs: &[Obj]) -> Vec<usize> {
+    if objs.is_empty() {
+        return Vec::new();
+    }
+    if objs[0].len() == 2 {
+        two_objective_sort(objs)
+    } else {
+        generic_sort(objs)
+    }
+}
+
+// Jensen-style sweep for the two-objective case, O(n log n). Points are
+// processed in (f1 asc, f2 asc) order, so an earlier point q dominates the
+// current point p iff q.f2 <= p.f2; `front_min[k]` (the smallest f2 in front
+// k+1) is non-decreasing in k, so the first non-dominating front is found by
+// binary search. Exact duplicates do not dominate each other, so a duplicate
+// group is placed in one front together before `front_min` is consulted
+// again. Produces ranks identical to `generic_sort`.
+fn two_objective_sort(objs: &[Obj]) -> Vec<usize> {
+    let n = objs.len();
+    let mut idx: Vec<usize> = (0..n).collect();
+    idx.sort_by(|&a, &b| {
+        objs[a][0]
+            .partial_cmp(&objs[b][0])
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(
+                objs[a][1]
+                    .partial_cmp(&objs[b][1])
+                    .unwrap_or(std::cmp::Ordering::Equal),
+            )
+    });
+
+    let mut rank = vec![0usize; n];
+    let mut front_min: Vec<f64> = Vec::new();
+    let mut i = 0;
+    while i < n {
+        let (f1, f2) = (objs[idx[i]][0], objs[idx[i]][1]);
+        let mut j = i + 1;
+        while j < n && objs[idx[j]][0] == f1 && objs[idx[j]][1] == f2 {
+            j += 1;
+        }
+        let k = front_min.partition_point(|&m| m <= f2);
+        if k == front_min.len() {
+            front_min.push(f2);
+        } else {
+            front_min[k] = f2;
+        }
+        for &p in &idx[i..j] {
+            rank[p] = k + 1;
+        }
+        i = j;
+    }
+    rank
+}
+
+fn generic_sort(objs: &[Obj]) -> Vec<usize> {
     let n = objs.len();
     let mut rank = vec![0usize; n];
     if n == 0 {
         return rank;
     }
 
-    let mut dominated: Vec<Vec<usize>> = vec![Vec::new(); n]; // S_p
-    let mut dom_count = vec![0usize; n]; // n_p
+    let mut dominated: Vec<Vec<usize>> = vec![Vec::new(); n];
+    let mut dom_count = vec![0usize; n];
 
     for p in 0..n {
         for q in 0..n {
             if p == q {
                 continue;
             }
-            if dominates(objs[p], objs[q]) {
+            if dominates(&objs[p], &objs[q]) {
                 dominated[p].push(q);
-            } else if dominates(objs[q], objs[p]) {
+            } else if dominates(&objs[q], &objs[p]) {
                 dom_count[p] += 1;
             }
         }
@@ -51,8 +106,7 @@ pub fn fast_nondominated_sort(objs: &[(f64, f64)]) -> Vec<usize> {
     rank
 }
 
-/// Crowding distance, computed per front, summed over both objectives.
-pub fn crowding_distance(objs: &[(f64, f64)], ranks: &[usize]) -> Vec<f64> {
+pub fn crowding_distance(objs: &[Obj], ranks: &[usize]) -> Vec<f64> {
     let n = objs.len();
     let mut dist = vec![0.0f64; n];
     if n == 0 {
@@ -75,8 +129,10 @@ pub fn crowding_distance(objs: &[(f64, f64)], ranks: &[usize]) -> Vec<f64> {
             continue;
         }
 
-        for obj in 0..2 {
-            let key = |idx: usize| -> f64 { if obj == 0 { objs[idx].0 } else { objs[idx].1 } };
+        let m = objs[group[0]].len();
+        #[allow(clippy::needless_range_loop)]
+        for obj in 0..m {
+            let key = |idx: usize| -> f64 { objs[idx][obj] };
 
             let mut order = group.clone();
             order.sort_by(|&a, &b| {
@@ -107,9 +163,7 @@ pub fn crowding_distance(objs: &[(f64, f64)], ranks: &[usize]) -> Vec<f64> {
     dist
 }
 
-/// Environment selection: fill survivors by ascending rank, truncating the last
-/// overflowing front by descending crowding distance. Size min(keep, len).
-pub fn environment_selection(objs: &[(f64, f64)], keep: usize) -> Vec<usize> {
+pub fn environment_selection(objs: &[Obj], keep: usize) -> Vec<usize> {
     let n = objs.len();
     let target = keep.min(n);
     if target == 0 {
@@ -157,8 +211,12 @@ mod tests {
 
     #[test]
     fn test_nondominated_sort_two_fronts() {
-        // (1,4),(2,2),(4,1) mutually non-dominating; (3,3) dominated by (2,2).
-        let objs = vec![(1.0, 4.0), (2.0, 2.0), (4.0, 1.0), (3.0, 3.0)];
+        let objs = vec![
+            vec![1.0, 4.0],
+            vec![2.0, 2.0],
+            vec![4.0, 1.0],
+            vec![3.0, 3.0],
+        ];
         let ranks = fast_nondominated_sort(&objs);
         assert_eq!(ranks[0], 1);
         assert_eq!(ranks[1], 1);
@@ -168,7 +226,7 @@ mod tests {
 
     #[test]
     fn test_crowding_boundaries_infinite() {
-        let objs = vec![(1.0, 4.0), (2.0, 2.0), (4.0, 1.0)];
+        let objs = vec![vec![1.0, 4.0], vec![2.0, 2.0], vec![4.0, 1.0]];
         let ranks = fast_nondominated_sort(&objs);
         let crowd = crowding_distance(&objs, &ranks);
         assert!(crowd[0].is_infinite());
@@ -178,7 +236,12 @@ mod tests {
 
     #[test]
     fn test_environment_selection_size_and_rank1_priority() {
-        let objs = vec![(1.0, 4.0), (2.0, 2.0), (4.0, 1.0), (3.0, 3.0)];
+        let objs = vec![
+            vec![1.0, 4.0],
+            vec![2.0, 2.0],
+            vec![4.0, 1.0],
+            vec![3.0, 3.0],
+        ];
         let surv = environment_selection(&objs, 3);
         assert_eq!(surv.len(), 3);
         assert!(!surv.contains(&3));
@@ -186,8 +249,37 @@ mod tests {
     }
 
     #[test]
+    fn two_objective_sort_matches_generic_on_random_data() {
+        // LCG so the test needs no rng dependency; values are drawn from a
+        // small lattice to force plenty of ties and exact duplicates.
+        let mut state = 0x9e3779b97f4a7c15u64;
+        let mut next = move || {
+            state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+            (state >> 33) as usize
+        };
+        for case in 0..200 {
+            let n = 1 + next() % 120;
+            let lattice = 1 + case % 12;
+            let objs: Vec<Obj> = (0..n)
+                .map(|_| vec![(next() % lattice) as f64, (next() % lattice) as f64])
+                .collect();
+            assert_eq!(
+                two_objective_sort(&objs),
+                generic_sort(&objs),
+                "diverged on {objs:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn two_objective_sort_keeps_exact_duplicates_in_one_front() {
+        let objs = vec![vec![1.0, 2.0], vec![1.0, 2.0], vec![0.5, 3.0]];
+        assert_eq!(fast_nondominated_sort(&objs), vec![1, 1, 1]);
+    }
+
+    #[test]
     fn test_environment_selection_clamps_to_len() {
-        let objs = vec![(1.0, 1.0), (2.0, 2.0)];
+        let objs = vec![vec![1.0, 1.0], vec![2.0, 2.0]];
         assert_eq!(environment_selection(&objs, 10).len(), 2);
         assert_eq!(environment_selection(&objs, 0).len(), 0);
         assert!(environment_selection(&[], 5).is_empty());

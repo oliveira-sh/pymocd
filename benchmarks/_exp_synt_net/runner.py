@@ -120,7 +120,8 @@ class ExperimentRunner:
         results = []
         with tqdm(total=total, desc="Benchmarking", unit="task") as pbar:
             if parallel_args:
-                with Pool() as pool:
+                procs = os.environ.get("PYMOCD_BENCH_POOL")
+                with Pool(int(procs) if procs else None) as pool:
                     for result in pool.imap_unordered(self._run_single, parallel_args):
                         results.append(result)
                         pbar.set_postfix(

@@ -9,14 +9,13 @@ mod objectives;
 mod operators;
 mod utils;
 
+use crate::core::graph::normalize_community_ids;
 use crate::core::graph::{Graph, Partition};
 use individual::{Individual, TOURNAMENT_SIZE};
-use crate::core::graph::normalize_community_ids;
 use utils::max_q_selection;
 
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
-use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use rayon::prelude::*;
 use rustc_hash::FxBuildHasher;
 use std::collections::HashMap;
@@ -35,7 +34,6 @@ pub use defaults::*;
 ///     mut_rate: mutation probability.
 ///     objectives: optional list of callables ``(graph, partition) -> float``
 ///         to minimise; replaces the built-in intra/inter objectives.
-#[gen_stub_pyclass]
 #[pyclass]
 pub struct HpMocd {
     graph: Graph,
@@ -140,7 +138,6 @@ impl HpMocd {
     }
 }
 
-#[gen_stub_pymethods]
 #[pymethods]
 impl HpMocd {
     #[new]

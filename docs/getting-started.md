@@ -18,14 +18,14 @@ make build
 
 ## First detection
 
-`pymocd.scale` is the recommended entry point:
+`pymocd.smocc` is the recommended entry point:
 
 ```python
 import networkx as nx
 import pymocd
 
 G = nx.karate_club_graph()
-communities = pymocd.scale(G)
+communities = pymocd.smocc(G)
 ```
 
 !!! important "Graph format"
@@ -33,10 +33,10 @@ communities = pymocd.scale(G)
 
 ## Tuning
 
-`scale` and `mmcomo` share the same evolutionary knobs:
+`smocc` and `mmcomo` share the same evolutionary knobs:
 
 ```python
-communities = pymocd.scale(
+communities = pymocd.smocc(
     G,
     pop_size=100,
     num_gens=50,
@@ -47,15 +47,7 @@ communities = pymocd.scale(
 )
 ```
 
-`gap` is the macro/micro co-evolution interval and `beta` the micro-stage perturbation strength.
-
-`scale` additionally supports an adaptive stopping rule:
-
-```python
-communities = pymocd.scale(G, adaptive_stop=True, conv_pval=0.1)
-```
-
-With `adaptive_stop=True`, a Welch t-test detects when the front has plateaued and stops early; `num_gens` then acts as a safety ceiling rather than a fixed budget.
+`gap` is the macro/micro co-evolution interval and `beta` the micro-stage perturbation strength. `num_gens` is the generation count: the search always runs all of them.
 
 For tuned HP-MOCD runs, use the `HpMocd` class — it exposes custom objectives, a per-generation callback, and the raw Pareto front:
 
@@ -98,10 +90,10 @@ Each metric is also available on its own: `pymocd.nmi`, `pymocd.ami`, `pymocd.ar
 
 ## Inspecting Pareto fronts
 
-`scale`, `mmcomo`, `ccm`, `krm` and `moga_net` each pick one partition from a Pareto front of candidates. To see the whole candidate set, use `scale_fronts`, `mmcomo_fronts`, `ccm_fronts`, `krm_fronts` or `moga_net_fronts`, which accept the same evolutionary kwargs as their detector (`scale_fronts` adds `refine` and `topo_mode`) and return a `list[dict[node, community]]`:
+`smocc`, `mmcomo`, `ccm`, `krm` and `moga_net` each pick one partition from a Pareto front of candidates. To see the whole candidate set, use `smocc_fronts`, `mmcomo_fronts`, `ccm_fronts`, `krm_fronts` or `moga_net_fronts`, which accept the same evolutionary kwargs as their detector (`smocc_fronts` adds `refine` and `topo_mode`) and return a `list[dict[node, community]]`:
 
 ```python
-front = pymocd.scale_fronts(G)
+front = pymocd.smocc_fronts(G)
 best = max(front, key=lambda p: pymocd.ari(p, gt))
 ```
 

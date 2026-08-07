@@ -38,7 +38,7 @@ def _partition_objectives(
 
 def _compute_pareto_records() -> tuple[list[dict[str, object]], dict[str, object]]:
     graph, ground_truth = generate_lfr_benchmark()
-    pareto_front = pymocd.scale_fronts(graph)
+    pareto_front = pymocd.smocc_fronts(graph)
     records: list[dict[str, object]] = []
 
     for communities in pareto_front:
