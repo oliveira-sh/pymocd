@@ -88,7 +88,6 @@ nav:
   - Algorithms: algorithms.md
   - Examples:
       - Plotting communities: examples/plotting.md
-      - Custom objectives: examples/custom-objectives.md
       - Pareto fronts: examples/pareto-fronts.md
   - API reference:
       - Detectors: api/detectors.md

@@ -1,8 +1,10 @@
 # Pareto fronts
 
-These functions expose the full candidate set a detector selects its final partition from, letting you inspect or re-select solutions yourself. For HP-MOCD, use [`HpMocd.generate_pareto_front`](detectors.md#pymocd.HpMocd) instead.
+These functions expose the full candidate set a detector selects its final partition from, letting you inspect or re-select solutions yourself.
 
 ::: pymocd.smocc_fronts
+
+::: pymocd.hpmocd_fronts
 
 ::: pymocd.mmcomo_fronts
 

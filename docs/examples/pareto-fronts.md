@@ -4,27 +4,21 @@ The evolutionary search optimizes competing objectives at once, so it ends with 
 
 Every detector already resolves this — each applies the selection rule published with its algorithm (max-modularity, MDL, etc.; see [Algorithms](../algorithms.md)) and returns a single partition. The front accessors exist for making that choice yourself: ground truth, a known expected community count, or your own quality metric.
 
-## `HpMocd.generate_pareto_front()`
+## The `*_fronts` functions
 
-Returns every non-dominated solution as a list of `(partition, objective_values)` tuples:
-
-- `partition`: `dict[node, community]`
-- `objective_values`: `list[float]`, one value per objective, **all minimized** — the built-in intra and inter objectives included. With custom objectives, the list matches the objectives you passed, in order.
+`smocc`, `hpmocd`, `mmcomo`, `ccm`, `krm` and `moga_net` each pair with a `*_fronts` function exposing the candidate set as a plain `list[dict]` of partitions. Each list is exactly what the corresponding detector selects from:
 
 ```python
 import networkx as nx
-from pymocd import HpMocd
+import pymocd
 
 G = nx.karate_club_graph()
-front = HpMocd(G).generate_pareto_front()
+front = pymocd.smocc_fronts(G)
 
-for partition, objectives in front:
+for partition in front:
     k = len(set(partition.values()))
-    print(f"{k} communities, objectives = {objectives}")
+    print(f"{k} communities")
 ```
-
-!!! warning "Both objectives are minimized"
-    Older documentation described intra as "higher is better". It is not: lower is better for **every** value in `objective_values`.
 
 ## Picking a member yourself
 
@@ -37,7 +31,7 @@ def modularity(G, partition):
         comms.setdefault(c, set()).add(node)
     return nx.community.modularity(G, comms.values())
 
-best, _ = max(front, key=lambda sol: modularity(G, sol[0]))
+best = max(front, key=lambda p: modularity(G, p))
 ```
 
 ### Against ground truth
@@ -45,11 +39,9 @@ best, _ = max(front, key=lambda sol: modularity(G, sol[0]))
 Score every member with `pymocd.gt_metrics` (or `ari`, `nmi`, `ami`, `f1` individually). Karate club, using the `club` attribute as ground truth:
 
 ```python
-import pymocd
-
 gt = {v: int(G.nodes[v]['club'] != 'Mr. Hi') for v in G}
 
-best, _ = max(front, key=lambda sol: pymocd.ari(sol[0], gt))
+best = max(front, key=lambda p: pymocd.ari(p, gt))
 nmi, ami, ari, f1 = pymocd.gt_metrics(best, gt)
 print(f"NMI={nmi:.3f} AMI={ami:.3f} ARI={ari:.3f} F1={f1:.3f}")
 ```
@@ -61,19 +53,10 @@ print(f"NMI={nmi:.3f} AMI={ami:.3f} ARI={ari:.3f} F1={f1:.3f}")
 
 ```python
 target = 2
-best, _ = min(front, key=lambda sol: abs(len(set(sol[0].values())) - target))
+best = min(front, key=lambda p: abs(len(set(p.values())) - target))
 ```
 
-## The `*_fronts` functions
-
-`smocc`, `mmcomo`, `ccm`, `krm` and `moga_net` expose their candidate sets as a plain `list[dict]` of partitions — no objective values attached. Each list is exactly what the corresponding detector selects from:
-
-```python
-candidates = pymocd.smocc_fronts(G)
-best = max(candidates, key=lambda p: pymocd.ari(p, gt))
-```
-
-Each takes the same kwargs as its detector; `smocc_fronts` adds two of its own: `refine` (apply union-refinement to the merged front, on by default) and `topo_mode` (topology-handling mode, integer).
+Each `*_fronts` function takes the same kwargs as its detector; `smocc_fronts` adds two of its own: `refine` (apply union-refinement to the merged front, on by default) and `topo_mode` (topology-handling mode, integer).
 
 The baseline fronts exist because the original papers report the best-NMI solution *of the front*, not the max-modularity one their detectors return — reproducing those tables needs the full candidate set:
 
@@ -84,5 +67,5 @@ best_nmi = max(pymocd.nmi(p, gt) for p in front)
 
 ## See also
 
-- [Plotting](plotting.md) — visualize the front in objective space and draw the selected partition.
-- [Fronts API](../api/fronts.md) — full signatures for `generate_pareto_front` and the `*_fronts` functions.
+- [Plotting](plotting.md) — visualize the trade-off the front spans and draw the selected partition.
+- [Fronts API](../api/fronts.md) — full signatures for the `*_fronts` functions.

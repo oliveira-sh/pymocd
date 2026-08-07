@@ -20,7 +20,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
 use pyo3_stub_gen::derive::gen_stub_pyfunction;
 
-/// Run HP-MOCD (NSGA-II) with defaults. For tuning, use the ``HpMocd`` class.
+/// Run HP-MOCD (NSGA-II) with its published defaults.
 ///
 /// Returns ``dict[node, community]``. Isolated nodes get ``-1``.
 #[gen_stub_pyfunction]
