@@ -8,6 +8,7 @@ license = "GPL-3.0-or-later"
 [lib]
 name = "pymocd"
 crate-type = ["cdylib", "rlib"]
+doctest = false
 
 [features]
 # Deliberately NOT in `default`: pyo3/extension-module omits libpython linkage,
