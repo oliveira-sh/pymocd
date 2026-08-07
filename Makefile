@@ -73,13 +73,15 @@ clean:
 
 # --- hardened campaign (Threadripper): resumable, incremental, 12h timeout ---
 hard-gen: build
-	cd benchmarks && $(BENCH_PY) hardened/gen_graphs.py
+	cd benchmarks && $(BENCH_PY) -m _exp_synt_net.gen_graphs
 
 hard-run: build
-	cd benchmarks && $(BENCH_PY) hardened/run.py
+	cd benchmarks && $(BENCH_PY) -m _exp_real_net.hardened
+	cd benchmarks && $(BENCH_PY) -m _exp_synt_net.hardened
 
 hard-report:
-	cd benchmarks/hardened && $(BENCH_PY) report.py $(METRIC)
+	cd benchmarks && $(BENCH_PY) -m _exp_synt_net.hardened_report $(METRIC)
 
 hard-smoke: build
-	cd benchmarks && HARD_SMOKE=1 $(BENCH_PY) hardened/run.py
+	cd benchmarks && HARD_SMOKE=1 $(BENCH_PY) -m _exp_real_net.hardened
+	cd benchmarks && HARD_SMOKE=1 $(BENCH_PY) -m _exp_synt_net.hardened

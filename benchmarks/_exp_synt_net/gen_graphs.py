@@ -1,6 +1,3 @@
-"""Resumable LFR graph cache; run to completion before run.py so graph
-generation does not spend the workers' timeout budget."""
-
 import os
 import sys
 import time
@@ -9,8 +6,8 @@ import networkx as nx
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from hardened.config import LFR_DIR, LFR_PARAMS, MU_SWEEP_MU, MU_SWEEP_N, \
-    NODES_SWEEP_MU, NODES_SWEEP_N, RUNS
+from _exp_synt_net.hardened import LFR_DIR, LFR_PARAMS, MU_SWEEP_MU, \
+    MU_SWEEP_N, NODES_SWEEP_MU, NODES_SWEEP_N, RUNS
 
 
 def path_for(n, mu, seed):
@@ -50,13 +47,8 @@ def ensure(n, mu, seed, log=print):
 
 
 def all_cells():
-    cells = set()
-    for n in MU_SWEEP_N:
-        for mu in MU_SWEEP_MU:
-            cells.add((n, mu))
-    for n in NODES_SWEEP_N:
-        for mu in NODES_SWEEP_MU:
-            cells.add((n, mu))
+    cells = {(n, mu) for n in MU_SWEEP_N for mu in MU_SWEEP_MU}
+    cells |= {(n, mu) for n in NODES_SWEEP_N for mu in NODES_SWEEP_MU}
     return sorted(cells)
 
 

@@ -1,6 +1,3 @@
-"""Mean/std per cell plus Wilcoxon signed-rank SMOCC-vs-others, paired by
-seed, Bonferroni-corrected per cell; usage: report.py [metric]."""
-
 import sys
 
 import numpy as np
@@ -11,7 +8,11 @@ try:
 except ImportError:
     wilcoxon = None
 
-from config import RESULTS_CSV
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from _exp_synt_net.hardened import RESULTS_CSV
 
 
 def cell_id(r):

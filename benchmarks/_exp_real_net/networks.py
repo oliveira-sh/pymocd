@@ -1,9 +1,3 @@
-"""Loaders return (edges uint32 [m,2] relabelled 0..n-1, n, gt labels or
-None, eval_nodes or None). Dolphins ground truth (Lusseau's two groups) comes
-from the vlivashkin/community-graphs `gt` attribute; com-* use the SNAP
-top-5000 sets restricted to single-membership nodes. lesmis and florentine
-have no accepted crisp ground truth in the literature — modularity only."""
-
 import gzip
 import os
 import sys

@@ -1,7 +1,3 @@
-"""Run ONE task and print `RESULT <json>`; usage: worker.py '<task json>'
-with task {"alg", "kind": "lfr"|"real", "net"?, "n_cfg"?, "mu"?, "seed",
-"threads"}. Process isolation is the crash barrier."""
-
 import json
 import os
 import sys
@@ -11,7 +7,6 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
-sys.path.insert(0, HERE)
 
 
 class Shim:
@@ -92,14 +87,14 @@ def main():
     kind, seed, threads = task["kind"], task["seed"], task["threads"]
 
     if kind == "lfr":
-        from gen_graphs import ensure
+        from _exp_synt_net.gen_graphs import ensure
         n_cfg, mu = task["n_cfg"], task["mu"]
         data = np.load(ensure(n_cfg, mu, seed, log=lambda *a, **k: None))
         edges, gt = data["edges"], data["gt"].astype(np.int64)
         n = n_cfg
         eval_nodes = np.arange(n, dtype=np.int64)
     else:
-        from realnets import LOADERS
+        from _exp_real_net.networks import LOADERS
         edges, n, gt, eval_nodes = LOADERS[task["net"]]()
 
     lab, dt = run_algorithm(task["alg"], n, edges, seed, threads)
