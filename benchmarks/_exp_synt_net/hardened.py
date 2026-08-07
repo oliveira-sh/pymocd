@@ -54,7 +54,8 @@ ALGORITHMS = {
 }
 
 CSV_FIELDS = ["alg", "kind", "net", "n_cfg", "mu", "seed", "status", "n", "m",
-              "k", "time", "nmi", "ami", "modularity", "threads", "stamp"]
+              "k", "time", "nmi", "ami", "ari", "hom", "cmp", "vm", "gt_k",
+              "mu_real", "modularity", "part", "threads", "stamp"]
 
 
 def row_key(r):
