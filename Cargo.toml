@@ -35,7 +35,3 @@ path = "src/bin/stub_gen.rs"
 
 [package.metadata.maturin]
 name = "pymocd"
-
-[[bin]]
-name = "profile_smocc"
-path = "src/bin/profile_smocc.rs"
