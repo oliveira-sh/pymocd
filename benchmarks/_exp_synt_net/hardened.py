@@ -16,10 +16,10 @@ BIG_N = int(os.environ.get("HARD_BIG_N", "250000"))
 BIG_WORKERS = int(os.environ.get("HARD_BIG_WORKERS", "1" if SMOKE else "4"))
 ALL_THREADS = int(os.environ.get("HARD_ALL_THREADS", "2" if SMOKE else "48"))
 
-# Rayon-parallel detectors: run one at a time with the whole machine,
-# SMOCC first, then HP-MOCD. Everything else is single-threaded, so those
-# runs are parallelized across cores instead (one worker = one core).
-PARALLEL_ALGS = ("SMOCC", "HP-MOCD")
+# Rayon-parallel detectors: run one at a time with the whole machine, AFTER
+# the single-threaded algorithms (which fan out one worker per core). Tuple
+# order = run order; SMOCC last, since it is the one still subject to change.
+PARALLEL_ALGS = ("HP-MOCD", "SMOCC")
 
 LFR_DIR = os.path.join(BENCH, "data", "lfr")
 OUT = os.path.join(BENCH, "results", "hardened")
@@ -188,9 +188,6 @@ def run_campaign(tasks):
     serial = [t for t in pending if t["alg"] not in PARALLEL_ALGS]
     serial.sort(key=lambda t: (t["_n"], task_key(t)))
 
-    for t in exclusive:
-        dispatch(t, ALL_THREADS)
-
     def run_pool(batch, workers):
         if not batch:
             return
@@ -208,6 +205,9 @@ def run_campaign(tasks):
     run_pool([t for t in serial if t["_n"] < BIG_N], WORKERS)
     # ponytail: few concurrent multi-GB graph loads; raise HARD_BIG_WORKERS if RAM allows
     run_pool([t for t in serial if t["_n"] >= BIG_N], BIG_WORKERS)
+
+    for t in exclusive:
+        dispatch(t, ALL_THREADS)
 
 
 if __name__ == "__main__":
