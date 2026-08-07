@@ -6,8 +6,6 @@ Every detector takes a graph and returns a partition as `dict[node, community]`.
 
 ::: pymocd.hpmocd
 
-::: pymocd.HpMocd
-
 ::: pymocd.mmcomo
 
 ::: pymocd.mocd_q

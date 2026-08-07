@@ -47,9 +47,9 @@ The frontier is exposed for inspection via
 ## HP-MOCD
 
 HP-MOCD optimises decomposed modularity with a parallel NSGA-II and returns
-the max-*Q* solution from the Pareto front. The
-[`HpMocd`](api/detectors.md#pymocd.HpMocd) class exposes the front itself for
-inspection. Published in
+the max-*Q* solution from the Pareto front. The front itself is exposed for
+inspection via [`hpmocd_fronts`](api/fronts.md#pymocd.hpmocd_fronts).
+Published in
 [Social Network Analysis and Mining (2025)](https://doi.org/10.1007/s13278-025-01519-7).
 
 ## Citation

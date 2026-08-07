@@ -49,19 +49,7 @@ communities = pymocd.smocc(
 
 `gap` is the macro/micro co-evolution interval and `beta` the micro-stage perturbation strength. `num_gens` is the generation count: the search always runs all of them.
 
-For tuned HP-MOCD runs, use the `HpMocd` class — it exposes custom objectives, a per-generation callback, and the raw Pareto front:
-
-```python
-alg = pymocd.HpMocd(G, pop_size=100, num_gens=100, cross_rate=0.7, mut_rate=0.5)
-alg.set_on_generation(lambda gen, total, front_size: print(gen, total, front_size))
-
-best = alg.run()
-front = alg.generate_pareto_front()
-```
-
-`run` returns the max-Q partition from the front; `generate_pareto_front` returns `[(partition, objectives), ...]`.
-
-Custom objectives are callables `(graph, partition) -> float` to minimize, passed via `objectives=` or `set_objectives`; an empty list reverts to the built-in intra/inter pair.
+`hpmocd` runs with its published defaults and returns the max-*Q* partition from its Pareto front; the front itself is available via [`hpmocd_fronts`](api/fronts.md#pymocd.hpmocd_fronts).
 
 See [Algorithms](algorithms.md) for what each detector optimizes, and the [detector API reference](api/detectors.md) for every signature.
 
