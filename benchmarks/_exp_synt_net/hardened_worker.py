@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sys
 import time
 
@@ -101,16 +102,38 @@ def main():
 
     import igraph as ig
     from sklearn.metrics.cluster import (adjusted_mutual_info_score,
+                                         adjusted_rand_score,
+                                         homogeneity_completeness_v_measure,
                                          normalized_mutual_info_score)
     _, lab_dense = np.unique(lab, return_inverse=True)
     mod = float(ig.Graph(n=n, edges=edges).modularity(lab_dense.tolist()))
     out = {"status": "ok", "n": int(n), "m": int(len(edges)),
            "k": int(len(np.unique(lab))), "time": round(dt, 4),
-           "modularity": round(mod, 6), "nmi": "", "ami": ""}
+           "modularity": round(mod, 6), "nmi": "", "ami": "", "ari": "",
+           "hom": "", "cmp": "", "vm": "", "gt_k": "", "mu_real": ""}
     if gt is not None:
         pred = lab[eval_nodes]
         out["nmi"] = round(float(normalized_mutual_info_score(gt, pred)), 6)
         out["ami"] = round(float(adjusted_mutual_info_score(gt, pred)), 6)
+        out["ari"] = round(float(adjusted_rand_score(gt, pred)), 6)
+        hom, cmp_, vm = homogeneity_completeness_v_measure(gt, pred)
+        out["hom"], out["cmp"], out["vm"] = \
+            round(float(hom), 6), round(float(cmp_), 6), round(float(vm), 6)
+        out["gt_k"] = int(len(np.unique(gt)))
+    if kind == "lfr":
+        out["mu_real"] = round(
+            float((gt[edges[:, 0]] != gt[edges[:, 1]]).mean()), 6)
+
+    # full label vector on NFS (benchmarks/data symlink) so any metric can be
+    # recomputed later without rerunning
+    slug = re.sub(r"\W+", "-", "_".join(map(str, [
+        task["alg"], kind, task.get("net", task.get("n_cfg")),
+        task.get("mu", ""), seed])))
+    parts_dir = os.path.join(os.path.dirname(HERE), "data", "parts")
+    os.makedirs(parts_dir, exist_ok=True)
+    np.savez_compressed(os.path.join(parts_dir, slug + ".npz"),
+                        labels=lab.astype(np.int32))
+    out["part"] = f"data/parts/{slug}.npz"
     print("RESULT " + json.dumps(out), flush=True)
 
 
