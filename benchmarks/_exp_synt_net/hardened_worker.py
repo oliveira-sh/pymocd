@@ -55,11 +55,15 @@ def run_algorithm(alg, n, edges, seed, threads):
         unassigned = lab == -1
         lab[unassigned] = np.arange(n, dtype=np.int64)[unassigned] + n
         return lab, dt
-    if alg == "Leiden":
+    if alg in ("Leiden", "Leiden-CPM"):
         import igraph as ig
         g = ig.Graph(n=n, edges=edges)
+        kw = {"objective_function": "modularity"}
+        if alg == "Leiden-CPM":
+            kw = {"objective_function": "CPM",
+                  "resolution": len(edges) / (n * (n - 1) / 2)}
         t0 = time.perf_counter()
-        part = g.community_leiden(objective_function="modularity")
+        part = g.community_leiden(**kw)
         dt = time.perf_counter() - t0
         return np.asarray(part.membership, dtype=np.int64), dt
     if alg == "Louvain":

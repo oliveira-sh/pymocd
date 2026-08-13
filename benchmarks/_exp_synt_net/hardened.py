@@ -42,7 +42,8 @@ else:
 ALGORITHMS = {
     "SMOCC":       dict(deterministic=True,  max_nodes=None,      needs="shim"),
     "HP-MOCD":     dict(deterministic=False, max_nodes=None,      needs="shim"),
-    "MMCoMO":      dict(deterministic=False, max_nodes=2_000,     needs="shim"),
+    "MMCoMO":      dict(deterministic=False, max_nodes=None,      needs="shim",
+                        real_max_nodes=2_000),
     "NSGA-III CCM": dict(deterministic=False, max_nodes=None,     needs="shim"),
     "NSGA-III KRM": dict(deterministic=False, max_nodes=None,     needs="shim"),
     "Shi-MOCD (Q)": dict(deterministic=False, max_nodes=None,     needs="shim"),
@@ -50,6 +51,9 @@ ALGORITHMS = {
     "MOGA-Net":    dict(deterministic=False, max_nodes=None,      needs="shim"),
     "Louvain":     dict(deterministic=False, max_nodes=2_000_000, needs="nx"),
     "Leiden":      dict(deterministic=False, max_nodes=None,      needs="ig"),
+    # gamma = graph density; CPM's resolution-free counterpoint to modularity
+    "Leiden-CPM":  dict(deterministic=False, max_nodes=None,      needs="ig",
+                        real_max_nodes=2_000),
     "ASYN-LPA":    dict(deterministic=False, max_nodes=2_000_000, needs="nx"),
 }
 
