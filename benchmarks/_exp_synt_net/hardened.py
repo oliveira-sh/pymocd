@@ -52,8 +52,7 @@ ALGORITHMS = {
     "Louvain":     dict(deterministic=False, max_nodes=2_000_000, needs="nx"),
     "Leiden":      dict(deterministic=False, max_nodes=None,      needs="ig"),
     # gamma = graph density; CPM's resolution-free counterpoint to modularity
-    "Leiden-CPM":  dict(deterministic=False, max_nodes=None,      needs="ig",
-                        real_max_nodes=2_000),
+    "Leiden-CPM":  dict(deterministic=False, max_nodes=None,      needs="ig"),
     "ASYN-LPA":    dict(deterministic=False, max_nodes=2_000_000, needs="nx"),
 }
 
