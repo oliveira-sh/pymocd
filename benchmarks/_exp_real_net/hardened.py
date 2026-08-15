@@ -18,7 +18,8 @@ def real_tasks():
     for net in REAL_SMALL + REAL_SNAP:
         n = REAL_SIZES[net]
         for alg, info in ALGORITHMS.items():
-            if info["max_nodes"] is not None and n > info["max_nodes"]:
+            cap = info.get("real_max_nodes", info["max_nodes"])
+            if cap is not None and n > cap:
                 continue
             runs = 1 if info["deterministic"] else RUNS
             for seed in range(runs):

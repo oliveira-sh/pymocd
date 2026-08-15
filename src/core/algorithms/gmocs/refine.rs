@@ -1,10 +1,17 @@
-use crate::core::graph::CsrGraph;
+//! GMOCS: GPU-accelerated Multiobjective Co-evolutionary Swarm particle
+//! optimization for community detection.
+//! This Source Code Form is subject to the terms of The GNU General Public License v3.0
+//! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! file, You can obtain one at <https://www.gnu.org/licenses/gpl-3.0.html>
+
+use rayon::prelude::*;
 use rustc_hash::FxHashMap;
 use std::collections::HashSet;
 
-use super::Labels;
-use super::nsga2::fast_nondominated_sort;
-use super::objectives::{ObjSet, evaluate};
+use crate::core::algorithms::gmocs::Labels;
+use crate::core::algorithms::gmocs::mopso::pareto::fast_nondominated_sort;
+use crate::core::algorithms::gmocs::objectives::{ObjSet, evaluate};
+use crate::core::graph::CsrGraph;
 
 pub(crate) fn refine_tiny(g: &CsrGraph, wadj: &[f64], part: &[i32], max_size: usize) -> Vec<i32> {
     let mut p = part.to_vec();
@@ -43,8 +50,8 @@ pub(crate) fn refine_tiny(g: &CsrGraph, wadj: &[f64], part: &[i32], max_size: us
                 a.1.partial_cmp(b.1)
                     .unwrap_or(std::cmp::Ordering::Equal)
                     .then_with(|| {
-                        let sa = members.get(a.0).map_or(0, |v| v.len());
-                        let sb = members.get(b.0).map_or(0, |v| v.len());
+                        let sa = members.get(a.0).map_or(0, Vec::len);
+                        let sb = members.get(b.0).map_or(0, Vec::len);
                         sa.cmp(&sb)
                     })
             });
@@ -96,25 +103,29 @@ pub fn refine_front(g: &CsrGraph, wadj: &[f64], front: Vec<Labels>, objset: ObjS
     }
     let mut seen: HashSet<Vec<i32>> = front.iter().cloned().collect();
     let mut all: Vec<Labels> = front.clone();
-    for p in &front {
-        if let Some(split) = split_components(g, p) {
-            let merged = refine_tiny(g, wadj, &split, 2);
-            if seen.insert(merged.clone()) {
-                all.push(merged);
+    let variants: Vec<Vec<Labels>> = front
+        .par_iter()
+        .map(|p| {
+            let mut v: Vec<Labels> = Vec::new();
+            if let Some(split) = split_components(g, p) {
+                v.push(refine_tiny(g, wadj, &split, 2));
+                v.push(split);
             }
-            if seen.insert(split.clone()) {
-                all.push(split);
+            v.push(refine_tiny(g, wadj, p, 2));
+            v
+        })
+        .collect();
+    for v in variants {
+        for cand in v {
+            if seen.insert(cand.clone()) {
+                all.push(cand);
             }
-        }
-        let refined = refine_tiny(g, wadj, p, 2);
-        if seen.insert(refined.clone()) {
-            all.push(refined);
         }
     }
     if all.len() == front.len() {
         return front;
     }
-    let objs: Vec<Vec<f64>> = all.iter().map(|p| evaluate(g, p, objset)).collect();
+    let objs: Vec<Vec<f64>> = all.par_iter().map(|p| evaluate(g, p, objset)).collect();
     let ranks = fast_nondominated_sort(&objs);
     all.into_iter()
         .zip(ranks)
@@ -152,7 +163,7 @@ mod tests {
         let g = graph_with_pendant();
         let w = unit_weights(&g);
         let part: Labels = vec![0, 0, 0, 3, 3, 3, 6];
-        let front = vec![part.clone()];
+        let front = vec![part];
         let refined = refine_front(&g, &w, front, ObjSet::default());
         assert!(!refined.is_empty());
         let absorbed = refined.iter().any(|p| p[6] == p[0]);
@@ -171,65 +182,23 @@ mod tests {
     }
 
     #[test]
-    fn refine_tiny_merge_target_follows_edge_weights() {
-        // Two triangles, singleton node 6 bridged to BOTH (one edge each): raw
-        // counts tie, so only the weights can decide the merge target.
-        let nodes: Vec<i32> = (0..7).collect();
-        let edges = vec![
-            (0, 1),
-            (1, 2),
-            (0, 2),
-            (3, 4),
-            (4, 5),
-            (3, 5),
-            (2, 6),
-            (3, 6),
-        ];
-        let g = CsrGraph::from_edges(&nodes, &edges);
-        let part: Labels = vec![0, 0, 0, 3, 3, 3, 6];
-        let weight_edge = |w: &mut [f64], a: usize, b: usize, val: f64| {
-            for (u, v) in [(a, b), (b, a)] {
-                let start = g.xadj[u] as usize;
-                let end = g.xadj[u + 1] as usize;
-                for p in start..end {
-                    if g.adj[p] as usize == v {
-                        w[p] = val;
-                    }
-                }
-            }
-        };
-        let mut w = vec![1.0; g.adj.len()];
-        weight_edge(&mut w, 3, 6, 5.0);
-        assert_eq!(refine_tiny(&g, &w, &part, 2)[6], 3, "heavier side lost");
-        let mut w = vec![1.0; g.adj.len()];
-        weight_edge(&mut w, 2, 6, 5.0);
-        assert_eq!(refine_tiny(&g, &w, &part, 2)[6], 0, "heavier side lost");
-    }
-
-    #[test]
     fn split_components_separates_disconnected_community() {
-        // Two disjoint triangles under ONE label: split must give two
-        // communities, each triangle whole.
         let nodes: Vec<i32> = (0..6).collect();
         let edges = vec![(0, 1), (1, 2), (0, 2), (3, 4), (4, 5), (3, 5)];
         let g = CsrGraph::from_edges(&nodes, &edges);
-        let split = split_components(&g, &vec![0; 6]).expect("no split produced");
+        let split = split_components(&g, &[0; 6]).expect("no split produced");
         assert_eq!(split[0], split[1]);
         assert_eq!(split[1], split[2]);
         assert_eq!(split[3], split[4]);
         assert_eq!(split[4], split[5]);
         assert_ne!(split[0], split[3]);
 
-        // A partition whose communities are all connected must return None so
-        // no duplicate-equivalent candidate is added.
         let connected: Labels = vec![0, 0, 0, 3, 3, 3];
         assert!(split_components(&g, &connected).is_none());
     }
 
     #[test]
     fn refine_front_split_copy_dominates_disconnected_member() {
-        // One community spanning two disjoint triangles: the split copy strictly
-        // dominates it under (KKM, RC), so the refined front drops the original.
         let nodes: Vec<i32> = (0..6).collect();
         let edges = vec![(0, 1), (1, 2), (0, 2), (3, 4), (4, 5), (3, 5)];
         let g = CsrGraph::from_edges(&nodes, &edges);

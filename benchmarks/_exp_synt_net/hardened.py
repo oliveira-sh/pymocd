@@ -16,10 +16,10 @@ BIG_N = int(os.environ.get("HARD_BIG_N", "250000"))
 BIG_WORKERS = int(os.environ.get("HARD_BIG_WORKERS", "1" if SMOKE else "4"))
 ALL_THREADS = int(os.environ.get("HARD_ALL_THREADS", "2" if SMOKE else "48"))
 
-# Rayon-parallel detectors: run one at a time with the whole machine,
-# SMOCC first, then HP-MOCD. Everything else is single-threaded, so those
-# runs are parallelized across cores instead (one worker = one core).
-PARALLEL_ALGS = ("SMOCC", "HP-MOCD")
+# Rayon-parallel detectors: run one at a time with the whole machine, BEFORE
+# the single-threaded algorithms (which fan out one worker per core). Tuple
+# order = run order.
+PARALLEL_ALGS = ("GMOCS", "HP-MOCD")
 
 LFR_DIR = os.path.join(BENCH, "data", "lfr")
 OUT = os.path.join(BENCH, "results", "hardened")
@@ -40,9 +40,10 @@ else:
     NODES_SWEEP_MU = [0.3, 0.5]
 
 ALGORITHMS = {
-    "SMOCC":       dict(deterministic=True,  max_nodes=None,      needs="shim"),
+    "GMOCS":       dict(deterministic=False, max_nodes=None,      needs="shim"),
     "HP-MOCD":     dict(deterministic=False, max_nodes=None,      needs="shim"),
-    "MMCoMO":      dict(deterministic=False, max_nodes=2_000,     needs="shim"),
+    "MMCoMO":      dict(deterministic=False, max_nodes=None,      needs="shim",
+                        real_max_nodes=2_000),
     "NSGA-III CCM": dict(deterministic=False, max_nodes=None,     needs="shim"),
     "NSGA-III KRM": dict(deterministic=False, max_nodes=None,     needs="shim"),
     "Shi-MOCD (Q)": dict(deterministic=False, max_nodes=None,     needs="shim"),
@@ -50,6 +51,8 @@ ALGORITHMS = {
     "MOGA-Net":    dict(deterministic=False, max_nodes=None,      needs="shim"),
     "Louvain":     dict(deterministic=False, max_nodes=2_000_000, needs="nx"),
     "Leiden":      dict(deterministic=False, max_nodes=None,      needs="ig"),
+    # gamma = graph density; CPM's resolution-free counterpoint to modularity
+    "Leiden-CPM":  dict(deterministic=False, max_nodes=None,      needs="ig"),
     "ASYN-LPA":    dict(deterministic=False, max_nodes=2_000_000, needs="nx"),
 }
 
@@ -188,9 +191,6 @@ def run_campaign(tasks):
     serial = [t for t in pending if t["alg"] not in PARALLEL_ALGS]
     serial.sort(key=lambda t: (t["_n"], task_key(t)))
 
-    for t in exclusive:
-        dispatch(t, ALL_THREADS)
-
     def run_pool(batch, workers):
         if not batch:
             return
@@ -204,6 +204,9 @@ def run_campaign(tasks):
                         f.result()
             for f in futs:
                 f.result()
+
+    for t in exclusive:
+        dispatch(t, ALL_THREADS)
 
     run_pool([t for t in serial if t["_n"] < BIG_N], WORKERS)
     # ponytail: few concurrent multi-GB graph loads; raise HARD_BIG_WORKERS if RAM allows

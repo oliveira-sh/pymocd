@@ -36,11 +36,11 @@ def main():
     if wilcoxon is None:
         print("\nscipy not installed; skipping significance tests")
         return
-    print(f"\n=== Wilcoxon signed-rank: SMOCC vs others on {metric} "
+    print(f"\n=== Wilcoxon signed-rank: GMOCS vs others on {metric} "
           f"(paired by seed, Bonferroni per cell) ===")
     for cell, sub in ok.groupby("cell"):
-        ours = sub[sub["alg"] == "SMOCC"].set_index("seed")[metric].dropna()
-        others = [a for a in sub["alg"].unique() if a != "SMOCC"]
+        ours = sub[sub["alg"] == "GMOCS"].set_index("seed")[metric].dropna()
+        others = [a for a in sub["alg"].unique() if a != "GMOCS"]
         m = len(others)
         for alg in sorted(others):
             theirs = sub[sub["alg"] == alg].set_index("seed")[metric].dropna()
@@ -52,7 +52,7 @@ def main():
                 verdict = "tie"
             else:
                 p = wilcoxon(a, b).pvalue * m
-                direction = "SMOCC>" if a.mean() > b.mean() else "SMOCC<"
+                direction = "GMOCS>" if a.mean() > b.mean() else "GMOCS<"
                 verdict = f"{direction} p_adj={min(p, 1):.4f}" \
                           f"{' *' if p < 0.05 else ''}"
             print(f"{cell:24s} vs {alg:14s} n={len(common):2d} "
