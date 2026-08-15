@@ -2,12 +2,14 @@ use rayon::prelude::*;
 
 use crate::core::graph::CsrGraph;
 
-use super::super::smocc::nsga2::{Obj, crowding_distance, fast_nondominated_sort};
-use super::super::smocc::sim::{decode, encode, update_weights};
-use super::super::smocc::{Genome, Labels};
+use crate::core::algorithms::smocc::nsga2::{Obj, crowding_distance, fast_nondominated_sort};
+use crate::core::algorithms::smocc::sim::{decode, encode, update_weights};
+use crate::core::algorithms::smocc::{Genome, Labels};
+use crate::core::algorithms::smocc2::config::objectives::Cfg;
+use crate::core::algorithms::smocc2::gpu::Gpu;
+
 use super::archive::{update_macro_archive, update_micro_archive};
-use super::gpu::Gpu;
-use super::types::{Cfg, MacElite, MicElite, MicParticle};
+use super::particles::{MacElite, MicElite, MicParticle};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn guidance(

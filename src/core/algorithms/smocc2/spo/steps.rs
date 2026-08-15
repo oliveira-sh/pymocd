@@ -4,12 +4,14 @@ use rayon::prelude::*;
 
 use crate::core::graph::CsrGraph;
 
-use super::super::smocc::Labels;
-use super::super::smocc::nsga2::dominates;
-use super::super::smocc::sim::decode;
-use super::defaults::{C1, C2};
-use super::gpu::Gpu;
-use super::types::{Cfg, MacElite, MacParticle, MicElite, MicParticle};
+use crate::core::algorithms::smocc::nsga2::dominates;
+use crate::core::algorithms::smocc::sim::decode;
+use crate::core::algorithms::smocc::{Genome, Labels};
+use crate::core::algorithms::smocc2::config::defaults::{C1, C2};
+use crate::core::algorithms::smocc2::config::objectives::Cfg;
+use crate::core::algorithms::smocc2::gpu::Gpu;
+
+use super::particles::{MacElite, MacParticle, MicElite, MicParticle};
 
 fn bernoulli(p: f64) -> Bernoulli {
     match Bernoulli::new(p) {
@@ -224,7 +226,7 @@ pub(crate) fn macro_step_gpu(
     parts
         .par_iter_mut()
         .for_each(|p| macro_move(n, p, arch, crowd, w, p_t));
-    let genomes: Vec<&super::super::smocc::Genome> = parts.iter().map(|p| &p.genome).collect();
+    let genomes: Vec<&Genome> = parts.iter().map(|p| &p.genome).collect();
     let labels = gpu
         .batch_decode(g, &genomes)
         .expect("CUDA runtime failure in macro decode");

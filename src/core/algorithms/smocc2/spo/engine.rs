@@ -1,16 +1,19 @@
 use crate::core::graph::CsrGraph;
 
-use super::super::smocc::Labels;
-use super::super::smocc::nsga2::{Obj, fast_nondominated_sort};
-use super::super::smocc::refine::refine_front;
-use super::super::smocc::sim::init_weights;
+use crate::core::algorithms::smocc::Labels;
+use crate::core::algorithms::smocc::nsga2::{Obj, fast_nondominated_sort};
+use crate::core::algorithms::smocc::refine::refine_front;
+use crate::core::algorithms::smocc::sim::init_weights;
+use crate::core::algorithms::smocc2::config::defaults::DEFAULT_TURB;
+use crate::core::algorithms::smocc2::config::objectives::Cfg;
+use crate::core::algorithms::smocc2::config::schedule::{inertia, turbulence};
+use crate::core::algorithms::smocc2::gpu::Gpu;
+
 use super::archive::{arch_crowd, update_macro_archive, update_micro_archive};
 use super::coevo::{guidance, influence};
-use super::defaults::{DEFAULT_TURB, W_MAX};
-use super::gpu::Gpu;
 use super::init::{init_macro_swarm, init_micro_swarm};
-use super::pso;
-use super::types::{Cfg, MacElite, MicElite, inertia};
+use super::particles::{MacElite, MicElite};
+use super::steps;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn run_fronts(
@@ -68,11 +71,11 @@ pub(crate) fn run_fronts(
 
     for t in 1..=num_gens {
         let w = inertia(t, num_gens);
-        let p_t = (turb * w / W_MAX).clamp(0.0, 1.0);
+        let p_t = turbulence(turb, w);
 
         let mic_objs: Vec<Obj> = mic_arch.iter().map(|a| a.obj.clone()).collect();
         let crowd = arch_crowd(&mic_objs);
-        pso::micro_step(g, &mut mic, &mic_arch, &crowd, &cfg, w, p_t);
+        steps::micro_step(g, &mut mic, &mic_arch, &crowd, &cfg, w, p_t);
         mic_arch = update_micro_archive(
             mic_arch,
             mic.iter()
@@ -87,8 +90,8 @@ pub(crate) fn run_fronts(
         let mac_objs: Vec<Obj> = mac_arch.iter().map(|a| a.obj.clone()).collect();
         let crowd = arch_crowd(&mac_objs);
         match dev.as_mut() {
-            Some(d) => pso::macro_step_gpu(g, d, &mut mac, &mac_arch, &crowd, &cfg, w, p_t),
-            None => pso::macro_step(g, &wadj, &mut mac, &mac_arch, &crowd, &cfg, w, p_t),
+            Some(d) => steps::macro_step_gpu(g, d, &mut mac, &mac_arch, &crowd, &cfg, w, p_t),
+            None => steps::macro_step(g, &wadj, &mut mac, &mac_arch, &crowd, &cfg, w, p_t),
         }
         mac_arch = update_macro_archive(
             mac_arch,

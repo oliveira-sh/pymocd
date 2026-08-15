@@ -1,7 +1,10 @@
 use std::collections::HashSet;
 
-use super::super::smocc::nsga2::{Obj, crowding_distance, dominates, fast_nondominated_sort};
-use super::types::{MacElite, MicElite};
+use crate::core::algorithms::smocc::nsga2::{
+    Obj, crowding_distance, dominates, fast_nondominated_sort,
+};
+
+use super::particles::{MacElite, MicElite};
 
 fn archive_select(objs: &[Obj], same: impl Fn(usize, usize) -> bool, cap: usize) -> Vec<usize> {
     let ranks = fast_nondominated_sort(objs);

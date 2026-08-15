@@ -1,8 +1,8 @@
+use crate::core::algorithms::smocc::{select_best, to_output};
 use crate::core::graph::CsrGraph;
 
-use super::super::smocc::{select_best, to_output};
-use super::defaults::DEFAULT_OBJ_MODE;
-use super::engine::run_fronts;
+use super::config::defaults::DEFAULT_OBJ_MODE;
+use super::spo::engine::run_fronts;
 
 #[allow(clippy::too_many_arguments)]
 pub fn smocc2(

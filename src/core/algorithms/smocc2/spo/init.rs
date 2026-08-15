@@ -5,10 +5,12 @@ use std::collections::HashSet;
 
 use crate::core::graph::CsrGraph;
 
-use super::super::smocc::sim::decode;
-use super::super::smocc::{Genome, Labels, macro_cmax};
-use super::gpu::Gpu;
-use super::types::{Cfg, MacParticle, MicParticle};
+use crate::core::algorithms::smocc::sim::decode;
+use crate::core::algorithms::smocc::{Genome, Labels, macro_cmax};
+use crate::core::algorithms::smocc2::config::objectives::Cfg;
+use crate::core::algorithms::smocc2::gpu::Gpu;
+
+use super::particles::{MacParticle, MicParticle};
 
 pub(crate) fn init_micro_swarm(g: &CsrGraph, pop: usize, cfg: &Cfg) -> Vec<MicParticle> {
     (0..pop)

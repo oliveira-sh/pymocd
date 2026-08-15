@@ -1,15 +1,10 @@
 mod api;
-mod archive;
-mod coevo;
-mod defaults;
-mod engine;
+mod config;
 mod gpu;
-mod init;
-mod pso;
-mod types;
+mod spo;
 
 #[cfg(test)]
 mod tests;
 
 pub use api::{smocc2, smocc2_fronts};
-pub use defaults::*;
+pub use config::defaults::*;
