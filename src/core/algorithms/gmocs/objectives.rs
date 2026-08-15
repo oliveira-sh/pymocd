@@ -2,7 +2,7 @@
 //! optimization for community detection.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
-//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+//! file, You can obtain one at <https://www.gnu.org/licenses/gpl-3.0.html>
 
 use rustc_hash::FxHashMap;
 
@@ -20,15 +20,15 @@ pub enum ObjSet {
 }
 
 impl ObjSet {
-    pub fn from_u8(v: u8) -> Self {
+    pub const fn from_u8(v: u8) -> Self {
         match v {
-            6 => ObjSet::HpIntraInter,
-            _ => ObjSet::KkmRc,
+            6 => Self::HpIntraInter,
+            _ => Self::KkmRc,
         }
     }
 }
 
-pub fn split_mode(v: u16) -> (ObjSet, ObjSet) {
+pub const fn split_mode(v: u16) -> (ObjSet, ObjSet) {
     if v < 100 {
         let s = ObjSet::from_u8(v as u8);
         (s, s)
@@ -97,7 +97,7 @@ pub fn kkm_rc(g: &CsrGraph, labels: &Labels) -> (f64, f64) {
 
     let mut kkm_internal = 0.0;
     let mut rc = 0.0;
-    for (_, &b) in order.iter() {
+    for &b in order.values() {
         let b = b as usize;
         let sz = size[b];
         if sz == 0.0 {

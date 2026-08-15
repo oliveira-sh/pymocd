@@ -2,7 +2,7 @@
 //! optimization for community detection.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
-//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+//! file, You can obtain one at <https://www.gnu.org/licenses/gpl-3.0.html>
 
 use rustc_hash::FxHashMap;
 
@@ -26,14 +26,13 @@ pub(crate) fn select_best(
                 .expect("CUDA runtime failure in selection eval"),
         );
     }
-    pick_best(front, obj)
+    pick_best(front, &obj)
 }
 
-fn pick_best(front: Vec<Labels>, obj: Vec<[f64; 4]>) -> Labels {
-
+fn pick_best(front: Vec<Labels>, obj: &[[f64; 4]]) -> Labels {
     let mut lo = [f64::INFINITY; 4];
     let mut hi = [f64::NEG_INFINITY; 4];
-    for o in &obj {
+    for o in obj {
         for c in 0..4 {
             if o[c] < lo[c] {
                 lo[c] = o[c];
@@ -121,23 +120,23 @@ mod tests {
         let nodes: Vec<i32> = (0..10).collect();
         let g = CsrGraph::from_edges(&nodes, &two_clique_edges());
 
-        let split: Labels = (0..g.n).map(|i| if i < 5 { 0 } else { 1 }).collect();
+        let split: Labels = (0..g.n).map(|i| i32::from(i >= 5)).collect();
         let one: Labels = vec![0; g.n];
         let sing: Labels = (0..g.n as i32).collect();
 
         let f = vec![split.clone(), split.clone()];
         let o = objs(&g, &f);
         assert_eq!(
-            pick_best(f, o),
+            pick_best(f, &o),
             split,
             "a constant column must contribute 0, not NaN"
         );
         let f = vec![one.clone()];
         let o = objs(&g, &f);
-        assert_eq!(pick_best(f, o), one);
+        assert_eq!(pick_best(f, &o), one);
 
-        let f = vec![one.clone(), sing.clone(), split.clone()];
+        let f = vec![one, sing, split.clone()];
         let o = objs(&g, &f);
-        assert_eq!(pick_best(f, o), split, "normalised scalarisation missed the split");
+        assert_eq!(pick_best(f, &o), split, "normalised scalarisation missed the split");
     }
 }

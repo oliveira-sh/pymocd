@@ -2,7 +2,7 @@
 //! optimization for community detection.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
-//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+//! file, You can obtain one at <https://www.gnu.org/licenses/gpl-3.0.html>
 
 use rayon::prelude::*;
 use rustc_hash::FxHashMap;
@@ -50,8 +50,8 @@ pub(crate) fn refine_tiny(g: &CsrGraph, wadj: &[f64], part: &[i32], max_size: us
                 a.1.partial_cmp(b.1)
                     .unwrap_or(std::cmp::Ordering::Equal)
                     .then_with(|| {
-                        let sa = members.get(a.0).map_or(0, |v| v.len());
-                        let sb = members.get(b.0).map_or(0, |v| v.len());
+                        let sa = members.get(a.0).map_or(0, Vec::len);
+                        let sb = members.get(b.0).map_or(0, Vec::len);
                         sa.cmp(&sb)
                     })
             });
@@ -163,7 +163,7 @@ mod tests {
         let g = graph_with_pendant();
         let w = unit_weights(&g);
         let part: Labels = vec![0, 0, 0, 3, 3, 3, 6];
-        let front = vec![part.clone()];
+        let front = vec![part];
         let refined = refine_front(&g, &w, front, ObjSet::default());
         assert!(!refined.is_empty());
         let absorbed = refined.iter().any(|p| p[6] == p[0]);

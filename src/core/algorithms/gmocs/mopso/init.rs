@@ -2,7 +2,7 @@
 //! optimization for community detection.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
-//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+//! file, You can obtain one at <https://www.gnu.org/licenses/gpl-3.0.html>
 
 use rand::RngExt;
 use rand::seq::SliceRandom;
@@ -30,7 +30,7 @@ pub(crate) fn macro_cmax(n: usize, macro_cap: f64) -> usize {
     ((mult * (n as f64).sqrt()).ceil() as usize).clamp(1, n.max(1))
 }
 
-pub(crate) fn init_micro_swarm(g: &CsrGraph, pop: usize, cfg: &Cfg) -> Vec<MicParticle> {
+pub(crate) fn init_micro_swarm(g: &CsrGraph, pop: usize, cfg: Cfg) -> Vec<MicParticle> {
     (0..pop)
         .into_par_iter()
         .map(|_| {
@@ -49,7 +49,6 @@ pub(crate) fn init_micro_swarm(g: &CsrGraph, pop: usize, cfg: &Cfg) -> Vec<MicPa
             MicParticle {
                 pbest: x.clone(),
                 pbest_obj: obj.clone(),
-                v: vec![0.0; g.n],
                 x,
                 obj,
             }
@@ -60,7 +59,7 @@ pub(crate) fn init_micro_swarm(g: &CsrGraph, pop: usize, cfg: &Cfg) -> Vec<MicPa
 pub(crate) fn init_macro_swarm(
     g: &CsrGraph,
     pop: usize,
-    cfg: &Cfg,
+    cfg: Cfg,
     macro_cap: f64,
     gpu: &mut Gpu,
 ) -> Vec<MacParticle> {

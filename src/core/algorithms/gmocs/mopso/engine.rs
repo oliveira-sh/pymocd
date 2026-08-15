@@ -2,7 +2,7 @@
 //! optimization for community detection.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
-//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+//! file, You can obtain one at <https://www.gnu.org/licenses/gpl-3.0.html>
 
 use crate::core::graph::CsrGraph;
 
@@ -32,9 +32,9 @@ pub(crate) fn run_fronts(
     obj_mode: u16,
     macro_cap: f64,
     dev: &mut Gpu,
-) -> Result<Vec<Labels>, String> {
+) -> Vec<Labels> {
     if g.n == 0 {
-        return Ok(vec![Vec::new()]);
+        return vec![Vec::new()];
     }
     let gap = gap.max(1);
     let turb = if turb.is_nan() {
@@ -45,13 +45,13 @@ pub(crate) fn run_fronts(
     let cfg = Cfg::new(obj_mode);
     let mut wadj = init_weights(g);
 
-    let mut mic = init_micro_swarm(g, pop, &cfg);
+    let mut mic = init_micro_swarm(g, pop, cfg);
     {
         let xs: Vec<&Labels> = mic.iter().map(|p| &p.x).collect();
         dev.micro_init(&xs)
             .expect("CUDA runtime failure in micro init");
     }
-    let mut mac = init_macro_swarm(g, pop, &cfg, macro_cap, dev);
+    let mut mac = init_macro_swarm(g, pop, cfg, macro_cap, dev);
 
     let mut mic_arch = update_micro_archive(
         Vec::new(),
@@ -81,7 +81,7 @@ pub(crate) fn run_fronts(
 
         let mic_objs: Vec<Obj> = mic_arch.iter().map(|a| a.obj.clone()).collect();
         let crowd = arch_crowd(&mic_objs);
-        steps::micro_step(dev, &mut mic, &mic_arch, &crowd, &cfg, w, p_t);
+        steps::micro_step(dev, &mut mic, &mic_arch, &crowd, cfg, w, p_t);
         mic_arch = update_micro_archive(
             mic_arch,
             mic.iter()
@@ -95,7 +95,7 @@ pub(crate) fn run_fronts(
 
         let mac_objs: Vec<Obj> = mac_arch.iter().map(|a| a.obj.clone()).collect();
         let crowd = arch_crowd(&mac_objs);
-        steps::macro_step(g, dev, &mut mac, &mac_arch, &crowd, &cfg, w, p_t);
+        steps::macro_step(g, dev, &mut mac, &mac_arch, &crowd, cfg, w, p_t);
         mac_arch = update_macro_archive(
             mac_arch,
             mac.iter()
@@ -115,7 +115,7 @@ pub(crate) fn run_fronts(
                 mic_arch,
                 &mut mic,
                 pop,
-                &cfg,
+                cfg,
                 dev,
             );
             mac_arch = influence(
@@ -126,7 +126,7 @@ pub(crate) fn run_fronts(
                 t,
                 num_gens,
                 pop,
-                &cfg,
+                cfg,
                 dev,
             );
         }
@@ -180,9 +180,9 @@ pub(crate) fn run_fronts(
         front
     };
 
-    Ok(if do_refine {
+    if do_refine {
         refine_front(g, &wadj, front, cfg.micro)
     } else {
         front
-    })
+    }
 }

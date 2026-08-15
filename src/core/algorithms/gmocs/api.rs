@@ -2,7 +2,7 @@
 //! optimization for community detection.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
-//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+//! file, You can obtain one at <https://www.gnu.org/licenses/gpl-3.0.html>
 
 use crate::core::graph::CsrGraph;
 
@@ -36,7 +36,7 @@ pub fn gmocs(
         DEFAULT_OBJ_MODE,
         macro_cap,
         &mut dev,
-    )?;
+    );
     let best = select_best(&g, front, &mut dev, pop);
     Ok(to_output(&g, &best))
 }
@@ -68,7 +68,7 @@ pub fn gmocs_fronts(
         obj_mode,
         macro_cap,
         &mut dev,
-    )?
+    )
     .iter()
     .map(|l| to_output(&g, l))
     .collect())

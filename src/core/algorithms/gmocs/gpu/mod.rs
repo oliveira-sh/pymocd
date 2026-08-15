@@ -2,7 +2,7 @@
 //! optimization for community detection.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
-//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+//! file, You can obtain one at <https://www.gnu.org/licenses/gpl-3.0.html>
 
 use std::sync::Arc;
 
@@ -161,9 +161,7 @@ impl Gpu {
         let leader_buf = stream.alloc_zeros::<i32>(cap).map_err(derr)?;
         let mut rows: Vec<u32> = vec![0u32; g.adj.len()];
         for u in 0..g.n {
-            for j in g.xadj[u] as usize..g.xadj[u + 1] as usize {
-                rows[j] = u as u32;
-            }
+            rows[g.xadj[u] as usize..g.xadj[u + 1] as usize].fill(u as u32);
         }
         let row_u = stream.clone_htod(&rows).map_err(derr)?;
 
@@ -174,7 +172,7 @@ impl Gpu {
         while gcd(perm, g.n.max(1) as u64) != 1 {
             perm += 1;
         }
-        Ok(Gpu {
+        Ok(Self {
             stream,
             lp_init,
             lp_sweep,
@@ -418,7 +416,7 @@ impl Gpu {
             .collect())
     }
 
-    fn download_labels(&mut self, batch: usize) -> Result<Vec<Labels>, Err> {
+    fn download_labels(&self, batch: usize) -> Result<Vec<Labels>, Err> {
         let n = self.n;
         let total = batch * n;
         let mut host = vec![0i32; total];
@@ -426,7 +424,7 @@ impl Gpu {
         self.stream
             .memcpy_dtoh(&live, &mut host[..])
             .map_err(derr)?;
-        Ok(host.chunks(n).map(|c| c.to_vec()).collect())
+        Ok(host.chunks(n).map(<[i32]>::to_vec).collect())
     }
 
     pub fn decode_eval(
@@ -549,7 +547,7 @@ impl Gpu {
         self.stream.memcpy_htod(labels, &mut dst).map_err(derr)
     }
 
-    pub fn micro_download(&mut self, batch: usize) -> Result<Vec<Labels>, Err> {
+    pub fn micro_download(&self, batch: usize) -> Result<Vec<Labels>, Err> {
         let n = self.n;
         let total = batch * n;
         let mut host = vec![0i32; total];
@@ -557,7 +555,7 @@ impl Gpu {
         self.stream
             .memcpy_dtoh(&live, &mut host[..])
             .map_err(derr)?;
-        Ok(host.chunks(n).map(|c| c.to_vec()).collect())
+        Ok(host.chunks(n).map(<[i32]>::to_vec).collect())
     }
 
     pub fn update_weights(&mut self, n_elites: usize, rho: f64) -> Result<Vec<f64>, Err> {

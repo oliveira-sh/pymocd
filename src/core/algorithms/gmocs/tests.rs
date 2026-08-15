@@ -2,7 +2,7 @@
 //! optimization for community detection.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
-//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+//! file, You can obtain one at <https://www.gnu.org/licenses/gpl-3.0.html>
 
 use rustc_hash::FxHashMap;
 
@@ -12,12 +12,11 @@ use crate::core::graph::CsrGraph;
 use super::api::{gmocs, gmocs_fronts};
 use super::config::defaults::*;
 use super::config::schedule::inertia;
-use super::gpu::Gpu;
 use super::mopso::archive::update_micro_archive;
 use super::mopso::init::macro_cmax;
-use super::mopso::particles::{MacElite, MicParticle, MicElite};
+use super::mopso::particles::MacElite;
 use super::mopso::steps::macro_move;
-use super::mopso::particles::MacParticle;
+use super::mopso::particles::{MacParticle, MicElite};
 
 fn two_clique_edges() -> Vec<(i32, i32)> {
     let mut e = Vec::new();
@@ -204,7 +203,7 @@ fn macro_cardinality_invariant_survives_updates() {
     let num_gens = 30usize;
     for t in 1..=num_gens {
         let w = inertia(t, num_gens);
-        for p in parts.iter_mut() {
+        for p in &mut parts {
             macro_move(n, p, &arch, &crowd, w, 0.5);
         }
         for (k, (p, &c0)) in parts.iter().zip(&cards).enumerate() {
@@ -226,7 +225,7 @@ fn archive_never_contains_a_dominated_member() {
         let mut arch: Vec<MicElite> = Vec::new();
         for _round in 0..4 {
             let lattice = 2 + case % 7;
-            let fresh: Vec<MicElite> = (0..(1 + next() % 20))
+            let fresh: Vec<MicElite> = (0..=(next() % 20))
                 .map(|_| {
                     let o = vec![(next() % lattice) as f64, (next() % lattice) as f64];
                     let labels = (0..4).map(|_| (next() % 3) as i32).collect();

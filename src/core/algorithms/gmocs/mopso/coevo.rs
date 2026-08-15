@@ -2,7 +2,7 @@
 //! optimization for community detection.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
-//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+//! file, You can obtain one at <https://www.gnu.org/licenses/gpl-3.0.html>
 
 use rayon::prelude::*;
 
@@ -24,7 +24,7 @@ pub(crate) fn guidance(
     mic_arch: Vec<MicElite>,
     mic: &mut [MicParticle],
     pop: usize,
-    cfg: &Cfg,
+    cfg: Cfg,
     gpu: &mut Gpu,
 ) -> Vec<MicElite> {
     let refs: Vec<&Genome> = mac_arch.iter().map(|a| &a.genome).collect();
@@ -73,7 +73,7 @@ pub(crate) fn influence(
     t: usize,
     num_gens: usize,
     pop: usize,
-    cfg: &Cfg,
+    cfg: Cfg,
     gpu: &mut Gpu,
 ) -> Vec<MacElite> {
     let elites: Vec<&Labels> = mic_arch.iter().map(|a| &a.labels).collect();

@@ -2,7 +2,7 @@
 //! optimization for community detection.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
-//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+//! file, You can obtain one at <https://www.gnu.org/licenses/gpl-3.0.html>
 
 use crate::core::algorithms::gmocs::Labels;
 use crate::core::algorithms::gmocs::mopso::pareto::Obj;
@@ -16,21 +16,20 @@ pub(crate) struct Cfg {
 }
 
 impl Cfg {
-    pub fn new(obj_mode: u16) -> Self {
+    pub const fn new(obj_mode: u16) -> Self {
         let (micro, macro_) = split_mode(obj_mode);
-        Cfg { micro, macro_ }
+        Self { micro, macro_ }
     }
 
-    pub fn eval_micro(&self, g: &CsrGraph, labels: &Labels) -> Obj {
+    pub fn eval_micro(self, g: &CsrGraph, labels: &Labels) -> Obj {
         evaluate(g, labels, self.micro)
     }
 
-
-    pub fn pick_micro(&self, o: &[f64; 4]) -> Obj {
+    pub fn pick_micro(self, o: &[f64; 4]) -> Obj {
         pick(self.micro, o)
     }
 
-    pub fn pick_macro(&self, o: &[f64; 4]) -> Obj {
+    pub fn pick_macro(self, o: &[f64; 4]) -> Obj {
         pick(self.macro_, o)
     }
 }
