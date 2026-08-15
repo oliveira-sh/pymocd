@@ -1,4 +1,5 @@
-//! SMOCC: Sparse Multi-Objective Co-evolutionary Community detection,
+//! GMOCS: GPU-accelerated Multiobjective Co-evolutionary Swarm particle
+//! optimization for community detection.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -12,9 +13,10 @@ use cudarc::nvrtc::Ptx;
 
 use crate::core::graph::CsrGraph;
 
-use super::super::smocc2::{Genome, Labels};
+use super::super::gmocs::{Genome, Labels};
 
-const PTX: &str = include_str!("decode.ptx");
+const PTX_60: &str = include_str!("decode_60.ptx");
+const PTX_75: &str = include_str!("decode_75.ptx");
 const MAX_DEG: u32 = 1024;
 const SWEEPS: usize = 16;
 const FLOOD_SWEEPS: usize = 32;
@@ -78,8 +80,12 @@ impl Gpu {
         }
         let cap = cap.max(1);
         let ctx = CudaContext::new(0).map_err(|e| format!("CUDA unavailable: {e:?}"))?;
+        let cc = ctx
+            .compute_capability()
+            .map_err(|e| format!("compute capability query failed: {e:?}"))?;
+        let ptx = if cc >= (7, 5) { PTX_75 } else { PTX_60 };
         let module = ctx
-            .load_module(Ptx::from_src(PTX))
+            .load_module(Ptx::from_src(ptx))
             .map_err(|e| format!("PTX load failed: {e:?}"))?;
         let f = |name: &str| {
             module

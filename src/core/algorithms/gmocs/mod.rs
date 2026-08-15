@@ -1,4 +1,5 @@
-//! SMOCC: Sparse Multi-Objective Co-evolutionary Community detection,
+//! GMOCS: GPU-accelerated Multiobjective Co-evolutionary Swarm particle
+//! optimization for community detection.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -18,5 +19,5 @@ mod tests;
 pub type Labels = Vec<i32>;
 pub type Genome = Vec<u8>;
 
-pub use api::{smocc2, smocc2_fronts};
+pub use api::{gmocs, gmocs_fronts};
 pub use config::defaults::*;

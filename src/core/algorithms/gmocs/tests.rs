@@ -1,14 +1,15 @@
-//! SMOCC: Sparse Multi-Objective Co-evolutionary Community detection,
+//! GMOCS: GPU-accelerated Multiobjective Co-evolutionary Swarm particle
+//! optimization for community detection.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use rustc_hash::FxHashMap;
 
-use crate::core::algorithms::smocc2::mopso::pareto::dominates;
+use crate::core::algorithms::gmocs::mopso::pareto::dominates;
 use crate::core::graph::CsrGraph;
 
-use super::api::{smocc2, smocc2_fronts};
+use super::api::{gmocs, gmocs_fronts};
 use super::config::defaults::*;
 use super::config::schedule::inertia;
 use super::gpu::Gpu;
@@ -53,7 +54,7 @@ fn ring_of_cliques(k: i32, s: i32) -> (Vec<i32>, Vec<(i32, i32)>) {
 #[test]
 fn finds_two_community_split() {
     let nodes: Vec<i32> = (0..10).collect();
-    let out = match smocc2(
+    let out = match gmocs(
         &nodes,
         &two_clique_edges(),
         60,
@@ -81,7 +82,7 @@ fn finds_two_community_split() {
 #[test]
 fn isolated_node_gets_minus_one() {
     let nodes: Vec<i32> = (0..7).collect();
-    let out = match smocc2(
+    let out = match gmocs(
         &nodes,
         &two_triangle_edges(),
         40,
@@ -103,7 +104,7 @@ fn isolated_node_gets_minus_one() {
 #[test]
 fn fronts_are_nonempty() {
     let nodes: Vec<i32> = (0..6).collect();
-    let fronts = match smocc2_fronts(
+    let fronts = match gmocs_fronts(
         &nodes,
         &two_triangle_edges(),
         40,
@@ -129,7 +130,7 @@ fn objective_modes_produce_full_partitions() {
     let nodes: Vec<i32> = (0..10).collect();
     let edges = two_clique_edges();
     for obj_mode in [106u16, 160, 166, 100, 0, 6] {
-        let a = match smocc2_fronts(
+        let a = match gmocs_fronts(
             &nodes,
             &edges,
             40,

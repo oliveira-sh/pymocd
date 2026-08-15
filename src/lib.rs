@@ -13,7 +13,7 @@ use api::metrics::*;
 /// Python Multi-objective Community Detection (pymocd) is a Python library, powered by
 /// a Rust backend, for performing efficient community detection in complex networks.
 /// Get your graph, call a method, and we'll offer you a community.
-/// Recommended Methods: `smocc2` or `hpmocd`.
+/// Recommended Methods: `gmocs` or `hpmocd`.
 #[pymodule]
 #[pyo3(name = "pymocd")]
 fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -29,14 +29,14 @@ fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(ccm_fn, m)?)?;
     m.add_function(wrap_pyfunction!(krm_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mmcomo_fn, m)?)?;
-    m.add_function(wrap_pyfunction!(smocc2_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(gmocs_fn, m)?)?;
 
     // detectors -> pareto frontier
     m.add_function(wrap_pyfunction!(ccm_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(krm_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(moga_net_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mmcomo_fronts_fn, m)?)?;
-    m.add_function(wrap_pyfunction!(smocc2_fronts_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(gmocs_fronts_fn, m)?)?;
 
     // evaluation metrics
     m.add_function(wrap_pyfunction!(gt_metrics_fn, m)?)?;

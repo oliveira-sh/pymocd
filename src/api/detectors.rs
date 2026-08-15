@@ -14,7 +14,7 @@ use crate::core::algorithms::krm;
 use crate::core::algorithms::mmcomo;
 use crate::core::algorithms::mocd;
 use crate::core::algorithms::moganet;
-use crate::core::algorithms::smocc2;
+use crate::core::algorithms::gmocs;
 use crate::core::graph::{Graph, Partition, get_edges, get_nodes};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
@@ -409,31 +409,30 @@ pub fn mmcomo_fronts_fn(
     Ok(out.into_any().unbind())
 }
 
-/// `smocc2` (SMOCC-II) — SMOCC with the NSGA-II genetic search replaced by
-/// multi-objective particle swarm optimization (MOPSO, Gong et al. 2014
-/// lineage). Graph representation, decode/encode, objectives, co-evolution,
-/// refinement and final selection are SMOCC's; only the search operators
-/// differ. Stochastic: repeated runs return different partitions. Returns
-/// the label-free-selected member of the merged rank-1 front. Isolated nodes
-/// get -1.
+/// GMOCS — GPU-accelerated Multiobjective Co-evolutionary Swarm particle
+/// optimization for community detection. Two co-evolving multi-objective
+/// swarms (a discrete particle swarm over label vectors and a set-based
+/// binary swarm over community-centre genomes) exchange guidance/influence
+/// through crowding-pruned Pareto archives and an elite-consensus edge
+/// weighting. Stochastic: repeated runs return different partitions. Returns
+/// the selected member of the merged, refined rank-1 front.
+/// ``dict[node, community]``; isolated nodes get -1.
+///
+/// Requires an NVIDIA GPU: decoding, swarm updates and objective evaluations
+/// run as CUDA kernels (Pascal or newer). Raises RuntimeError when no usable
+/// CUDA device is present or the graph has a node degree above the kernel's
+/// limit (1024).
 ///
 /// Args:
 ///     turb: per-node turbulence probability at the first generation; it
-///         decays linearly with the inertia weight. Diversity insurance — a
-///         mutation-free discrete swarm collapses; raise it if high-mu
-///         accuracy regresses.
+///         decays linearly with the inertia weight.
 ///     macro_cap: multiplier on the macro swarm's centre ceiling
-///         ``ceil(macro_cap * sqrt(n))`` (still hard-capped at ``n``),
-///         exactly as in `smocc`.
-/// Requires an NVIDIA GPU: the swarms, decodes and objective evaluations run
-/// as CUDA kernels (any Pascal-or-newer device). Raises RuntimeError when no
-/// usable CUDA device is present or the graph has a node degree above the
-/// kernel's limit (1024).
+///         ``ceil(macro_cap * sqrt(n))`` (still hard-capped at ``n``).
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(name = "smocc2", signature = (graph, pop_size = smocc2::DEFAULT_POP_SIZE, num_gens = smocc2::DEFAULT_NUM_GENS, gap = smocc2::DEFAULT_GAP, turb = smocc2::DEFAULT_TURB, macro_cap = smocc2::DEFAULT_MACRO_CAP))]
+#[pyo3(name = "gmocs", signature = (graph, pop_size = gmocs::DEFAULT_POP_SIZE, num_gens = gmocs::DEFAULT_NUM_GENS, gap = gmocs::DEFAULT_GAP, turb = gmocs::DEFAULT_TURB, macro_cap = gmocs::DEFAULT_MACRO_CAP))]
 #[allow(clippy::too_many_arguments)]
-pub fn smocc2_fn(
+pub fn gmocs_fn(
     graph: &Bound<'_, PyAny>,
     pop_size: usize,
     num_gens: usize,
@@ -444,7 +443,7 @@ pub fn smocc2_fn(
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
-    let part = smocc2::smocc2(&nodes, &edges, pop_size, num_gens, gap, turb, macro_cap)
+    let part = gmocs::gmocs(&nodes, &edges, pop_size, num_gens, gap, turb, macro_cap)
         .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
     let d = PyDict::new(py);
     for (node, comm) in part {
@@ -453,13 +452,13 @@ pub fn smocc2_fn(
     Ok(d.into_any().unbind())
 }
 
-/// `smocc2`'s merged rank-1 front (after union-refinement), the candidate set
-/// `smocc2` selects from. Isolated nodes get -1.
+/// `gmocs`'s merged rank-1 front (after union-refinement), the candidate set
+/// `gmocs` selects from. Isolated nodes get -1.
 ///
 /// Args:
 ///     turb: per-node turbulence probability at the first generation; decays
 ///         linearly with the inertia weight.
-///     obj_mode: objective placement, exactly as in `smocc_fronts`: ``0`` =
+///     obj_mode: objective placement: ``0`` =
 ///         ``(KKM, RC)``, ``6`` = ``(intra, inter)``, heterogeneous split for
 ///         ``100 <= v < 1000`` (``micro = (v-100)//10``, ``macro =
 ///         (v-100)%10``); the shipped default ``160`` is micro
@@ -468,9 +467,9 @@ pub fn smocc2_fn(
 ///         ``ceil(macro_cap * sqrt(n))`` (still hard-capped at ``n``).
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(name = "smocc2_fronts", signature = (graph, pop_size = smocc2::DEFAULT_POP_SIZE, num_gens = smocc2::DEFAULT_NUM_GENS, gap = smocc2::DEFAULT_GAP, turb = smocc2::DEFAULT_TURB, refine = true, obj_mode = smocc2::DEFAULT_OBJ_MODE, macro_cap = smocc2::DEFAULT_MACRO_CAP))]
+#[pyo3(name = "gmocs_fronts", signature = (graph, pop_size = gmocs::DEFAULT_POP_SIZE, num_gens = gmocs::DEFAULT_NUM_GENS, gap = gmocs::DEFAULT_GAP, turb = gmocs::DEFAULT_TURB, refine = true, obj_mode = gmocs::DEFAULT_OBJ_MODE, macro_cap = gmocs::DEFAULT_MACRO_CAP))]
 #[allow(clippy::too_many_arguments)]
-pub fn smocc2_fronts_fn(
+pub fn gmocs_fronts_fn(
     graph: &Bound<'_, PyAny>,
     pop_size: usize,
     num_gens: usize,
@@ -483,7 +482,7 @@ pub fn smocc2_fronts_fn(
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
-    let fronts = smocc2::smocc2_fronts(
+    let fronts = gmocs::gmocs_fronts(
         &nodes, &edges, pop_size, num_gens, gap, turb, refine, obj_mode, macro_cap,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;

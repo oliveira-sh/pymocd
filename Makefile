@@ -20,8 +20,9 @@ $(VENV)/bin/activate: res/requirements.txt
 
 dependencies: $(VENV)/bin/activate
 
-smocc2-ptx:
-	nvcc -ptx -arch=compute_60 src/core/algorithms/smocc2/gpu/decode.cu -o src/core/algorithms/smocc2/gpu/decode.ptx
+gmocs-ptx:
+	nvcc -ptx -arch=compute_60 src/core/algorithms/gmocs/gpu/decode.cu -o src/core/algorithms/gmocs/gpu/decode_60.ptx
+	nvcc -ptx -arch=compute_75 src/core/algorithms/gmocs/gpu/decode.cu -o src/core/algorithms/gmocs/gpu/decode_75.ptx
 
 stubs:
 	cargo run --bin stub_gen

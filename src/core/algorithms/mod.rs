@@ -7,4 +7,4 @@ pub mod krm;
 pub mod mmcomo;
 pub mod mocd;
 pub mod moganet;
-pub mod smocc2;
+pub mod gmocs;
