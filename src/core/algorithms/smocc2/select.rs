@@ -22,6 +22,30 @@ pub(crate) fn select_best(g: &CsrGraph, front: Vec<Labels>) -> Labels {
             [kkm, rc, intra, inter]
         })
         .collect();
+    pick_best(front, obj)
+}
+
+pub(crate) fn select_best_gpu(
+    g: &CsrGraph,
+    front: Vec<Labels>,
+    dev: &mut crate::core::algorithms::smocc2::gpu::Gpu,
+    cap: usize,
+) -> Labels {
+    if front.is_empty() {
+        return vec![0; g.n];
+    }
+    let mut obj: Vec<[f64; 4]> = Vec::with_capacity(front.len());
+    for chunk in front.chunks(cap.max(1)) {
+        let refs: Vec<&Labels> = chunk.iter().collect();
+        obj.extend(
+            dev.eval_labels(&refs)
+                .expect("CUDA runtime failure in selection eval"),
+        );
+    }
+    pick_best(front, obj)
+}
+
+fn pick_best(front: Vec<Labels>, obj: Vec<[f64; 4]>) -> Labels {
 
     let mut lo = [f64::INFINITY; 4];
     let mut hi = [f64::NEG_INFINITY; 4];
@@ -58,6 +82,7 @@ pub(crate) fn select_best(g: &CsrGraph, front: Vec<Labels>) -> Labels {
     }
     front.into_iter().nth(pick).unwrap()
 }
+
 
 pub(crate) fn to_output(g: &CsrGraph, labels: &Labels) -> Vec<(i32, i32)> {
     let mut remap: FxHashMap<i32, i32> = FxHashMap::default();

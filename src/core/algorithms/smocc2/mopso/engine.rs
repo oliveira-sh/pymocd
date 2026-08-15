@@ -30,7 +30,7 @@ pub(crate) fn run_fronts(
     do_refine: bool,
     obj_mode: u16,
     macro_cap: f64,
-    use_gpu: bool,
+    mut dev: Option<&mut Gpu>,
 ) -> Result<Vec<Labels>, String> {
     if g.n == 0 {
         return Ok(vec![Vec::new()]);
@@ -43,18 +43,13 @@ pub(crate) fn run_fronts(
     };
     let cfg = Cfg::new(obj_mode);
     let mut wadj = init_weights(g);
-    let mut dev: Option<Gpu> = if use_gpu {
-        Some(Gpu::new(g, pop)?)
-    } else {
-        None
-    };
 
     let mut mic = init_micro_swarm(g, pop, &cfg);
-    if let Some(d) = dev.as_mut() {
+    if let Some(d) = dev.as_deref_mut() {
         let xs: Vec<&Labels> = mic.iter().map(|p| &p.x).collect();
         d.micro_init(&xs).expect("CUDA runtime failure in micro init");
     }
-    let mut mac = init_macro_swarm(g, &wadj, pop, &cfg, macro_cap, dev.as_mut());
+    let mut mac = init_macro_swarm(g, &wadj, pop, &cfg, macro_cap, dev.as_deref_mut());
 
     let mut mic_arch = update_micro_archive(
         Vec::new(),
@@ -84,7 +79,7 @@ pub(crate) fn run_fronts(
 
         let mic_objs: Vec<Obj> = mic_arch.iter().map(|a| a.obj.clone()).collect();
         let crowd = arch_crowd(&mic_objs);
-        match dev.as_mut() {
+        match dev.as_deref_mut() {
             Some(d) => steps::micro_step_gpu(d, &mut mic, &mic_arch, &crowd, &cfg, w, p_t),
             None => steps::micro_step(g, &mut mic, &mic_arch, &crowd, &cfg, w, p_t),
         }
@@ -101,7 +96,7 @@ pub(crate) fn run_fronts(
 
         let mac_objs: Vec<Obj> = mac_arch.iter().map(|a| a.obj.clone()).collect();
         let crowd = arch_crowd(&mac_objs);
-        match dev.as_mut() {
+        match dev.as_deref_mut() {
             Some(d) => steps::macro_step_gpu(g, d, &mut mac, &mac_arch, &crowd, &cfg, w, p_t),
             None => steps::macro_step(g, &wadj, &mut mac, &mac_arch, &crowd, &cfg, w, p_t),
         }
@@ -126,7 +121,7 @@ pub(crate) fn run_fronts(
                 &mut mic,
                 pop,
                 &cfg,
-                dev.as_mut(),
+                dev.as_deref_mut(),
             );
             mac_arch = influence(
                 g,
@@ -137,7 +132,7 @@ pub(crate) fn run_fronts(
                 num_gens,
                 pop,
                 &cfg,
-                dev.as_mut(),
+                dev.as_deref_mut(),
             );
         }
     }

@@ -3,11 +3,12 @@
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use super::select::{select_best, to_output};
 use crate::core::graph::CsrGraph;
 
 use super::config::defaults::DEFAULT_OBJ_MODE;
+use super::gpu::Gpu;
 use super::mopso::engine::run_fronts;
+use super::select::{select_best, select_best_gpu, to_output};
 
 #[allow(clippy::too_many_arguments)]
 pub fn smocc2(
@@ -24,6 +25,7 @@ pub fn smocc2(
     if g.n == 0 {
         return Ok(Vec::new());
     }
+    let mut dev = if gpu { Some(Gpu::new(&g, pop)?) } else { None };
     let front = run_fronts(
         &g,
         pop,
@@ -33,9 +35,12 @@ pub fn smocc2(
         true,
         DEFAULT_OBJ_MODE,
         macro_cap,
-        gpu,
+        dev.as_mut(),
     )?;
-    let best = select_best(&g, front);
+    let best = match dev.as_mut() {
+        Some(d) => select_best_gpu(&g, front, d, pop),
+        None => select_best(&g, front),
+    };
     Ok(to_output(&g, &best))
 }
 
@@ -56,8 +61,17 @@ pub fn smocc2_fronts(
     if g.n == 0 {
         return Ok(Vec::new());
     }
+    let mut dev = if gpu { Some(Gpu::new(&g, pop)?) } else { None };
     Ok(run_fronts(
-        &g, pop, num_gens, gap, turb, refine, obj_mode, macro_cap, gpu,
+        &g,
+        pop,
+        num_gens,
+        gap,
+        turb,
+        refine,
+        obj_mode,
+        macro_cap,
+        dev.as_mut(),
     )?
     .iter()
     .map(|l| to_output(&g, l))
