@@ -1,5 +1,20 @@
 #define CACHE 64
 
+__device__ unsigned long long sm64(unsigned long long z)
+{
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+    return z ^ (z >> 31);
+}
+
+__device__ float rnd01(unsigned long long seed, long long idx, int ctr)
+{
+    unsigned long long h =
+        sm64(seed ^ sm64((unsigned long long)idx * 0x9e3779b97f4a7c15ULL + ctr));
+    return (float)(h >> 40) * (1.0f / 16777216.0f);
+}
+
+
 extern "C" __global__ void lp_init(
     const unsigned char* __restrict__ genomes,
     int* __restrict__ labels,
@@ -20,7 +35,8 @@ extern "C" __global__ void lp_sweep(
     const unsigned char* __restrict__ genomes,
     int* __restrict__ labels,
     unsigned char* __restrict__ dirty,
-    long long total, int n, int perm)
+    long long total, int n, int perm,
+    unsigned long long seed)
 {
     long long tid = (long long)blockIdx.x * blockDim.x + threadIdx.x;
     if (tid >= total) return;
@@ -40,50 +56,41 @@ extern "C" __global__ void lp_sweep(
     int best = cur;
     float best_w = -1.0f;
 
+    int labs[CACHE];
+    float ws[CACHE];
+    int k;
     if (deg <= CACHE) {
-        int labs[CACHE];
-        float ws[CACHE];
-        for (int j = 0; j < deg; j++) {
+        k = deg;
+        for (int j = 0; j < k; j++) {
             labs[j] = L[adj[s + j]];
             ws[j] = wadj[s + j];
         }
-        if (cur >= 0) {
-            float w = 0.0f;
-            for (int j = 0; j < deg; j++)
-                if (labs[j] == cur) w += ws[j];
-            best_w = w;
-        }
-        for (int j = 0; j < deg; j++) {
-            int l = labs[j];
-            if (l < 0 || l == cur) continue;
-            bool first = true;
-            for (int q = 0; q < j; q++)
-                if (labs[q] == l) { first = false; break; }
-            if (!first) continue;
-            float w = ws[j];
-            for (int q = j + 1; q < deg; q++)
-                if (labs[q] == l) w += ws[q];
-            if (w > best_w) { best_w = w; best = l; }
-        }
     } else {
-        if (cur >= 0) {
-            float w = 0.0f;
-            for (unsigned j = s; j < e; j++)
-                if (L[adj[j]] == cur) w += wadj[j];
-            best_w = w;
+        k = CACHE;
+        for (int j = 0; j < k; j++) {
+            int pick = (int)(rnd01(seed, idx, j) * (float)deg);
+            if (pick >= deg) pick = deg - 1;
+            labs[j] = L[adj[s + pick]];
+            ws[j] = wadj[s + pick];
         }
-        for (unsigned j = s; j < e; j++) {
-            int l = L[adj[j]];
-            if (l < 0 || l == cur) continue;
-            bool first = true;
-            for (unsigned q = s; q < j; q++)
-                if (L[adj[q]] == l) { first = false; break; }
-            if (!first) continue;
-            float w = wadj[j];
-            for (unsigned q = j + 1; q < e; q++)
-                if (L[adj[q]] == l) w += wadj[q];
-            if (w > best_w) { best_w = w; best = l; }
-        }
+    }
+    if (cur >= 0) {
+        float w = 0.0f;
+        for (int j = 0; j < k; j++)
+            if (labs[j] == cur) w += ws[j];
+        best_w = w;
+    }
+    for (int j = 0; j < k; j++) {
+        int l = labs[j];
+        if (l < 0 || l == cur) continue;
+        bool first = true;
+        for (int q = 0; q < j; q++)
+            if (labs[q] == l) { first = false; break; }
+        if (!first) continue;
+        float w = ws[j];
+        for (int q = j + 1; q < k; q++)
+            if (labs[q] == l) w += ws[q];
+        if (w > best_w) { best_w = w; best = l; }
     }
 
     if (best != cur) {
@@ -201,20 +208,6 @@ extern "C" __global__ void eval_reduce(
     atomicAdd(&lintot[p], lin_acc[idx]);
 }
 
-__device__ unsigned long long sm64(unsigned long long z)
-{
-    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
-    z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
-    return z ^ (z >> 31);
-}
-
-__device__ float rnd01(unsigned long long seed, long long idx, int ctr)
-{
-    unsigned long long h =
-        sm64(seed ^ sm64((unsigned long long)idx * 0x9e3779b97f4a7c15ULL + ctr));
-    return (float)(h >> 40) * (1.0f / 16777216.0f);
-}
-
 extern "C" __global__ void micro_move(
     const unsigned* __restrict__ xadj,
     const unsigned* __restrict__ adj,
@@ -248,13 +241,19 @@ extern "C" __global__ void micro_move(
 
     if (rnd01(seed, tid, 2) < v) {
         int winner = L[u];
-        if (deg > 0 && deg <= CACHE) {
+        if (deg > 0) {
             int labs[CACHE];
             int cnt[CACHE];
             int nd = 0;
             int max_c = 0;
-            for (int j = 0; j < deg; j++) {
-                int l = L[adj[s + j]];
+            int k = deg <= CACHE ? deg : CACHE;
+            for (int j = 0; j < k; j++) {
+                int pos = j;
+                if (deg > CACHE) {
+                    pos = (int)(rnd01(seed, tid, 5 + j) * (float)deg);
+                    if (pos >= deg) pos = deg - 1;
+                }
+                int l = L[adj[s + pos]];
                 int hit = nd;
                 for (int q = 0; q < nd; q++)
                     if (labs[q] == l) { hit = q; break; }
@@ -271,23 +270,6 @@ extern "C" __global__ void micro_move(
             int best = winner;
             for (int q = 0; q < nd; q++)
                 if (cnt[q] == max_c) { n_max++; best = labs[q]; }
-            if (n_max == 1) winner = best;
-        } else if (deg > 0) {
-            int n_max = 0;
-            int best = winner;
-            int max_c = 0;
-            for (unsigned j = s; j < e; j++) {
-                int l = L[adj[j]];
-                bool first = true;
-                for (unsigned q = s; q < j; q++)
-                    if (L[adj[q]] == l) { first = false; break; }
-                if (!first) continue;
-                int c = 1;
-                for (unsigned q = j + 1; q < e; q++)
-                    if (L[adj[q]] == l) c++;
-                if (c > max_c) { max_c = c; best = l; n_max = 1; }
-                else if (c == max_c) n_max++;
-            }
             if (n_max == 1) winner = best;
         }
         x = winner;

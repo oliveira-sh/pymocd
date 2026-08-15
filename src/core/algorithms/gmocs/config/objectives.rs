@@ -25,9 +25,6 @@ impl Cfg {
         evaluate(g, labels, self.micro)
     }
 
-    pub fn eval_macro(&self, g: &CsrGraph, labels: &Labels) -> Obj {
-        evaluate(g, labels, self.macro_)
-    }
 
     pub fn pick_micro(&self, o: &[f64; 4]) -> Obj {
         pick(self.micro, o)

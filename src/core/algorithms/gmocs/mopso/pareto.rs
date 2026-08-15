@@ -24,6 +24,7 @@ pub fn fast_nondominated_sort(objs: &[Obj]) -> Vec<usize> {
     }
 }
 
+// O(n log n) Jensen-style sweep algorithm to sort points.
 fn two_objective_sort(objs: &[Obj]) -> Vec<usize> {
     let n = objs.len();
     let mut idx: Vec<usize> = (0..n).collect();

@@ -17,7 +17,6 @@ use super::super::gmocs::{Genome, Labels};
 
 const PTX_60: &str = include_str!("decode_60.ptx");
 const PTX_75: &str = include_str!("decode_75.ptx");
-const MAX_DEG: u32 = 1024;
 const SWEEPS: usize = 16;
 const FLOOD_SWEEPS: usize = 32;
 
@@ -72,12 +71,6 @@ pub(crate) struct Gpu {
 
 impl Gpu {
     pub fn new(g: &CsrGraph, cap: usize) -> Result<Self, Err> {
-        let max_deg = g.deg.iter().copied().max().unwrap_or(0);
-        if max_deg > MAX_DEG {
-            return Err(format!(
-                "gpu=true supports max degree {MAX_DEG}, graph has {max_deg}"
-            ));
-        }
         let cap = cap.max(1);
         let ctx = CudaContext::new(0).map_err(|e| format!("CUDA unavailable: {e:?}"))?;
         let cc = ctx
@@ -191,11 +184,6 @@ impl Gpu {
         })
     }
 
-    pub fn set_wadj(&mut self, wadj: &[f64]) -> Result<(), Err> {
-        let w32: Vec<f32> = wadj.iter().map(|&w| w as f32).collect();
-        self.stream.memcpy_htod(&w32, &mut self.wadj).map_err(derr)
-    }
-
     fn decode(&mut self, g: &CsrGraph, genomes: &[&Genome]) -> Result<(), Err> {
         let batch = genomes.len();
         assert!(batch <= self.cap);
@@ -232,7 +220,9 @@ impl Gpu {
                 .arg(&n_i32)
                 .launch(cfg)
                 .map_err(derr)?;
-            for _ in 0..SWEEPS {
+            let base_seed: u64 = rand::RngExt::random(&mut rand::rng());
+            for sweep in 0..SWEEPS {
+                let seed = base_seed ^ (sweep as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
                 self.stream
                     .launch_builder(&self.lp_sweep)
                     .arg(&self.xadj)
@@ -244,6 +234,7 @@ impl Gpu {
                     .arg(&t_i64)
                     .arg(&n_i32)
                     .arg(&self.perm)
+                    .arg(&seed)
                     .launch(cfg)
                     .map_err(derr)?;
             }

@@ -140,16 +140,6 @@ pub(crate) fn macro_move(n: usize, p: &mut MacParticle, arch: &[MacElite], crowd
     }
 }
 
-fn macro_finish(g: &CsrGraph, p: &mut MacParticle, labels: Labels, cfg: &Cfg) {
-    p.labels = labels;
-    p.obj = cfg.eval_macro(g, &p.labels);
-    let mut r = rand::rng();
-    if pbest_wants_new(&p.obj, &p.pbest_obj, &mut r) {
-        p.pbest.clone_from(&p.genome);
-        p.pbest_obj.clone_from(&p.obj);
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn macro_step(
     g: &CsrGraph,

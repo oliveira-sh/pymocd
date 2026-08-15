@@ -40,8 +40,7 @@ else:
     NODES_SWEEP_MU = [0.3, 0.5]
 
 ALGORITHMS = {
-    "GMOCS":    dict(deterministic=False, max_nodes=None,      needs="shim",
-                        real_max_nodes=400_000),
+    "GMOCS":       dict(deterministic=False, max_nodes=None,      needs="shim"),
     "HP-MOCD":     dict(deterministic=False, max_nodes=None,      needs="shim"),
     "MMCoMO":      dict(deterministic=False, max_nodes=None,      needs="shim",
                         real_max_nodes=2_000),

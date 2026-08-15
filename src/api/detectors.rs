@@ -420,8 +420,7 @@ pub fn mmcomo_fronts_fn(
 ///
 /// Requires an NVIDIA GPU: decoding, swarm updates and objective evaluations
 /// run as CUDA kernels (Pascal or newer). Raises RuntimeError when no usable
-/// CUDA device is present or the graph has a node degree above the kernel's
-/// limit (1024).
+/// CUDA device is present.
 ///
 /// Args:
 ///     turb: per-node turbulence probability at the first generation; it
