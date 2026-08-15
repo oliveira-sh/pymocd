@@ -81,7 +81,15 @@ pub(crate) struct Gpu {
 impl Gpu {
     pub fn new(g: &CsrGraph, cap: usize) -> Result<Self, Err> {
         let cap = cap.max(1);
-        let ctx = CudaContext::new(0).map_err(|e| format!("CUDA unavailable: {e:?}"))?;
+        let ctx = std::panic::catch_unwind(|| CudaContext::new(0))
+            .unwrap_or_else(|_| Err(cudarc::driver::DriverError(
+                cudarc::driver::sys::CUresult::CUDA_ERROR_NOT_FOUND,
+            )))
+            .map_err(|e| {
+                format!(
+                    "CUDA unavailable (an NVIDIA GPU and driver are required                      to run GMOCS): {e:?}"
+                )
+            })?;
         let cc = ctx
             .compute_capability()
             .map_err(|e| format!("compute capability query failed: {e:?}"))?;
