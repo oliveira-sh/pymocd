@@ -9,6 +9,16 @@ use std::sync::Arc;
 use cudarc::driver::{
     CudaContext, CudaFunction, CudaSlice, CudaStream, LaunchConfig, PushKernelArg,
 };
+
+fn launch_cfg(total: usize) -> LaunchConfig {
+    const BLOCK: u32 = 256;
+    let grid = (total as u32).div_ceil(BLOCK);
+    LaunchConfig {
+        grid_dim: (grid.max(1), 1, 1),
+        block_dim: (BLOCK, 1, 1),
+        shared_mem_bytes: 0,
+    }
+}
 use cudarc::nvrtc::{CompileOptions, compile_ptx_with_opts};
 
 use crate::core::graph::CsrGraph;
@@ -231,7 +241,7 @@ impl Gpu {
             .memcpy_htod(&self.staging[..total], &mut self.genomes)
             .map_err(derr)?;
 
-        let cfg = LaunchConfig::for_num_elems(total as u32);
+        let cfg = launch_cfg(total);
         let t_i64 = total as i64;
         let n_i32 = n as i32;
         unsafe {
@@ -247,6 +257,7 @@ impl Gpu {
             let base_seed: u64 = rand::RngExt::random(&mut rand::rng());
             for sweep in 0..SWEEPS {
                 let seed = base_seed ^ (sweep as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+                let perm = random_coprime(self.n);
                 self.stream
                     .launch_builder(&self.lp_sweep)
                     .arg(&self.xadj)
@@ -257,7 +268,7 @@ impl Gpu {
                     .arg(&mut self.dirty)
                     .arg(&t_i64)
                     .arg(&n_i32)
-                    .arg(&self.perm)
+                    .arg(&perm)
                     .arg(&seed)
                     .launch(cfg)
                     .map_err(derr)?;
@@ -312,7 +323,7 @@ impl Gpu {
     fn eval(&mut self, batch: usize) -> Result<Vec<[f64; 4]>, Err> {
         let n = self.n;
         let total = batch * n;
-        let cfg = LaunchConfig::for_num_elems(total as u32);
+        let cfg = launch_cfg(total);
         let t_i64 = total as i64;
         let n_i32 = n as i32;
 
@@ -344,7 +355,7 @@ impl Gpu {
                 .launch(cfg)
                 .map_err(derr)?;
             if self.m > 0 {
-                let cfg_e = LaunchConfig::for_num_elems(total_e as u32);
+                let cfg_e = launch_cfg(total_e as usize);
                 self.stream
                     .launch_builder(&self.eval_scatter_edges)
                     .arg(&self.labels)
@@ -483,7 +494,7 @@ impl Gpu {
         self.stream
             .memcpy_htod(leaders, &mut self.leader_buf)
             .map_err(derr)?;
-        let cfg = LaunchConfig::for_num_elems(total as u32);
+        let cfg = launch_cfg(total);
         let t_i64 = total as i64;
         let n_i32 = n as i32;
         let wf = w as f32;
@@ -583,4 +594,13 @@ impl Gpu {
 
 fn gcd(a: u64, b: u64) -> u64 {
     if b == 0 { a } else { gcd(b, a % b) }
+}
+
+fn random_coprime(n: usize) -> i32 {
+    let n = n.max(1) as u64;
+    let mut p = rand::RngExt::random_range(&mut rand::rng(), 1..n.max(2));
+    while gcd(p, n) != 1 {
+        p = p % n + 1;
+    }
+    p as i32
 }

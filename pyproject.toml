@@ -9,6 +9,9 @@ name = "pymocd"
 version = "5.1.0"
 description = "pymocd is a lib for multi-objective evolutionary community detection in complex networks. The evolutionary core is written in Rust and exposed through PyO3, giving it a large speed advantage over pure-Python implementations while staying a drop-in for the NetworkX/igraph ecosystem, making it well-suited to large-scale graphs."
 requires-python = ">=3.10"
+dependencies = [
+    "nvidia-cuda-nvrtc-cu12; sys_platform != 'darwin'",
+]
 authors = [
     {name = "Guilherme O. Santos", email = "git@guiolvr.com"},
 ]

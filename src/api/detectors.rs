@@ -19,6 +19,34 @@ use crate::core::graph::{Graph, Partition, get_edges, get_nodes};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
 use pyo3_stub_gen::derive::gen_stub_pyfunction;
+use std::sync::Once;
+
+static NVRTC_PRELOAD: Once = Once::new();
+
+fn preload_pip_nvrtc(py: Python<'_>) {
+    NVRTC_PRELOAD.call_once(|| {
+        let code = std::ffi::CString::new(concat!(
+            "import ctypes, glob, os
+",
+            "try:
+",
+            "    import nvidia.cuda_nvrtc as _m
+",
+            "    for _d in list(getattr(_m, '__path__', [])):
+",
+            "        for _f in sorted(glob.glob(os.path.join(_d, 'lib', 'libnvrtc*'))):
+",
+            "            ctypes.CDLL(_f, mode=ctypes.RTLD_GLOBAL)
+",
+            "except Exception:
+",
+            "    pass
+",
+        ))
+        .unwrap();
+        let _ = py.run(code.as_c_str(), None, None);
+    });
+}
 
 /// Run HP-MOCD (NSGA-II) with its published defaults.
 ///
@@ -440,6 +468,7 @@ pub fn gmocs_fn(
     macro_cap: f64,
 ) -> PyResult<Py<PyAny>> {
     let py = graph.py();
+    preload_pip_nvrtc(py);
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
     let part = gmocs::gmocs(&nodes, &edges, pop_size, num_gens, gap, turb, macro_cap)
@@ -479,6 +508,7 @@ pub fn gmocs_fronts_fn(
     macro_cap: f64,
 ) -> PyResult<Py<PyAny>> {
     let py = graph.py();
+    preload_pip_nvrtc(py);
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
     let fronts = gmocs::gmocs_fronts(
