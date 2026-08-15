@@ -1,6 +1,9 @@
 pub const DEFAULT_POP_SIZE: usize = 100;
 
-pub const DEFAULT_NUM_GENS: usize = 100;
+// 50, not SMOCC's 100: the budget sweep showed the swarm converges by ~50
+// generations (mu<=0.5 within 0.02 AMI of 100 gens, the mu=0.6 edge intact),
+// so the extra 50 generations buy nothing at 2x the cost.
+pub const DEFAULT_NUM_GENS: usize = 50;
 
 pub const DEFAULT_GAP: usize = 10;
 

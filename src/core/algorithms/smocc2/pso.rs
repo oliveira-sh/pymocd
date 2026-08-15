@@ -11,6 +11,7 @@ use crate::core::graph::CsrGraph;
 use super::super::smocc::nsga2::dominates;
 use super::super::smocc::operators::slot_rng;
 use super::super::smocc::sim::decode;
+use super::super::smocc::Labels;
 use super::defaults::{C1, C2};
 use super::{Cfg, MacA, MacP, MicA, MicP};
 
@@ -158,27 +159,20 @@ pub(super) fn micro_step(
     });
 }
 
-/// One macro-swarm step: cardinality-preserving set-based binary PSO. The
-/// velocity is a pair of scored candidate pools (ADD/DEL) and the inertia
-/// weight sets the fraction of the disagreement resolved per step
-/// (V_scale = 1 - w: each candidate swap is skipped with probability w).
-#[allow(clippy::too_many_arguments)]
-pub(super) fn macro_step(
-    g: &CsrGraph,
-    wadj: &[f64],
-    parts: &mut [MacP],
+/// Move phase of one macro particle: leader tournament, the set-based swap
+/// update, and turbulence — everything except decode/eval/pbest, so the CPU
+/// and GPU paths share it (and its RNG phase streams) exactly.
+fn macro_move_one(
+    n: usize,
+    k: usize,
+    p: &mut MacP,
     arch: &[MacA],
     crowd: &[f64],
-    cfg: &Cfg,
     w: f64,
     p_t: f64,
     t: usize,
 ) {
-    let n = g.n;
-    if arch.is_empty() {
-        return;
-    }
-    parts.par_iter_mut().enumerate().for_each(|(k, p)| {
+    {
         let mut rl = phase_rng(t, PH_MAC_LEAD, k);
         let leader = &arch[leader_tournament(crowd, &mut rl)].genome;
 
@@ -230,34 +224,97 @@ pub(super) fn macro_step(
             }
         }
 
-        // Turbulence: swap one centre for a uniformly random non-centre node.
-        // Swapping preserves |S|, so the ≥1-centre and cmax invariants from
-        // init hold for the particle's whole lifetime.
-        let mut rt = phase_rng(t, PH_MAC_TURB, k);
-        if rt.random_bool(p_t) {
-            let centers: Vec<usize> = (0..n).filter(|&i| p.genome[i] != 0).collect();
-            let c = centers.len();
-            if c > 0 && c < n {
-                let out = centers[rt.random_range(0..c)];
-                loop {
-                    let cand = rt.random_range(0..n);
-                    if p.genome[cand] == 0 {
-                        p.genome[out] = 0;
-                        p.genome[cand] = 1;
-                        break;
-                    }
+    }
+
+    // Turbulence: swap one centre for a uniformly random non-centre node.
+    // Swapping preserves |S|, so the ≥1-centre and cmax invariants from
+    // init hold for the particle's whole lifetime.
+    let mut rt = phase_rng(t, PH_MAC_TURB, k);
+    if rt.random_bool(p_t) {
+        let centers: Vec<usize> = (0..n).filter(|&i| p.genome[i] != 0).collect();
+        let c = centers.len();
+        if c > 0 && c < n {
+            let out = centers[rt.random_range(0..c)];
+            loop {
+                let cand = rt.random_range(0..n);
+                if p.genome[cand] == 0 {
+                    p.genome[out] = 0;
+                    p.genome[cand] = 1;
+                    break;
                 }
             }
         }
+    }
+}
 
+/// Eval-and-pbest phase of one macro particle, given its decoded labels.
+fn macro_finish_one(g: &CsrGraph, k: usize, p: &mut MacP, labels: Labels, cfg: &Cfg, t: usize) {
+    p.labels = labels;
+    p.obj = cfg.eval_macro(g, &p.labels);
+    let mut rb = phase_rng(t, PH_MAC_PB, k);
+    if pbest_wants_new(&p.obj, &p.pb_obj, &mut rb) {
+        p.pb.clone_from(&p.genome);
+        p.pb_obj.clone_from(&p.obj);
+    }
+}
+
+/// One macro-swarm step: cardinality-preserving set-based binary PSO. The
+/// velocity is a pair of scored candidate pools (ADD/DEL) and the inertia
+/// weight sets the fraction of the disagreement resolved per step
+/// (V_scale = 1 - w: each candidate swap is skipped with probability w).
+#[allow(clippy::too_many_arguments)]
+pub(super) fn macro_step(
+    g: &CsrGraph,
+    wadj: &[f64],
+    parts: &mut [MacP],
+    arch: &[MacA],
+    crowd: &[f64],
+    cfg: &Cfg,
+    w: f64,
+    p_t: f64,
+    t: usize,
+) {
+    if arch.is_empty() {
+        return;
+    }
+    let n = g.n;
+    parts.par_iter_mut().enumerate().for_each(|(k, p)| {
+        macro_move_one(n, k, p, arch, crowd, w, p_t, t);
         // Decode/eval is the hot path, exactly as in SMOCC.
-        p.labels = decode(g, wadj, &p.genome);
-        p.obj = cfg.eval_macro(g, &p.labels);
-
-        let mut rb = phase_rng(t, PH_MAC_PB, k);
-        if pbest_wants_new(&p.obj, &p.pb_obj, &mut rb) {
-            p.pb.clone_from(&p.genome);
-            p.pb_obj.clone_from(&p.obj);
-        }
+        let labels = decode(g, wadj, &p.genome);
+        macro_finish_one(g, k, p, labels, cfg, t);
     });
+}
+
+/// GPU variant of [`macro_step`]: identical move and eval/pbest phases (same
+/// RNG streams), with the pop decodes batched into one device launch.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn macro_step_gpu(
+    g: &CsrGraph,
+    gpu: &mut super::gpu::Gpu,
+    parts: &mut [MacP],
+    arch: &[MacA],
+    crowd: &[f64],
+    cfg: &Cfg,
+    w: f64,
+    p_t: f64,
+    t: usize,
+) {
+    if arch.is_empty() {
+        return;
+    }
+    let n = g.n;
+    parts
+        .par_iter_mut()
+        .enumerate()
+        .for_each(|(k, p)| macro_move_one(n, k, p, arch, crowd, w, p_t, t));
+    let genomes: Vec<&super::Genome> = parts.iter().map(|p| &p.genome).collect();
+    let labels = gpu
+        .batch_decode(g, &genomes)
+        .expect("CUDA runtime failure in macro decode");
+    parts
+        .par_iter_mut()
+        .zip(labels)
+        .enumerate()
+        .for_each(|(k, (p, l))| macro_finish_one(g, k, p, l, cfg, t));
 }

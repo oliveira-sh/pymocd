@@ -28,6 +28,7 @@ use super::smocc::sim::{decode, encode, init_weights, update_weights};
 use super::smocc::{Genome, Labels, macro_cmax, select_best, to_output};
 
 mod defaults;
+mod gpu;
 mod pso;
 
 pub use defaults::*;
@@ -225,12 +226,13 @@ fn init_macro_swarm(
     pop: usize,
     cfg: &Cfg,
     macro_cap: f64,
+    gpu: Option<&mut gpu::Gpu>,
 ) -> Vec<MacP> {
     let n = g.n;
     let mut by_deg: Vec<usize> = (0..n).collect();
     by_deg.sort_unstable_by(|&a, &b| g.deg[b].cmp(&g.deg[a]));
     let cmax = macro_cmax(n, macro_cap);
-    (0..pop)
+    let genomes: Vec<Genome> = (0..pop)
         .into_par_iter()
         .map(|k| {
             let mut r = slot_rng(u64::MAX - 1, k);
@@ -255,7 +257,23 @@ fn init_macro_swarm(
             if genome.iter().all(|&b| b == 0) {
                 genome[by_deg[0]] = 1;
             }
-            let labels = decode(g, wadj, &genome);
+            genome
+        })
+        .collect();
+
+    let labels: Vec<Labels> = match gpu {
+        Some(dev) => {
+            let refs: Vec<&Genome> = genomes.iter().collect();
+            dev.batch_decode(g, &refs)
+                .expect("CUDA runtime failure in init decode")
+        }
+        None => genomes.par_iter().map(|gn| decode(g, wadj, gn)).collect(),
+    };
+
+    genomes
+        .into_par_iter()
+        .zip(labels)
+        .map(|(genome, labels)| {
             let obj = cfg.eval_macro(g, &labels);
             MacP {
                 pb: genome.clone(),
@@ -274,6 +292,7 @@ fn init_macro_swarm(
 /// objectives, inject into the micro archive (nondominated-merge + prune),
 /// and reset the pbests of the worst-crowded micro particles to the
 /// injected solutions.
+#[allow(clippy::too_many_arguments)]
 fn guidance(
     g: &CsrGraph,
     wadj: &[f64],
@@ -282,15 +301,30 @@ fn guidance(
     mic: &mut [MicP],
     pop: usize,
     cfg: &Cfg,
+    gpu: Option<&mut gpu::Gpu>,
 ) -> Vec<MicA> {
-    let inj: Vec<MicA> = mac_arch
-        .par_iter()
-        .map(|a| {
-            let labels = decode(g, wadj, &a.genome);
-            let obj = cfg.eval_micro(g, &labels);
-            MicA { labels, obj }
-        })
-        .collect();
+    let inj: Vec<MicA> = match gpu {
+        Some(dev) => {
+            let refs: Vec<&Genome> = mac_arch.iter().map(|a| &a.genome).collect();
+            let labs = dev
+                .batch_decode(g, &refs)
+                .expect("CUDA runtime failure in guidance decode");
+            labs.into_par_iter()
+                .map(|labels| {
+                    let obj = cfg.eval_micro(g, &labels);
+                    MicA { labels, obj }
+                })
+                .collect()
+        }
+        None => mac_arch
+            .par_iter()
+            .map(|a| {
+                let labels = decode(g, wadj, &a.genome);
+                let obj = cfg.eval_micro(g, &labels);
+                MicA { labels, obj }
+            })
+            .collect(),
+    };
 
     let objs: Vec<Obj> = mic.iter().map(|p| p.obj.clone()).collect();
     let ranks = fast_nondominated_sort(&objs);
@@ -331,25 +365,52 @@ fn influence(
     num_gens: usize,
     pop: usize,
     cfg: &Cfg,
+    gpu: Option<&mut gpu::Gpu>,
 ) -> Vec<MacA> {
     let elites: Vec<&Labels> = mic_arch.iter().map(|a| &a.labels).collect();
     let rho = 0.5 * t as f64 / num_gens as f64;
     update_weights(g, wadj, &elites, rho);
 
     let wadj_ro: &[f64] = wadj;
-    let inj: Vec<MacA> = elites
-        .par_iter()
-        .map(|e| {
-            let genome = encode(g, wadj_ro, e);
-            let labels = decode(g, wadj_ro, &genome);
-            let obj = cfg.eval_macro(g, &labels);
-            MacA {
-                genome,
-                labels,
-                obj,
-            }
-        })
-        .collect();
+    let inj: Vec<MacA> = match gpu {
+        Some(dev) => {
+            // The elite-consensus weights just changed: mirror them to the
+            // device BEFORE decoding, and for every later generation.
+            dev.set_wadj(wadj_ro)
+                .expect("CUDA runtime failure in wadj upload");
+            let genomes: Vec<Genome> =
+                elites.par_iter().map(|e| encode(g, wadj_ro, e)).collect();
+            let refs: Vec<&Genome> = genomes.iter().collect();
+            let labs = dev
+                .batch_decode(g, &refs)
+                .expect("CUDA runtime failure in influence decode");
+            genomes
+                .into_par_iter()
+                .zip(labs)
+                .map(|(genome, labels)| {
+                    let obj = cfg.eval_macro(g, &labels);
+                    MacA {
+                        genome,
+                        labels,
+                        obj,
+                    }
+                })
+                .collect()
+        }
+        None => elites
+            .par_iter()
+            .map(|e| {
+                let genome = encode(g, wadj_ro, e);
+                let labels = decode(g, wadj_ro, &genome);
+                let obj = cfg.eval_macro(g, &labels);
+                MacA {
+                    genome,
+                    labels,
+                    obj,
+                }
+            })
+            .collect(),
+    };
     update_macro_archive(mac_arch, inj, pop)
 }
 
@@ -365,9 +426,10 @@ fn run_fronts(
     do_refine: bool,
     obj_mode: u16,
     macro_cap: f64,
-) -> Vec<Labels> {
+    use_gpu: bool,
+) -> Result<Vec<Labels>, String> {
     if g.n == 0 {
-        return vec![Vec::new()];
+        return Ok(vec![Vec::new()]);
     }
     let gap = gap.max(1);
     let turb = if turb.is_nan() {
@@ -377,9 +439,14 @@ fn run_fronts(
     };
     let cfg = Cfg::new(obj_mode);
     let mut wadj = init_weights(g);
+    let mut dev: Option<gpu::Gpu> = if use_gpu {
+        Some(gpu::Gpu::new(g, pop)?)
+    } else {
+        None
+    };
 
     let mut mic = init_micro_swarm(g, pop, &cfg);
-    let mut mac = init_macro_swarm(g, &wadj, pop, &cfg, macro_cap);
+    let mut mac = init_macro_swarm(g, &wadj, pop, &cfg, macro_cap, dev.as_mut());
 
     let mut mic_arch = update_micro_archive(
         Vec::new(),
@@ -423,7 +490,10 @@ fn run_fronts(
 
         let mac_objs: Vec<Obj> = mac_arch.iter().map(|a| a.obj.clone()).collect();
         let crowd = arch_crowd(&mac_objs);
-        pso::macro_step(g, &wadj, &mut mac, &mac_arch, &crowd, &cfg, w, p_t, t);
+        match dev.as_mut() {
+            Some(d) => pso::macro_step_gpu(g, d, &mut mac, &mac_arch, &crowd, &cfg, w, p_t, t),
+            None => pso::macro_step(g, &wadj, &mut mac, &mac_arch, &crowd, &cfg, w, p_t, t),
+        }
         mac_arch = update_macro_archive(
             mac_arch,
             mac.iter()
@@ -437,8 +507,14 @@ fn run_fronts(
         );
 
         if t % gap == 0 {
-            mic_arch = guidance(g, &wadj, &mac_arch, mic_arch, &mut mic, pop, &cfg);
-            mac_arch = influence(g, &mut wadj, &mic_arch, mac_arch, t, num_gens, pop, &cfg);
+            mic_arch = guidance(
+                g, &wadj, &mac_arch, mic_arch, &mut mic, pop, &cfg,
+                dev.as_mut(),
+            );
+            mac_arch = influence(
+                g, &mut wadj, &mic_arch, mac_arch, t, num_gens, pop, &cfg,
+                dev.as_mut(),
+            );
         }
     }
 
@@ -486,16 +562,17 @@ fn run_fronts(
         front
     };
 
-    if do_refine {
+    Ok(if do_refine {
         refine_front(g, &wadj, front, cfg.micro)
     } else {
         front
-    }
+    })
 }
 
 // --- public API -----------------------------------------------------------
 
 #[cfg_attr(not(test), allow(dead_code))]
+#[allow(clippy::too_many_arguments)]
 pub fn smocc2(
     nodes: &[i32],
     edges: &[(i32, i32)],
@@ -504,10 +581,11 @@ pub fn smocc2(
     gap: usize,
     turb: f64,
     macro_cap: f64,
-) -> Vec<(i32, i32)> {
+    gpu: bool,
+) -> Result<Vec<(i32, i32)>, String> {
     let g = CsrGraph::from_edges(nodes, edges);
     if g.n == 0 {
-        return Vec::new();
+        return Ok(Vec::new());
     }
     let front = run_fronts(
         &g,
@@ -518,9 +596,10 @@ pub fn smocc2(
         true,
         DEFAULT_OBJ_MODE,
         macro_cap,
-    );
+        gpu,
+    )?;
     let best = select_best(&g, front);
-    to_output(&g, &best)
+    Ok(to_output(&g, &best))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -534,15 +613,18 @@ pub fn smocc2_fronts(
     refine: bool,
     obj_mode: u16,
     macro_cap: f64,
-) -> Vec<Vec<(i32, i32)>> {
+    gpu: bool,
+) -> Result<Vec<Vec<(i32, i32)>>, String> {
     let g = CsrGraph::from_edges(nodes, edges);
     if g.n == 0 {
-        return Vec::new();
+        return Ok(Vec::new());
     }
-    run_fronts(&g, pop, num_gens, gap, turb, refine, obj_mode, macro_cap)
-        .iter()
-        .map(|l| to_output(&g, l))
-        .collect()
+    Ok(
+        run_fronts(&g, pop, num_gens, gap, turb, refine, obj_mode, macro_cap, gpu)?
+            .iter()
+            .map(|l| to_output(&g, l))
+            .collect(),
+    )
 }
 
 #[cfg(test)]
@@ -593,7 +675,9 @@ mod tests {
             DEFAULT_GAP,
             DEFAULT_TURB,
             DEFAULT_MACRO_CAP,
-        );
+            false,
+        )
+        .unwrap();
         let c: FxHashMap<i32, i32> = out.into_iter().collect();
         for i in 1..5 {
             assert_eq!(c[&0], c[&i], "clique A node {i} split off");
@@ -615,7 +699,9 @@ mod tests {
             DEFAULT_GAP,
             DEFAULT_TURB,
             DEFAULT_MACRO_CAP,
-        );
+            false,
+        )
+        .unwrap();
         let c: FxHashMap<i32, i32> = out.into_iter().collect();
         assert_eq!(c[&6], -1);
     }
@@ -633,7 +719,9 @@ mod tests {
             true,
             0,
             DEFAULT_MACRO_CAP,
-        );
+            false,
+        )
+        .unwrap();
         assert!(!fronts.is_empty());
         assert!(fronts.iter().all(|f| f.len() == 6));
     }
@@ -652,7 +740,9 @@ mod tests {
                 true,
                 0,
                 DEFAULT_MACRO_CAP,
+                false,
             )
+            .unwrap()
         };
         assert_eq!(run(), run());
     }
@@ -673,7 +763,9 @@ mod tests {
                     true,
                     obj_mode,
                     DEFAULT_MACRO_CAP,
+                    false,
                 )
+                .unwrap()
             };
             let a = run();
             assert!(!a.is_empty(), "obj_mode {obj_mode} produced an empty front");
@@ -693,7 +785,7 @@ mod tests {
         let pop = 12usize;
         let cmax = macro_cmax(g.n, DEFAULT_MACRO_CAP);
 
-        let mut parts = init_macro_swarm(&g, &wadj, pop, &cfg, DEFAULT_MACRO_CAP);
+        let mut parts = init_macro_swarm(&g, &wadj, pop, &cfg, DEFAULT_MACRO_CAP, None);
         let cards: Vec<usize> = parts
             .iter()
             .map(|p| p.genome.iter().filter(|&&b| b != 0).count())
@@ -749,6 +841,60 @@ mod tests {
                 assert_eq!(cp, c0, "gen {t}: particle {k} pbest drifted");
             }
         }
+    }
+
+    /// gpu=true must be structurally correct where CUDA is available (it is
+    /// intentionally nondeterministic — async in-place label updates — so no
+    /// run-to-run equality is asserted); on machines without a device the
+    /// test skips (the graceful runtime-failure path is itself exercised by
+    /// the attempted init).
+    #[test]
+    fn gpu_fronts_are_valid_and_find_the_split() {
+        let nodes: Vec<i32> = (0..10).collect();
+        let edges = two_clique_edges();
+        let run = || {
+            smocc2_fronts(
+                &nodes,
+                &edges,
+                40,
+                20,
+                DEFAULT_GAP,
+                DEFAULT_TURB,
+                true,
+                DEFAULT_OBJ_MODE,
+                DEFAULT_MACRO_CAP,
+                true,
+            )
+        };
+        let a = match run() {
+            Err(e) => {
+                eprintln!("skipping GPU test (no usable CUDA device): {e}");
+                return;
+            }
+            Ok(a) => a,
+        };
+        assert!(!a.is_empty());
+        assert!(a.iter().all(|f| f.len() == 10));
+
+        let out = smocc2(
+            &nodes,
+            &edges,
+            60,
+            40,
+            DEFAULT_GAP,
+            DEFAULT_TURB,
+            DEFAULT_MACRO_CAP,
+            true,
+        )
+        .unwrap();
+        let c: FxHashMap<i32, i32> = out.into_iter().collect();
+        for i in 1..5 {
+            assert_eq!(c[&0], c[&i], "gpu: clique A node {i} split off");
+        }
+        for i in 6..10 {
+            assert_eq!(c[&5], c[&i], "gpu: clique B node {i} split off");
+        }
+        assert_ne!(c[&0], c[&5], "gpu: cliques merged");
     }
 
     /// The archive is the leader pool: it must never hold a dominated member,
