@@ -2,7 +2,7 @@
 
 These functions expose the full candidate set a detector selects its final partition from, letting you inspect or re-select solutions yourself.
 
-::: pymocd.smocc_fronts
+::: pymocd.gmocs_fronts
 
 ::: pymocd.hpmocd_fronts
 

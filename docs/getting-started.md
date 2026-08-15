@@ -18,36 +18,38 @@ make build
 
 ## First detection
 
-`pymocd.smocc` is the recommended entry point:
+`pymocd.gmocs` is the recommended entry point on machines with an NVIDIA GPU; `pymocd.hpmocd` is the CPU-only recommendation:
 
 ```python
 import networkx as nx
 import pymocd
 
 G = nx.karate_club_graph()
-communities = pymocd.smocc(G)
+communities = pymocd.gmocs(G)
 ```
 
 !!! important "Graph format"
     Every detector accepts a **NetworkX** or **igraph** graph with **integer node ids** and returns a crisp `dict[node, community]`. Isolated nodes are always assigned community `-1`.
 
+!!! important "GPU requirement"
+    `gmocs` runs its search as CUDA kernels and requires an NVIDIA GPU (Pascal or newer); it raises `RuntimeError` when no usable CUDA device is present. It is also stochastic by design: repeated runs return different partitions.
+
 ## Tuning
 
-`smocc` and `mmcomo` share the same evolutionary knobs:
+`gmocs` exposes the swarm knobs directly:
 
 ```python
-communities = pymocd.smocc(
+communities = pymocd.gmocs(
     G,
     pop_size=100,
     num_gens=50,
-    cross_rate=0.1,
-    mut_rate=0.1,
     gap=10,
-    beta=0.05,
+    turb=0.1,
+    macro_cap=1.0,
 )
 ```
 
-`gap` is the macro/micro co-evolution interval and `beta` the micro-stage perturbation strength. `num_gens` is the generation count: the search always runs all of them.
+`gap` is the macro/micro co-evolution interval, `turb` the first-generation per-node turbulence probability (it decays with the inertia weight), and `macro_cap` a multiplier on the macro swarm's community-centre ceiling. `num_gens` is the generation count: the search always runs all of them.
 
 `hpmocd` runs with its published defaults and returns the max-*Q* partition from its Pareto front; the front itself is available via [`hpmocd_fronts`](api/fronts.md#pymocd.hpmocd_fronts).
 
@@ -78,10 +80,10 @@ Each metric is also available on its own: `pymocd.nmi`, `pymocd.ami`, `pymocd.ar
 
 ## Inspecting Pareto fronts
 
-`smocc`, `mmcomo`, `ccm`, `krm` and `moga_net` each pick one partition from a Pareto front of candidates. To see the whole candidate set, use `smocc_fronts`, `mmcomo_fronts`, `ccm_fronts`, `krm_fronts` or `moga_net_fronts`, which accept the same evolutionary kwargs as their detector (`smocc_fronts` adds `refine` and `topo_mode`) and return a `list[dict[node, community]]`:
+`gmocs`, `mmcomo`, `ccm`, `krm` and `moga_net` each pick one partition from a Pareto front of candidates. To see the whole candidate set, use `gmocs_fronts`, `mmcomo_fronts`, `ccm_fronts`, `krm_fronts` or `moga_net_fronts`, which accept the same evolutionary kwargs as their detector (`gmocs_fronts` adds `refine` and `obj_mode`) and return a `list[dict[node, community]]`:
 
 ```python
-front = pymocd.smocc_fronts(G)
+front = pymocd.gmocs_fronts(G)
 best = max(front, key=lambda p: pymocd.ari(p, gt))
 ```
 

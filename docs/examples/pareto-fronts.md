@@ -6,14 +6,14 @@ Every detector already resolves this — each applies the selection rule publish
 
 ## The `*_fronts` functions
 
-`smocc`, `hpmocd`, `mmcomo`, `ccm`, `krm` and `moga_net` each pair with a `*_fronts` function exposing the candidate set as a plain `list[dict]` of partitions. Each list is exactly what the corresponding detector selects from:
+`gmocs`, `hpmocd`, `mmcomo`, `ccm`, `krm` and `moga_net` each pair with a `*_fronts` function exposing the candidate set as a plain `list[dict]` of partitions. Each list is exactly what the corresponding detector selects from:
 
 ```python
 import networkx as nx
 import pymocd
 
 G = nx.karate_club_graph()
-front = pymocd.smocc_fronts(G)
+front = pymocd.gmocs_fronts(G)
 
 for partition in front:
     k = len(set(partition.values()))
@@ -56,7 +56,7 @@ target = 2
 best = min(front, key=lambda p: abs(len(set(p.values())) - target))
 ```
 
-Each `*_fronts` function takes the same kwargs as its detector; `smocc_fronts` adds two of its own: `refine` (apply union-refinement to the merged front, on by default) and `topo_mode` (topology-handling mode, integer).
+Each `*_fronts` function takes the same kwargs as its detector; `gmocs_fronts` adds two of its own: `refine` (apply union-refinement to the merged front, on by default) and `obj_mode` (objective-placement mode, integer).
 
 The baseline fronts exist because the original papers report the best-NMI solution *of the front*, not the max-modularity one their detectors return — reproducing those tables needs the full candidate set:
 
