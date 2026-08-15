@@ -38,6 +38,7 @@ def run_algorithm(alg, n, edges, seed, threads):
     lib = {
         "SMOCC": lambda: pymocd.smocc(shim),
         "SMOCC-II": lambda: pymocd.smocc2(shim),
+        "SMOCC-II-GPU": lambda: pymocd.smocc2(shim, gpu=True),
         "HP-MOCD": lambda: pymocd.hpmocd(shim),
         "MMCoMO": lambda: pymocd.mmcomo(shim),
         "NSGA-III CCM": lambda: pymocd.ccm(shim),

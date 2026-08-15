@@ -1,0 +1,178 @@
+use crate::core::graph::CsrGraph;
+
+use super::super::smocc::Labels;
+use super::super::smocc::nsga2::{Obj, fast_nondominated_sort};
+use super::super::smocc::refine::refine_front;
+use super::super::smocc::sim::init_weights;
+use super::archive::{arch_crowd, update_macro_archive, update_micro_archive};
+use super::coevo::{guidance, influence};
+use super::defaults::{DEFAULT_TURB, W_MAX};
+use super::gpu::Gpu;
+use super::init::{init_macro_swarm, init_micro_swarm};
+use super::pso;
+use super::types::{Cfg, MacElite, MicElite, inertia};
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn run_fronts(
+    g: &CsrGraph,
+    pop: usize,
+    num_gens: usize,
+    gap: usize,
+    turb: f64,
+    do_refine: bool,
+    obj_mode: u16,
+    macro_cap: f64,
+    use_gpu: bool,
+) -> Result<Vec<Labels>, String> {
+    if g.n == 0 {
+        return Ok(vec![Vec::new()]);
+    }
+    let gap = gap.max(1);
+    let turb = if turb.is_nan() {
+        DEFAULT_TURB
+    } else {
+        turb.clamp(0.0, 1.0)
+    };
+    let cfg = Cfg::new(obj_mode);
+    let mut wadj = init_weights(g);
+    let mut dev: Option<Gpu> = if use_gpu {
+        Some(Gpu::new(g, pop)?)
+    } else {
+        None
+    };
+
+    let mut mic = init_micro_swarm(g, pop, &cfg);
+    let mut mac = init_macro_swarm(g, &wadj, pop, &cfg, macro_cap, dev.as_mut());
+
+    let mut mic_arch = update_micro_archive(
+        Vec::new(),
+        mic.iter()
+            .map(|p| MicElite {
+                labels: p.x.clone(),
+                obj: p.obj.clone(),
+            })
+            .collect(),
+        pop,
+    );
+    let mut mac_arch = update_macro_archive(
+        Vec::new(),
+        mac.iter()
+            .map(|p| MacElite {
+                genome: p.genome.clone(),
+                labels: p.labels.clone(),
+                obj: p.obj.clone(),
+            })
+            .collect(),
+        pop,
+    );
+
+    for t in 1..=num_gens {
+        let w = inertia(t, num_gens);
+        let p_t = (turb * w / W_MAX).clamp(0.0, 1.0);
+
+        let mic_objs: Vec<Obj> = mic_arch.iter().map(|a| a.obj.clone()).collect();
+        let crowd = arch_crowd(&mic_objs);
+        pso::micro_step(g, &mut mic, &mic_arch, &crowd, &cfg, w, p_t);
+        mic_arch = update_micro_archive(
+            mic_arch,
+            mic.iter()
+                .map(|p| MicElite {
+                    labels: p.x.clone(),
+                    obj: p.obj.clone(),
+                })
+                .collect(),
+            pop,
+        );
+
+        let mac_objs: Vec<Obj> = mac_arch.iter().map(|a| a.obj.clone()).collect();
+        let crowd = arch_crowd(&mac_objs);
+        match dev.as_mut() {
+            Some(d) => pso::macro_step_gpu(g, d, &mut mac, &mac_arch, &crowd, &cfg, w, p_t),
+            None => pso::macro_step(g, &wadj, &mut mac, &mac_arch, &crowd, &cfg, w, p_t),
+        }
+        mac_arch = update_macro_archive(
+            mac_arch,
+            mac.iter()
+                .map(|p| MacElite {
+                    genome: p.genome.clone(),
+                    labels: p.labels.clone(),
+                    obj: p.obj.clone(),
+                })
+                .collect(),
+            pop,
+        );
+
+        if t % gap == 0 {
+            mic_arch = guidance(
+                g,
+                &wadj,
+                &mac_arch,
+                mic_arch,
+                &mut mic,
+                pop,
+                &cfg,
+                dev.as_mut(),
+            );
+            mac_arch = influence(
+                g,
+                &mut wadj,
+                &mic_arch,
+                mac_arch,
+                t,
+                num_gens,
+                pop,
+                &cfg,
+                dev.as_mut(),
+            );
+        }
+    }
+
+    let het = cfg.micro != cfg.macro_;
+    let cap = 2 * (mic.len() + mac.len());
+    let mut labels: Vec<Labels> = Vec::with_capacity(cap);
+    let mut objs: Vec<Obj> = Vec::with_capacity(cap);
+    for p in mic {
+        labels.push(p.x);
+        objs.push(p.obj);
+    }
+    for a in mic_arch {
+        labels.push(a.labels);
+        objs.push(a.obj);
+    }
+    for p in mac {
+        let obj = if het {
+            cfg.eval_micro(g, &p.labels)
+        } else {
+            p.obj
+        };
+        labels.push(p.labels);
+        objs.push(obj);
+    }
+    for a in mac_arch {
+        let obj = if het {
+            cfg.eval_micro(g, &a.labels)
+        } else {
+            a.obj
+        };
+        labels.push(a.labels);
+        objs.push(obj);
+    }
+    let ranks = fast_nondominated_sort(&objs);
+    let front: Vec<Labels> = labels
+        .into_iter()
+        .zip(ranks)
+        .filter(|(_, r)| *r == 1)
+        .map(|(l, _)| l)
+        .collect();
+    let front = if front.is_empty() {
+        vec![(0..g.n as i32).collect()]
+    } else {
+        front
+    };
+
+    Ok(if do_refine {
+        refine_front(g, &wadj, front, cfg.micro)
+    } else {
+        front
+    })
+}

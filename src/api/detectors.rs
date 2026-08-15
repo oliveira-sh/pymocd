@@ -459,7 +459,7 @@ pub fn smocc_fn(
 /// multi-objective particle swarm optimization (MOPSO, Gong et al. 2014
 /// lineage). Graph representation, decode/encode, objectives, co-evolution,
 /// refinement and final selection are SMOCC's; only the search operators
-/// differ, so the two are directly comparable at equal (pop, gens). Returns
+/// differ. Stochastic: repeated runs return different partitions. Returns
 /// the label-free-selected member of the merged rank-1 front. Isolated nodes
 /// get -1.
 ///
@@ -472,11 +472,9 @@ pub fn smocc_fn(
 ///         ``ceil(macro_cap * sqrt(n))`` (still hard-capped at ``n``),
 ///         exactly as in `smocc`.
 ///     gpu: run the macro decodes (the per-generation hot path) batched on a
-///         CUDA device with asynchronous in-place label propagation. FASTER
-///         but NONDETERMINISTIC: repeated gpu=True runs may return different
-///         (equally valid) partitions, and results differ from gpu=False.
-///         Raises RuntimeError when no usable CUDA device is present or the
-///         graph has a node degree above the kernel's limit (256).
+///         CUDA device with asynchronous in-place label propagation. Raises
+///         RuntimeError when no usable CUDA device is present or the graph
+///         has a node degree above the kernel's limit (1024).
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(name = "smocc2", signature = (graph, pop_size = smocc2::DEFAULT_POP_SIZE, num_gens = smocc2::DEFAULT_NUM_GENS, gap = smocc2::DEFAULT_GAP, turb = smocc2::DEFAULT_TURB, macro_cap = smocc2::DEFAULT_MACRO_CAP, gpu = false))]
@@ -515,8 +513,7 @@ pub fn smocc2_fn(
 ///         ``(intra, inter)`` / macro ``(KKM, RC)``.
 ///     macro_cap: multiplier on the macro swarm's centre ceiling
 ///         ``ceil(macro_cap * sqrt(n))`` (still hard-capped at ``n``).
-///     gpu: batched CUDA macro decodes; see `smocc2`. Faster but
-///         nondeterministic, and a different trajectory than the CPU.
+///     gpu: batched CUDA macro decodes; see `smocc2`.
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(name = "smocc2_fronts", signature = (graph, pop_size = smocc2::DEFAULT_POP_SIZE, num_gens = smocc2::DEFAULT_NUM_GENS, gap = smocc2::DEFAULT_GAP, turb = smocc2::DEFAULT_TURB, refine = true, obj_mode = smocc2::DEFAULT_OBJ_MODE, macro_cap = smocc2::DEFAULT_MACRO_CAP, gpu = false))]
