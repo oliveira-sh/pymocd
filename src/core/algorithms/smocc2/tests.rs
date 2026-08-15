@@ -5,9 +5,9 @@
 
 use rustc_hash::FxHashMap;
 
-use crate::core::algorithms::smocc::macro_cmax;
-use crate::core::algorithms::smocc::nsga2::{Obj, dominates};
-use crate::core::algorithms::smocc::sim::init_weights;
+use super::spo::init::macro_cmax;
+use crate::core::algorithms::smocc2::nsga2::{Obj, dominates};
+use crate::core::algorithms::smocc2::sim::init_weights;
 use crate::core::graph::CsrGraph;
 
 use super::api::{smocc2, smocc2_fronts};

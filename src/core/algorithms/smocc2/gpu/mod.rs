@@ -1,3 +1,8 @@
+//! SMOCC: Sparse Multi-Objective Co-evolutionary Community detection,
+//! This Source Code Form is subject to the terms of The GNU General Public License v3.0
+//! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+
 use std::sync::Arc;
 
 use cudarc::driver::{
@@ -8,7 +13,7 @@ use rayon::prelude::*;
 
 use crate::core::graph::CsrGraph;
 
-use super::super::smocc::{Genome, Labels};
+use super::super::smocc2::{Genome, Labels};
 
 const PTX: &str = include_str!("decode.ptx");
 const MAX_DEG: u32 = 1024;
@@ -53,9 +58,7 @@ impl Gpu {
         let err = |e: cudarc::driver::DriverError| format!("CUDA alloc/copy failed: {e:?}");
         let xadj = stream.clone_htod(&g.xadj).map_err(err)?;
         let adj = stream.clone_htod(&g.adj).map_err(err)?;
-        let wadj = stream
-            .clone_htod(&vec![1.0f32; g.adj.len()])
-            .map_err(err)?;
+        let wadj = stream.clone_htod(&vec![1.0f32; g.adj.len()]).map_err(err)?;
         let total = cap * g.n;
         let genomes = stream.alloc_zeros::<u8>(total).map_err(err)?;
         let labels = stream.alloc_zeros::<i32>(total).map_err(err)?;
@@ -151,9 +154,7 @@ impl Gpu {
             .labels
             .try_slice(0..total)
             .ok_or_else(|| "label plane slice out of range".to_string())?;
-        self.stream
-            .memcpy_dtoh(&live, &mut host[..])
-            .map_err(err)?;
+        self.stream.memcpy_dtoh(&live, &mut host[..]).map_err(err)?;
 
         Ok(host
             .par_chunks(n)

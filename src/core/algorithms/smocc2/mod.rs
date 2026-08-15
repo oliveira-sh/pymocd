@@ -6,10 +6,18 @@
 mod api;
 mod config;
 mod gpu;
+mod nsga2;
+mod objectives;
+mod refine;
+mod select;
+mod sim;
 mod spo;
 
 #[cfg(test)]
 mod tests;
+
+pub type Labels = Vec<i32>;
+pub type Genome = Vec<u8>;
 
 pub use api::{smocc2, smocc2_fronts};
 pub use config::defaults::*;

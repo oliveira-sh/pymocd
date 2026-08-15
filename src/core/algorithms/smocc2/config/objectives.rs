@@ -1,6 +1,11 @@
-use crate::core::algorithms::smocc::Labels;
-use crate::core::algorithms::smocc::nsga2::Obj;
-use crate::core::algorithms::smocc::objectives::{ObjSet, evaluate, split_mode};
+//! SMOCC: Sparse Multi-Objective Co-evolutionary Community detection,
+//! This Source Code Form is subject to the terms of The GNU General Public License v3.0
+//! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+
+use crate::core::algorithms::smocc2::Labels;
+use crate::core::algorithms::smocc2::nsga2::Obj;
+use crate::core::algorithms::smocc2::objectives::{ObjSet, evaluate, split_mode};
 use crate::core::graph::CsrGraph;
 
 #[derive(Clone, Copy)]

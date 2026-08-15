@@ -1,8 +1,13 @@
-pub const DEFAULT_POP_SIZE: usize = 100;
+//! SMOCC: Sparse Multi-Objective Co-evolutionary Community detection,
+//! This Source Code Form is subject to the terms of The GNU General Public License v3.0
+//! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+
+pub const DEFAULT_POP_SIZE: usize = 100; // num of particles
 
 pub const DEFAULT_NUM_GENS: usize = 50;
 
-pub const DEFAULT_GAP: usize = 10;
+pub const DEFAULT_GAP: usize = 10; // how many gens to micro interact with macro
 
 pub const DEFAULT_OBJ_MODE: u16 = 160;
 

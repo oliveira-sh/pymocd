@@ -5,7 +5,7 @@
 
 use std::collections::HashSet;
 
-use crate::core::algorithms::smocc::nsga2::{
+use crate::core::algorithms::smocc2::nsga2::{
     Obj, crowding_distance, dominates, fast_nondominated_sort,
 };
 

@@ -14,7 +14,6 @@ use crate::core::algorithms::krm;
 use crate::core::algorithms::mmcomo;
 use crate::core::algorithms::mocd;
 use crate::core::algorithms::moganet;
-use crate::core::algorithms::smocc;
 use crate::core::algorithms::smocc2;
 use crate::core::graph::{Graph, Partition, get_edges, get_nodes};
 use pyo3::prelude::*;
@@ -410,51 +409,6 @@ pub fn mmcomo_fronts_fn(
     Ok(out.into_any().unbind())
 }
 
-/// `smocc` — optimized MMCoMO variant (sparse-CSR similarity, Rayon-parallel,
-/// union-refined Pareto front). Returns the label-free-selected member of the
-/// merged rank-1 front. Isolated nodes get -1.
-///
-/// Args:
-///     macro_cap: multiplier on the macro population's centre ceiling, which is
-///         ``ceil(macro_cap * sqrt(n))`` communities (still hard-capped at
-///         ``n``). ``1.0`` is the historical ``ceil(sqrt(n))`` and is exactly
-///         behaviour-preserving. Raise it when the true community count exceeds
-///         ``sqrt(n)``: the heterogeneous-objective gain measured on LFR holds
-///         while ``cap/k_true >= 1`` (+0.016 ARI at n <= 1000, +0.019 at
-///         n = 2000) and disappears once the ceiling can no longer express
-///         ``k_true`` (n = 5000/10000, ``cap/k_true`` 0.64/0.45).
-///
-/// Note: the published algorithm's local-search step (a Louvain-first-phase
-/// modularity ascent on the rank-1 micro members) is intentionally NOT
-/// implemented. It was removed outright, so there is no parameter to enable it.
-#[gen_stub_pyfunction]
-#[pyfunction]
-#[pyo3(name = "smocc", signature = (graph, pop_size = smocc::DEFAULT_POP_SIZE, num_gens = smocc::DEFAULT_NUM_GENS, cross_rate = smocc::DEFAULT_CROSS_RATE, mut_rate = smocc::DEFAULT_MUT_RATE, gap = smocc::DEFAULT_GAP, beta = smocc::DEFAULT_BETA, macro_cap = smocc::DEFAULT_MACRO_CAP, micro_mut = smocc::DEFAULT_MICRO_MUT))]
-#[allow(clippy::too_many_arguments)]
-pub fn smocc_fn(
-    graph: &Bound<'_, PyAny>,
-    pop_size: usize,
-    num_gens: usize,
-    cross_rate: f64,
-    mut_rate: f64,
-    gap: usize,
-    beta: f64,
-    macro_cap: f64,
-    micro_mut: f64,
-) -> PyResult<Py<PyAny>> {
-    let py = graph.py();
-    let nodes = get_nodes(graph)?;
-    let edges = get_edges(graph)?;
-    let part = smocc::smocc_capped(
-        &nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, beta, macro_cap, micro_mut,
-    );
-    let d = PyDict::new(py);
-    for (node, comm) in part {
-        d.set_item(node, comm)?;
-    }
-    Ok(d.into_any().unbind())
-}
-
 /// `smocc2` (SMOCC-II) — SMOCC with the NSGA-II genetic search replaced by
 /// multi-objective particle swarm optimization (MOPSO, Gong et al. 2014
 /// lineage). Graph representation, decode/encode, objectives, co-evolution,
@@ -547,76 +501,3 @@ pub fn smocc2_fronts_fn(
     Ok(out.into_any().unbind())
 }
 
-/// `smocc`'s merged rank-1 front (after union-refinement), the candidate set
-/// `smocc` selects from. Isolated nodes get -1.
-///
-/// Args:
-///     macro_cap: multiplier on the macro population's centre ceiling, which is
-///         ``ceil(macro_cap * sqrt(n))`` communities (still hard-capped at
-///         ``n``). ``1.0`` is the historical ``ceil(sqrt(n))`` and is exactly
-///         behaviour-preserving. Raise it when the true community count exceeds
-///         ``sqrt(n)``: the heterogeneous-objective gain measured on LFR holds
-///         while ``cap/k_true >= 1`` (+0.016 ARI at n <= 1000, +0.019 at
-///         n = 2000) and disappears once the ceiling can no longer express
-///         ``k_true`` (n = 5000/10000, ``cap/k_true`` 0.64/0.45).
-///     topo_mode: operator bitmask. Two bits remain: ``2`` neighbour-majority
-///         micro mutation and ``128`` faithful HP-MOCD ensemble crossover (4
-///         distinct parents). They combine freely, and the shipped default is
-///         ``130 = 128 | 2``. ``0`` is the historical operator set.
-///
-///         Every other bit is DELETED and silently inert. Bits ``1``, ``4``,
-///         ``8``, ``16``, ``32`` and ``64`` used to select a 3-parent ensemble
-///         crossover, a k-aware macro mutation, a community-split mutation, a
-///         multi-community graft, the ``wadj``-weighted local search and a
-///         2-hop-exclusion macro centre init respectively. None of them beat the
-///         shipped mask, so the code is gone; the bits are deliberately not
-///         reused, so old benchmark rows recording them cannot be confused with
-///         a new operator.
-///
-///     obj_mode: objective placement. Two objective sets remain, at their
-///         original ids: ``0`` = ``(KKM, RC)`` and ``6`` = ``(intra, inter)``.
-///         Values under ``100`` are homogeneous; ``100 <= v < 1000`` is
-///         heterogeneous with one decimal digit per side (``micro =
-///         (v-100)//10``, ``macro = (v-100)%10``), so the shipped default
-///         ``160`` is micro ``(intra, inter)`` / macro ``(KKM, RC)``. Ids
-///         ``1..=5`` and ``7..=12`` were losing objective sets and now decode to
-///         the default, exactly as any out-of-range id always did.
-///
-/// Note: the published algorithm's local-search step (a Louvain-first-phase
-/// modularity ascent on the rank-1 micro members) is intentionally NOT
-/// implemented. It was removed outright, so there is no parameter to enable it.
-#[gen_stub_pyfunction]
-#[pyfunction]
-#[pyo3(name = "smocc_fronts", signature = (graph, pop_size = smocc::DEFAULT_POP_SIZE, num_gens = smocc::DEFAULT_NUM_GENS, cross_rate = smocc::DEFAULT_CROSS_RATE, mut_rate = smocc::DEFAULT_MUT_RATE, gap = smocc::DEFAULT_GAP, beta = smocc::DEFAULT_BETA, refine = true, topo_mode = smocc::DEFAULT_TOPO_MODE, obj_mode = smocc::DEFAULT_OBJ_MODE, macro_cap = smocc::DEFAULT_MACRO_CAP, micro_mut = smocc::DEFAULT_MICRO_MUT))]
-#[allow(clippy::too_many_arguments)]
-pub fn smocc_fronts_fn(
-    graph: &Bound<'_, PyAny>,
-    pop_size: usize,
-    num_gens: usize,
-    cross_rate: f64,
-    mut_rate: f64,
-    gap: usize,
-    beta: f64,
-    refine: bool,
-    topo_mode: u8,
-    obj_mode: u16,
-    macro_cap: f64,
-    micro_mut: f64,
-) -> PyResult<Py<PyAny>> {
-    let py = graph.py();
-    let nodes = get_nodes(graph)?;
-    let edges = get_edges(graph)?;
-    let fronts = smocc::smocc_fronts_capped(
-        &nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, beta, refine, topo_mode,
-        obj_mode, macro_cap, micro_mut,
-    );
-    let out = PyList::empty(py);
-    for part in fronts {
-        let d = PyDict::new(py);
-        for (node, comm) in part {
-            d.set_item(node, comm)?;
-        }
-        out.append(d)?;
-    }
-    Ok(out.into_any().unbind())
-}

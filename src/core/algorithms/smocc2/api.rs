@@ -3,7 +3,7 @@
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use crate::core::algorithms::smocc::{select_best, to_output};
+use super::select::{select_best, to_output};
 use crate::core::graph::CsrGraph;
 
 use super::config::defaults::DEFAULT_OBJ_MODE;

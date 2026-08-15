@@ -7,9 +7,9 @@ use rayon::prelude::*;
 
 use crate::core::graph::CsrGraph;
 
-use crate::core::algorithms::smocc::nsga2::{Obj, crowding_distance, fast_nondominated_sort};
-use crate::core::algorithms::smocc::sim::{decode, encode, update_weights};
-use crate::core::algorithms::smocc::{Genome, Labels};
+use crate::core::algorithms::smocc2::nsga2::{Obj, crowding_distance, fast_nondominated_sort};
+use crate::core::algorithms::smocc2::sim::{decode, encode, update_weights};
+use crate::core::algorithms::smocc2::{Genome, Labels};
 use crate::core::algorithms::smocc2::config::objectives::Cfg;
 use crate::core::algorithms::smocc2::gpu::Gpu;
 
