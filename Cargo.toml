@@ -30,6 +30,7 @@ rand_chacha = "0.10.0"                                          # ChaCha random 
 ndarray = "0.17.2"
 pyo3-stub-gen = "0.23"
 cudarc = { version = "0.19.9", default-features = false, features = ["driver", "nvrtc", "dynamic-loading", "cuda-12000"] }
+libloading = "0.9"
 
 [[bin]]
 name = "stub_gen"

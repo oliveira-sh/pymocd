@@ -78,8 +78,31 @@ pub(crate) struct Gpu {
     perm: i32,
 }
 
+fn lib_present(names: &[&str]) -> bool {
+    names
+        .iter()
+        .any(|n| unsafe { libloading::Library::new(*n).is_ok() })
+}
+
 impl Gpu {
     pub fn new(g: &CsrGraph, cap: usize) -> Result<Self, Err> {
+        if !lib_present(&["libcuda.so", "libcuda.so.1"]) {
+            return Err(
+                "CUDA unavailable: the NVIDIA driver (libcuda) was not found;                  an NVIDIA GPU is required to run GMOCS"
+                    .into(),
+            );
+        }
+        if !lib_present(&[
+            "libnvrtc.so",
+            "libnvrtc.so.13",
+            "libnvrtc.so.12",
+            "libnvrtc.so.11",
+        ]) {
+            return Err(
+                "kernel compiler unavailable: libnvrtc was not found; install                  the CUDA toolkit or `pip install nvidia-cuda-nvrtc-cu12`"
+                    .into(),
+            );
+        }
         let cap = cap.max(1);
         let ctx = std::panic::catch_unwind(|| CudaContext::new(0))
             .unwrap_or_else(|_| Err(cudarc::driver::DriverError(

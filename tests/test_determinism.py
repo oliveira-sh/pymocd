@@ -3,7 +3,10 @@ import unittest
 import networkx as nx
 import pymocd
 
-from tests._gpu import requires_gpu
+try:
+    from tests._gpu import requires_gpu
+except ImportError:
+    from _gpu import requires_gpu
 
 
 class TestDeterminism(unittest.TestCase):
