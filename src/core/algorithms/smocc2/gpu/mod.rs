@@ -34,6 +34,8 @@ pub(crate) struct Gpu {
     eval_scatter_nodes: CudaFunction,
     eval_scatter_edges: CudaFunction,
     eval_reduce: CudaFunction,
+    micro_move: CudaFunction,
+    weights_update: CudaFunction,
     xadj: CudaSlice<u32>,
     adj: CudaSlice<u32>,
     wadj: CudaSlice<f32>,
@@ -52,6 +54,12 @@ pub(crate) struct Gpu {
     o_k: CudaSlice<u32>,
     o_lin: CudaSlice<u32>,
     any: CudaSlice<i32>,
+    mic_x: CudaSlice<i32>,
+    mic_v: CudaSlice<f32>,
+    mic_pb: CudaSlice<i32>,
+    arch_buf: CudaSlice<i32>,
+    leader_buf: CudaSlice<i32>,
+    row_u: CudaSlice<u32>,
     staging: Vec<u8>,
     staging_i32: Vec<i32>,
     n: usize,
@@ -85,6 +93,8 @@ impl Gpu {
         let eval_scatter_nodes = f("eval_scatter_nodes")?;
         let eval_scatter_edges = f("eval_scatter_edges")?;
         let eval_reduce = f("eval_reduce")?;
+        let micro_move = f("micro_move")?;
+        let weights_update = f("weights_update")?;
         let stream = ctx.default_stream();
 
         let xadj = stream.clone_htod(&g.xadj).map_err(derr)?;
@@ -111,6 +121,18 @@ impl Gpu {
         let o_k = stream.alloc_zeros::<u32>(cap).map_err(derr)?;
         let o_lin = stream.alloc_zeros::<u32>(cap).map_err(derr)?;
         let any = stream.alloc_zeros::<i32>(1).map_err(derr)?;
+        let mic_x = stream.alloc_zeros::<i32>(total).map_err(derr)?;
+        let mic_v = stream.alloc_zeros::<f32>(total).map_err(derr)?;
+        let mic_pb = stream.alloc_zeros::<i32>(total).map_err(derr)?;
+        let arch_buf = stream.alloc_zeros::<i32>(total).map_err(derr)?;
+        let leader_buf = stream.alloc_zeros::<i32>(cap).map_err(derr)?;
+        let mut rows: Vec<u32> = vec![0u32; g.adj.len()];
+        for u in 0..g.n {
+            for j in g.xadj[u] as usize..g.xadj[u + 1] as usize {
+                rows[j] = u as u32;
+            }
+        }
+        let row_u = stream.clone_htod(&rows).map_err(derr)?;
 
         let mut perm = 2654435761u64 % (g.n.max(1) as u64);
         if perm == 0 {
@@ -128,6 +150,8 @@ impl Gpu {
             eval_scatter_nodes,
             eval_scatter_edges,
             eval_reduce,
+            micro_move,
+            weights_update,
             xadj,
             adj,
             wadj,
@@ -146,6 +170,12 @@ impl Gpu {
             o_k,
             o_lin,
             any,
+            mic_x,
+            mic_v,
+            mic_pb,
+            arch_buf,
+            leader_buf,
+            row_u,
             staging: vec![0u8; total],
             staging_i32: vec![0i32; total],
             n: g.n,
@@ -387,6 +417,146 @@ impl Gpu {
         }
         self.upload_labels(labels)?;
         self.eval(labels.len())
+    }
+
+    pub fn micro_init(&mut self, xs: &[&Labels]) -> Result<(), Err> {
+        let batch = xs.len();
+        let n = self.n;
+        for (p, l) in xs.iter().enumerate() {
+            self.staging_i32[p * n..(p + 1) * n].copy_from_slice(l);
+        }
+        self.stream
+            .memcpy_htod(&self.staging_i32[..batch * n], &mut self.mic_x)
+            .map_err(derr)?;
+        self.stream
+            .memcpy_htod(&self.staging_i32[..batch * n], &mut self.mic_pb)
+            .map_err(derr)?;
+        self.stream.memset_zeros(&mut self.mic_v).map_err(derr)
+    }
+
+    pub fn upload_arch(&mut self, labels: &[&Labels]) -> Result<(), Err> {
+        let batch = labels.len();
+        assert!(batch <= self.cap);
+        let n = self.n;
+        for (p, l) in labels.iter().enumerate() {
+            self.staging_i32[p * n..(p + 1) * n].copy_from_slice(l);
+        }
+        self.stream
+            .memcpy_htod(&self.staging_i32[..batch * n], &mut self.arch_buf)
+            .map_err(derr)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn micro_step(
+        &mut self,
+        batch: usize,
+        leaders: &[i32],
+        w: f64,
+        c1: f64,
+        c2: f64,
+        p_t: f64,
+        seed: u64,
+    ) -> Result<Vec<[f64; 4]>, Err> {
+        let n = self.n;
+        let total = batch * n;
+        self.stream
+            .memcpy_htod(leaders, &mut self.leader_buf)
+            .map_err(derr)?;
+        let cfg = LaunchConfig::for_num_elems(total as u32);
+        let t_i64 = total as i64;
+        let n_i32 = n as i32;
+        let wf = w as f32;
+        let c1f = c1 as f32;
+        let c2f = c2 as f32;
+        let ptf = p_t as f32;
+        unsafe {
+            self.stream
+                .launch_builder(&self.micro_move)
+                .arg(&self.xadj)
+                .arg(&self.adj)
+                .arg(&mut self.mic_x)
+                .arg(&mut self.mic_v)
+                .arg(&self.mic_pb)
+                .arg(&self.arch_buf)
+                .arg(&self.leader_buf)
+                .arg(&t_i64)
+                .arg(&n_i32)
+                .arg(&wf)
+                .arg(&c1f)
+                .arg(&c2f)
+                .arg(&ptf)
+                .arg(&seed)
+                .launch(cfg)
+                .map_err(derr)?;
+        }
+        std::mem::swap(&mut self.labels, &mut self.mic_x);
+        let objs = self.eval(batch);
+        std::mem::swap(&mut self.labels, &mut self.mic_x);
+        objs
+    }
+
+    pub fn micro_pbest_commit(&mut self, accepted: &[usize]) -> Result<(), Err> {
+        let n = self.n;
+        for &p in accepted {
+            let src = self.mic_x.try_slice(p * n..(p + 1) * n).ok_or("slice")?;
+            let mut dst = self
+                .mic_pb
+                .try_slice_mut(p * n..(p + 1) * n)
+                .ok_or("slice")?;
+            self.stream.memcpy_dtod(&src, &mut dst).map_err(derr)?;
+        }
+        Ok(())
+    }
+
+    pub fn micro_set_pbest_row(&mut self, p: usize, labels: &Labels) -> Result<(), Err> {
+        let n = self.n;
+        let mut dst = self
+            .mic_pb
+            .try_slice_mut(p * n..(p + 1) * n)
+            .ok_or("slice")?;
+        self.stream.memcpy_htod(labels, &mut dst).map_err(derr)
+    }
+
+    pub fn micro_download(&mut self, batch: usize) -> Result<Vec<Labels>, Err> {
+        let n = self.n;
+        let total = batch * n;
+        let mut host = vec![0i32; total];
+        let live = self.mic_x.try_slice(0..total).ok_or("slice")?;
+        self.stream
+            .memcpy_dtoh(&live, &mut host[..])
+            .map_err(derr)?;
+        Ok(host.chunks(n).map(|c| c.to_vec()).collect())
+    }
+
+    pub fn update_weights(&mut self, n_elites: usize, rho: f64) -> Result<Vec<f64>, Err> {
+        let two_m = 2 * self.m;
+        if two_m == 0 || n_elites == 0 {
+            return Err("empty weight update".into());
+        }
+        let cfg = LaunchConfig::for_num_elems(two_m as u32);
+        let t_i64 = two_m as i64;
+        let n_i32 = self.n as i32;
+        let ne = n_elites as i32;
+        let rf = rho as f32;
+        unsafe {
+            self.stream
+                .launch_builder(&self.weights_update)
+                .arg(&self.row_u)
+                .arg(&self.adj)
+                .arg(&self.arch_buf)
+                .arg(&ne)
+                .arg(&mut self.wadj)
+                .arg(&t_i64)
+                .arg(&n_i32)
+                .arg(&rf)
+                .launch(cfg)
+                .map_err(derr)?;
+        }
+        let mut w32 = vec![0f32; two_m];
+        self.stream
+            .memcpy_dtoh(&self.wadj, &mut w32)
+            .map_err(derr)?;
+        Ok(w32.into_iter().map(|w| w as f64).collect())
     }
 }
 

@@ -25,21 +25,25 @@ pub(crate) fn guidance(
     mic: &mut [MicParticle],
     pop: usize,
     cfg: &Cfg,
-    gpu: Option<&mut Gpu>,
+    mut gpu: Option<&mut Gpu>,
 ) -> Vec<MicElite> {
-    let inj: Vec<MicElite> = match gpu {
+    let mut gpu_rows: Option<&mut Gpu> = None;
+    let inj: Vec<MicElite> = match gpu.take() {
         Some(dev) => {
             let refs: Vec<&Genome> = mac_arch.iter().map(|a| &a.genome).collect();
             let (labs, objs) = dev
                 .decode_eval(g, &refs)
                 .expect("CUDA runtime failure in guidance decode");
-            labs.into_iter()
+            let out: Vec<MicElite> = labs
+                .into_iter()
                 .zip(objs)
                 .map(|(labels, o)| MicElite {
                     labels,
                     obj: cfg.pick_micro(&o),
                 })
-                .collect()
+                .collect();
+            gpu_rows = Some(dev);
+            out
         }
         None => mac_arch
             .par_iter()
@@ -68,6 +72,10 @@ pub(crate) fn guidance(
     for (j, &pi) in order.iter().take(inj.len()).enumerate() {
         mic[pi].pbest.clone_from(&inj[j].labels);
         mic[pi].pbest_obj.clone_from(&inj[j].obj);
+        if let Some(dev) = gpu_rows.as_deref_mut() {
+            dev.micro_set_pbest_row(pi, &inj[j].labels)
+                .expect("CUDA runtime failure in pbest reset");
+        }
     }
 
     update_micro_archive(mic_arch, inj, pop)
@@ -87,13 +95,22 @@ pub(crate) fn influence(
 ) -> Vec<MacElite> {
     let elites: Vec<&Labels> = mic_arch.iter().map(|a| &a.labels).collect();
     let rho = 0.5 * t as f64 / num_gens as f64;
-    update_weights(g, wadj, &elites, rho);
+    let mut gpu = gpu;
+    match gpu.as_deref_mut() {
+        Some(dev) => {
+            dev.upload_arch(&elites)
+                .expect("CUDA runtime failure in elite upload");
+            let w = dev
+                .update_weights(elites.len(), rho)
+                .expect("CUDA runtime failure in weight update");
+            wadj.copy_from_slice(&w);
+        }
+        None => update_weights(g, wadj, &elites, rho),
+    }
 
     let wadj_ro: &[f64] = wadj;
     let inj: Vec<MacElite> = match gpu {
         Some(dev) => {
-            dev.set_wadj(wadj_ro)
-                .expect("CUDA runtime failure in wadj upload");
             let genomes: Vec<Genome> = elites.par_iter().map(|e| encode(g, wadj_ro, e)).collect();
             let refs: Vec<&Genome> = genomes.iter().collect();
             let (labs, objs) = dev

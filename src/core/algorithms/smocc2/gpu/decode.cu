@@ -200,3 +200,123 @@ extern "C" __global__ void eval_reduce(
     atomicAdd(&kcount[p], 1u);
     atomicAdd(&lintot[p], lin_acc[idx]);
 }
+
+__device__ unsigned long long sm64(unsigned long long z)
+{
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+    return z ^ (z >> 31);
+}
+
+__device__ float rnd01(unsigned long long seed, long long idx, int ctr)
+{
+    unsigned long long h =
+        sm64(seed ^ sm64((unsigned long long)idx * 0x9e3779b97f4a7c15ULL + ctr));
+    return (float)(h >> 40) * (1.0f / 16777216.0f);
+}
+
+extern "C" __global__ void micro_move(
+    const unsigned* __restrict__ xadj,
+    const unsigned* __restrict__ adj,
+    int* __restrict__ X,
+    float* __restrict__ V,
+    const int* __restrict__ PB,
+    const int* __restrict__ arch,
+    const int* __restrict__ leader_idx,
+    long long total, int n,
+    float w, float c1, float c2, float p_t,
+    unsigned long long seed)
+{
+    long long tid = (long long)blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= total) return;
+    int u = (int)(tid % n);
+    long long base = tid - u;
+    long long p = tid / n;
+    const int* L = arch + (long long)leader_idx[p] * n;
+
+    int x = X[tid];
+    float d1 = (PB[tid] != x) ? 1.0f : 0.0f;
+    float d2 = (L[u] != x) ? 1.0f : 0.0f;
+    float r1 = rnd01(seed, tid, 0);
+    float r2 = rnd01(seed, tid, 1);
+    float v = w * V[tid] + c1 * r1 * d1 + c2 * r2 * d2;
+    v = fminf(fmaxf(v, 0.0f), 1.0f);
+    V[tid] = v;
+
+    unsigned s = xadj[u], e = xadj[u + 1];
+    int deg = (int)(e - s);
+
+    if (rnd01(seed, tid, 2) < v) {
+        int winner = L[u];
+        if (deg > 0 && deg <= CACHE) {
+            int labs[CACHE];
+            int cnt[CACHE];
+            int nd = 0;
+            int max_c = 0;
+            for (int j = 0; j < deg; j++) {
+                int l = L[adj[s + j]];
+                int hit = nd;
+                for (int q = 0; q < nd; q++)
+                    if (labs[q] == l) { hit = q; break; }
+                if (hit == nd) {
+                    labs[nd] = l;
+                    cnt[nd] = 1;
+                    nd++;
+                } else {
+                    cnt[hit]++;
+                }
+                if (cnt[hit] > max_c) max_c = cnt[hit];
+            }
+            int n_max = 0;
+            int best = winner;
+            for (int q = 0; q < nd; q++)
+                if (cnt[q] == max_c) { n_max++; best = labs[q]; }
+            if (n_max == 1) winner = best;
+        } else if (deg > 0) {
+            int n_max = 0;
+            int best = winner;
+            int max_c = 0;
+            for (unsigned j = s; j < e; j++) {
+                int l = L[adj[j]];
+                bool first = true;
+                for (unsigned q = s; q < j; q++)
+                    if (L[adj[q]] == l) { first = false; break; }
+                if (!first) continue;
+                int c = 1;
+                for (unsigned q = j + 1; q < e; q++)
+                    if (L[adj[q]] == l) c++;
+                if (c > max_c) { max_c = c; best = l; n_max = 1; }
+                else if (c == max_c) n_max++;
+            }
+            if (n_max == 1) winner = best;
+        }
+        x = winner;
+    }
+
+    if (deg > 0 && rnd01(seed, tid, 3) < p_t) {
+        int j = (int)(rnd01(seed, tid, 4) * (float)deg);
+        if (j >= deg) j = deg - 1;
+        x = X[base + adj[s + j]];
+    }
+    X[tid] = x;
+}
+
+extern "C" __global__ void weights_update(
+    const unsigned* __restrict__ row_u,
+    const unsigned* __restrict__ adj,
+    const int* __restrict__ elites,
+    int n_elites,
+    float* __restrict__ wadj,
+    long long two_m, int n, float rho)
+{
+    long long j = (long long)blockIdx.x * blockDim.x + threadIdx.x;
+    if (j >= two_m) return;
+    int u = (int)row_u[j];
+    int v = (int)adj[j];
+    int c = 0;
+    for (int e = 0; e < n_elites; e++) {
+        const int* E = elites + (long long)e * n;
+        c += (E[u] == E[v]) ? 1 : 0;
+    }
+    wadj[j] = (1.0f - rho) * wadj[j] + rho * ((float)c / (float)n_elites);
+}

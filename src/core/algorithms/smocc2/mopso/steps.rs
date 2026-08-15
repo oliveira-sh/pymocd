@@ -141,7 +141,6 @@ pub(crate) fn micro_step(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn micro_step_gpu(
-    g: &CsrGraph,
     gpu: &mut Gpu,
     parts: &mut [MicParticle],
     arch: &[MicElite],
@@ -153,18 +152,33 @@ pub(crate) fn micro_step_gpu(
     if arch.is_empty() {
         return;
     }
-    let d_turb = bernoulli(p_t);
-    parts
-        .par_iter_mut()
-        .for_each(|p| micro_move(g, p, arch, crowd, w, &d_turb));
-    let xs: Vec<&Labels> = parts.iter().map(|p| &p.x).collect();
+    let arch_labels: Vec<&Labels> = arch.iter().map(|a| &a.labels).collect();
+    gpu.upload_arch(&arch_labels)
+        .expect("CUDA runtime failure in archive upload");
+    let mut r = rand::rng();
+    let leaders: Vec<i32> = (0..parts.len())
+        .map(|_| leader_tournament(crowd, &mut r) as i32)
+        .collect();
+    let seed: u64 = r.random();
     let objs = gpu
-        .eval_labels(&xs)
-        .expect("CUDA runtime failure in micro eval");
-    parts
-        .par_iter_mut()
-        .zip(objs)
-        .for_each(|(p, o)| micro_finish(g, p, Some(cfg.pick_micro(&o)), cfg));
+        .micro_step(parts.len(), &leaders, w, C1, C2, p_t, seed)
+        .expect("CUDA runtime failure in micro step");
+    let mut accepted: Vec<usize> = Vec::new();
+    for (i, (p, o)) in parts.iter_mut().zip(&objs).enumerate() {
+        p.obj = cfg.pick_micro(o);
+        if pbest_wants_new(&p.obj, &p.pbest_obj, &mut r) {
+            p.pbest_obj.clone_from(&p.obj);
+            accepted.push(i);
+        }
+    }
+    gpu.micro_pbest_commit(&accepted)
+        .expect("CUDA runtime failure in pbest commit");
+    let xs = gpu
+        .micro_download(parts.len())
+        .expect("CUDA runtime failure in micro download");
+    for (p, x) in parts.iter_mut().zip(xs) {
+        p.x = x;
+    }
 }
 
 fn macro_move(n: usize, p: &mut MacParticle, arch: &[MacElite], crowd: &[f64], w: f64, p_t: f64) {

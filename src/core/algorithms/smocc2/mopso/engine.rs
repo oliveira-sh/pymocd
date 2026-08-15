@@ -50,6 +50,10 @@ pub(crate) fn run_fronts(
     };
 
     let mut mic = init_micro_swarm(g, pop, &cfg);
+    if let Some(d) = dev.as_mut() {
+        let xs: Vec<&Labels> = mic.iter().map(|p| &p.x).collect();
+        d.micro_init(&xs).expect("CUDA runtime failure in micro init");
+    }
     let mut mac = init_macro_swarm(g, &wadj, pop, &cfg, macro_cap, dev.as_mut());
 
     let mut mic_arch = update_micro_archive(
@@ -81,7 +85,7 @@ pub(crate) fn run_fronts(
         let mic_objs: Vec<Obj> = mic_arch.iter().map(|a| a.obj.clone()).collect();
         let crowd = arch_crowd(&mic_objs);
         match dev.as_mut() {
-            Some(d) => steps::micro_step_gpu(g, d, &mut mic, &mic_arch, &crowd, &cfg, w, p_t),
+            Some(d) => steps::micro_step_gpu(d, &mut mic, &mic_arch, &crowd, &cfg, w, p_t),
             None => steps::micro_step(g, &mut mic, &mic_arch, &crowd, &cfg, w, p_t),
         }
         mic_arch = update_micro_archive(
