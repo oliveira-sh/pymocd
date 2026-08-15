@@ -9,7 +9,7 @@ use rayon::prelude::*;
 
 use crate::core::graph::CsrGraph;
 
-use crate::core::algorithms::smocc2::nsga2::dominates;
+use crate::core::algorithms::smocc2::mopso::pareto::dominates;
 use crate::core::algorithms::smocc2::sim::decode;
 use crate::core::algorithms::smocc2::{Genome, Labels};
 use crate::core::algorithms::smocc2::config::defaults::{C1, C2};

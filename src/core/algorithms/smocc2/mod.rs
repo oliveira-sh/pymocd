@@ -6,12 +6,11 @@
 mod api;
 mod config;
 mod gpu;
-mod nsga2;
+mod mopso;
 mod objectives;
 mod refine;
 mod select;
 mod sim;
-mod spo;
 
 #[cfg(test)]
 mod tests;

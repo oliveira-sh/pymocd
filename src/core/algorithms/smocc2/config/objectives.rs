@@ -4,7 +4,7 @@
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use crate::core::algorithms::smocc2::Labels;
-use crate::core::algorithms::smocc2::nsga2::Obj;
+use crate::core::algorithms::smocc2::mopso::pareto::Obj;
 use crate::core::algorithms::smocc2::objectives::{ObjSet, evaluate, split_mode};
 use crate::core::graph::CsrGraph;
 

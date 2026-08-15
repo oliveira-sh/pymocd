@@ -7,7 +7,7 @@ use super::select::{select_best, to_output};
 use crate::core::graph::CsrGraph;
 
 use super::config::defaults::DEFAULT_OBJ_MODE;
-use super::spo::engine::run_fronts;
+use super::mopso::engine::run_fronts;
 
 #[allow(clippy::too_many_arguments)]
 pub fn smocc2(

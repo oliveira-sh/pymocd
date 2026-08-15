@@ -6,7 +6,7 @@
 use crate::core::graph::CsrGraph;
 
 use crate::core::algorithms::smocc2::Labels;
-use crate::core::algorithms::smocc2::nsga2::{Obj, fast_nondominated_sort};
+use crate::core::algorithms::smocc2::mopso::pareto::{Obj, fast_nondominated_sort};
 use crate::core::algorithms::smocc2::refine::refine_front;
 use crate::core::algorithms::smocc2::sim::init_weights;
 use crate::core::algorithms::smocc2::config::defaults::DEFAULT_TURB;

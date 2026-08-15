@@ -3,6 +3,7 @@
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
+pub(crate) mod pareto;
 pub(crate) mod archive;
 pub(crate) mod coevo;
 pub(crate) mod engine;

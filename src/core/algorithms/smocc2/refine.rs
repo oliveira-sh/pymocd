@@ -7,7 +7,7 @@ use rustc_hash::FxHashMap;
 use std::collections::HashSet;
 
 use crate::core::algorithms::smocc2::Labels;
-use crate::core::algorithms::smocc2::nsga2::fast_nondominated_sort;
+use crate::core::algorithms::smocc2::mopso::pareto::fast_nondominated_sort;
 use crate::core::algorithms::smocc2::objectives::{ObjSet, evaluate};
 use crate::core::graph::CsrGraph;
 

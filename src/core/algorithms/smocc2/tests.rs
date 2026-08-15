@@ -5,8 +5,8 @@
 
 use rustc_hash::FxHashMap;
 
-use super::spo::init::macro_cmax;
-use crate::core::algorithms::smocc2::nsga2::{Obj, dominates};
+use super::mopso::init::macro_cmax;
+use crate::core::algorithms::smocc2::mopso::pareto::{Obj, dominates};
 use crate::core::algorithms::smocc2::sim::init_weights;
 use crate::core::graph::CsrGraph;
 
@@ -14,10 +14,10 @@ use super::api::{smocc2, smocc2_fronts};
 use super::config::defaults::*;
 use super::config::objectives::Cfg;
 use super::config::schedule::inertia;
-use super::spo::archive::{arch_crowd, update_macro_archive, update_micro_archive};
-use super::spo::init::init_macro_swarm;
-use super::spo::particles::{MacElite, MicElite};
-use super::spo::steps::macro_step;
+use super::mopso::archive::{arch_crowd, update_macro_archive, update_micro_archive};
+use super::mopso::init::init_macro_swarm;
+use super::mopso::particles::{MacElite, MicElite};
+use super::mopso::steps::macro_step;
 
 fn two_clique_edges() -> Vec<(i32, i32)> {
     let mut e = Vec::new();
