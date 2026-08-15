@@ -17,7 +17,7 @@ use super::super::smocc2::{Genome, Labels};
 
 const PTX: &str = include_str!("decode.ptx");
 const MAX_DEG: u32 = 1024;
-const SWEEPS: usize = 16;
+const SWEEPS: usize = 64;
 const UNSET: i32 = -1;
 
 pub(crate) struct Gpu {
@@ -29,6 +29,7 @@ pub(crate) struct Gpu {
     wadj: CudaSlice<f32>,
     genomes: CudaSlice<u8>,
     labels: CudaSlice<i32>,
+    dirty: CudaSlice<u8>,
     staging: Vec<u8>,
     n: usize,
     cap: usize,
@@ -62,6 +63,7 @@ impl Gpu {
         let total = cap * g.n;
         let genomes = stream.alloc_zeros::<u8>(total).map_err(err)?;
         let labels = stream.alloc_zeros::<i32>(total).map_err(err)?;
+        let dirty = stream.alloc_zeros::<u8>(total).map_err(err)?;
         Ok(Gpu {
             stream,
             lp_init,
@@ -71,6 +73,7 @@ impl Gpu {
             wadj,
             genomes,
             labels,
+            dirty,
             staging: vec![0u8; total],
             n: g.n,
             cap,
@@ -127,6 +130,7 @@ impl Gpu {
                 .launch_builder(&self.lp_init)
                 .arg(&self.genomes)
                 .arg(&mut self.labels)
+                .arg(&mut self.dirty)
                 .arg(&t_i64)
                 .arg(&n_i32)
                 .launch(cfg)
@@ -142,6 +146,7 @@ impl Gpu {
                     .arg(&self.wadj)
                     .arg(&self.genomes)
                     .arg(&mut self.labels)
+                    .arg(&mut self.dirty)
                     .arg(&t_i64)
                     .arg(&n_i32)
                     .launch(cfg)
