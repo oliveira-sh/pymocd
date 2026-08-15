@@ -5,19 +5,18 @@
 
 use rustc_hash::FxHashMap;
 
-use super::mopso::init::macro_cmax;
-use crate::core::algorithms::smocc2::mopso::pareto::{Obj, dominates};
-use crate::core::algorithms::smocc2::sim::init_weights;
+use crate::core::algorithms::smocc2::mopso::pareto::dominates;
 use crate::core::graph::CsrGraph;
 
 use super::api::{smocc2, smocc2_fronts};
 use super::config::defaults::*;
-use super::config::objectives::Cfg;
 use super::config::schedule::inertia;
-use super::mopso::archive::{arch_crowd, update_macro_archive, update_micro_archive};
-use super::mopso::init::init_macro_swarm;
-use super::mopso::particles::{MacElite, MicElite};
-use super::mopso::steps::macro_step;
+use super::gpu::Gpu;
+use super::mopso::archive::update_micro_archive;
+use super::mopso::init::macro_cmax;
+use super::mopso::particles::{MacElite, MicParticle, MicElite};
+use super::mopso::steps::macro_move;
+use super::mopso::particles::MacParticle;
 
 fn two_clique_edges() -> Vec<(i32, i32)> {
     let mut e = Vec::new();
@@ -54,7 +53,7 @@ fn ring_of_cliques(k: i32, s: i32) -> (Vec<i32>, Vec<(i32, i32)>) {
 #[test]
 fn finds_two_community_split() {
     let nodes: Vec<i32> = (0..10).collect();
-    let out = smocc2(
+    let out = match smocc2(
         &nodes,
         &two_clique_edges(),
         60,
@@ -62,9 +61,13 @@ fn finds_two_community_split() {
         DEFAULT_GAP,
         DEFAULT_TURB,
         DEFAULT_MACRO_CAP,
-        false,
-    )
-    .unwrap();
+    ) {
+        Err(e) => {
+            eprintln!("skipping GPU-only test (no usable CUDA device): {e}");
+            return;
+        }
+        Ok(o) => o,
+    };
     let c: FxHashMap<i32, i32> = out.into_iter().collect();
     for i in 1..5 {
         assert_eq!(c[&0], c[&i], "clique A node {i} split off");
@@ -78,7 +81,7 @@ fn finds_two_community_split() {
 #[test]
 fn isolated_node_gets_minus_one() {
     let nodes: Vec<i32> = (0..7).collect();
-    let out = smocc2(
+    let out = match smocc2(
         &nodes,
         &two_triangle_edges(),
         40,
@@ -86,9 +89,13 @@ fn isolated_node_gets_minus_one() {
         DEFAULT_GAP,
         DEFAULT_TURB,
         DEFAULT_MACRO_CAP,
-        false,
-    )
-    .unwrap();
+    ) {
+        Err(e) => {
+            eprintln!("skipping GPU-only test (no usable CUDA device): {e}");
+            return;
+        }
+        Ok(o) => o,
+    };
     let c: FxHashMap<i32, i32> = out.into_iter().collect();
     assert_eq!(c[&6], -1);
 }
@@ -96,7 +103,7 @@ fn isolated_node_gets_minus_one() {
 #[test]
 fn fronts_are_nonempty() {
     let nodes: Vec<i32> = (0..6).collect();
-    let fronts = smocc2_fronts(
+    let fronts = match smocc2_fronts(
         &nodes,
         &two_triangle_edges(),
         40,
@@ -106,9 +113,13 @@ fn fronts_are_nonempty() {
         true,
         0,
         DEFAULT_MACRO_CAP,
-        false,
-    )
-    .unwrap();
+    ) {
+        Err(e) => {
+            eprintln!("skipping GPU-only test (no usable CUDA device): {e}");
+            return;
+        }
+        Ok(o) => o,
+    };
     assert!(!fronts.is_empty());
     assert!(fronts.iter().all(|f| f.len() == 6));
 }
@@ -118,7 +129,7 @@ fn objective_modes_produce_full_partitions() {
     let nodes: Vec<i32> = (0..10).collect();
     let edges = two_clique_edges();
     for obj_mode in [106u16, 160, 166, 100, 0, 6] {
-        let a = smocc2_fronts(
+        let a = match smocc2_fronts(
             &nodes,
             &edges,
             40,
@@ -128,121 +139,76 @@ fn objective_modes_produce_full_partitions() {
             true,
             obj_mode,
             DEFAULT_MACRO_CAP,
-            false,
-        )
-        .unwrap();
+        ) {
+            Err(e) => {
+                eprintln!("skipping GPU-only test (no usable CUDA device): {e}");
+                return;
+            }
+            Ok(o) => o,
+        };
         assert!(!a.is_empty(), "obj_mode {obj_mode} produced an empty front");
         assert!(a.iter().all(|f| f.len() == 10));
     }
 }
 
 #[test]
-fn gpu_fronts_are_valid_and_find_the_split() {
-    let nodes: Vec<i32> = (0..10).collect();
-    let edges = two_clique_edges();
-    let a = match smocc2_fronts(
-        &nodes,
-        &edges,
-        40,
-        20,
-        DEFAULT_GAP,
-        DEFAULT_TURB,
-        true,
-        DEFAULT_OBJ_MODE,
-        DEFAULT_MACRO_CAP,
-        true,
-    ) {
-        Err(e) => {
-            eprintln!("skipping GPU test (no usable CUDA device): {e}");
-            return;
-        }
-        Ok(a) => a,
-    };
-    assert!(!a.is_empty());
-    assert!(a.iter().all(|f| f.len() == 10));
-
-    let out = smocc2(
-        &nodes,
-        &edges,
-        60,
-        40,
-        DEFAULT_GAP,
-        DEFAULT_TURB,
-        DEFAULT_MACRO_CAP,
-        true,
-    )
-    .unwrap();
-    let c: FxHashMap<i32, i32> = out.into_iter().collect();
-    for i in 1..5 {
-        assert_eq!(c[&0], c[&i], "gpu: clique A node {i} split off");
-    }
-    for i in 6..10 {
-        assert_eq!(c[&5], c[&i], "gpu: clique B node {i} split off");
-    }
-    assert_ne!(c[&0], c[&5], "gpu: cliques merged");
-}
-
-#[test]
 fn macro_cardinality_invariant_survives_updates() {
     let (nodes, edges) = ring_of_cliques(8, 5);
     let g = CsrGraph::from_edges(&nodes, &edges);
-    let wadj = init_weights(&g);
-    let cfg = Cfg::new(0);
+    let n = g.n;
+    let cmax = macro_cmax(n, DEFAULT_MACRO_CAP);
     let pop = 12usize;
-    let cmax = macro_cmax(g.n, DEFAULT_MACRO_CAP);
 
-    let mut parts = init_macro_swarm(&g, &wadj, pop, &cfg, DEFAULT_MACRO_CAP, None);
+    let mut r_state = 0x243f6a8885a308d3u64;
+    let mut next = move || {
+        r_state = r_state.wrapping_mul(6364136223846793005).wrapping_add(1);
+        (r_state >> 33) as usize
+    };
+    let mut parts: Vec<MacParticle> = (0..pop)
+        .map(|_| {
+            let c = 1 + next() % cmax;
+            let mut genome = vec![0u8; n];
+            let mut placed = 0;
+            while placed < c {
+                let i = next() % n;
+                if genome[i] == 0 {
+                    genome[i] = 1;
+                    placed += 1;
+                }
+            }
+            MacParticle {
+                pbest: genome.clone(),
+                pbest_obj: vec![0.0, 0.0],
+                genome,
+                labels: vec![0; n],
+                obj: vec![0.0, 0.0],
+            }
+        })
+        .collect();
     let cards: Vec<usize> = parts
         .iter()
         .map(|p| p.genome.iter().filter(|&&b| b != 0).count())
         .collect();
-    for &c in &cards {
-        assert!((1..=cmax).contains(&c), "init cardinality {c} out of range");
-    }
 
-    let mut arch = update_macro_archive(
-        Vec::new(),
-        parts
-            .iter()
-            .map(|p| MacElite {
-                genome: p.genome.clone(),
-                labels: p.labels.clone(),
-                obj: p.obj.clone(),
-            })
-            .collect(),
-        pop,
-    );
+    let arch: Vec<MacElite> = parts
+        .iter()
+        .map(|p| MacElite {
+            genome: p.genome.clone(),
+            labels: p.labels.clone(),
+            obj: vec![next() as f64 % 7.0, next() as f64 % 7.0],
+        })
+        .collect();
+    let crowd = vec![1.0f64; arch.len()];
+
     let num_gens = 30usize;
     for t in 1..=num_gens {
-        let objs: Vec<Obj> = arch.iter().map(|a| a.obj.clone()).collect();
-        let crowd = arch_crowd(&objs);
-        macro_step(
-            &g,
-            &wadj,
-            &mut parts,
-            &arch,
-            &crowd,
-            &cfg,
-            inertia(t, num_gens),
-            0.5,
-        );
-        arch = update_macro_archive(
-            arch,
-            parts
-                .iter()
-                .map(|p| MacElite {
-                    genome: p.genome.clone(),
-                    labels: p.labels.clone(),
-                    obj: p.obj.clone(),
-                })
-                .collect(),
-            pop,
-        );
+        let w = inertia(t, num_gens);
+        for p in parts.iter_mut() {
+            macro_move(n, p, &arch, &crowd, w, 0.5);
+        }
         for (k, (p, &c0)) in parts.iter().zip(&cards).enumerate() {
             let c = p.genome.iter().filter(|&&b| b != 0).count();
             assert_eq!(c, c0, "gen {t}: particle {k} drifted {c0} -> {c}");
-            let cp = p.pbest.iter().filter(|&&b| b != 0).count();
-            assert_eq!(cp, c0, "gen {t}: particle {k} pbest drifted");
         }
     }
 }

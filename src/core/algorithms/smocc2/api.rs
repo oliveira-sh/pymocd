@@ -8,7 +8,7 @@ use crate::core::graph::CsrGraph;
 use super::config::defaults::DEFAULT_OBJ_MODE;
 use super::gpu::Gpu;
 use super::mopso::engine::run_fronts;
-use super::select::{select_best, select_best_gpu, to_output};
+use super::select::{select_best, to_output};
 
 #[allow(clippy::too_many_arguments)]
 pub fn smocc2(
@@ -19,13 +19,12 @@ pub fn smocc2(
     gap: usize,
     turb: f64,
     macro_cap: f64,
-    gpu: bool,
 ) -> Result<Vec<(i32, i32)>, String> {
     let g = CsrGraph::from_edges(nodes, edges);
     if g.n == 0 {
         return Ok(Vec::new());
     }
-    let mut dev = if gpu { Some(Gpu::new(&g, pop)?) } else { None };
+    let mut dev = Gpu::new(&g, pop)?;
     let front = run_fronts(
         &g,
         pop,
@@ -35,12 +34,9 @@ pub fn smocc2(
         true,
         DEFAULT_OBJ_MODE,
         macro_cap,
-        dev.as_mut(),
+        &mut dev,
     )?;
-    let best = match dev.as_mut() {
-        Some(d) => select_best_gpu(&g, front, d, pop),
-        None => select_best(&g, front),
-    };
+    let best = select_best(&g, front, &mut dev, pop);
     Ok(to_output(&g, &best))
 }
 
@@ -55,13 +51,12 @@ pub fn smocc2_fronts(
     refine: bool,
     obj_mode: u16,
     macro_cap: f64,
-    gpu: bool,
 ) -> Result<Vec<Vec<(i32, i32)>>, String> {
     let g = CsrGraph::from_edges(nodes, edges);
     if g.n == 0 {
         return Ok(Vec::new());
     }
-    let mut dev = if gpu { Some(Gpu::new(&g, pop)?) } else { None };
+    let mut dev = Gpu::new(&g, pop)?;
     Ok(run_fronts(
         &g,
         pop,
@@ -71,7 +66,7 @@ pub fn smocc2_fronts(
         refine,
         obj_mode,
         macro_cap,
-        dev.as_mut(),
+        &mut dev,
     )?
     .iter()
     .map(|l| to_output(&g, l))

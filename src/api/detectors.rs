@@ -425,13 +425,13 @@ pub fn mmcomo_fronts_fn(
 ///     macro_cap: multiplier on the macro swarm's centre ceiling
 ///         ``ceil(macro_cap * sqrt(n))`` (still hard-capped at ``n``),
 ///         exactly as in `smocc`.
-///     gpu: run the macro decodes (the per-generation hot path) batched on a
-///         CUDA device with asynchronous in-place label propagation. Raises
-///         RuntimeError when no usable CUDA device is present or the graph
-///         has a node degree above the kernel's limit (1024).
+/// Requires an NVIDIA GPU: the swarms, decodes and objective evaluations run
+/// as CUDA kernels (any Pascal-or-newer device). Raises RuntimeError when no
+/// usable CUDA device is present or the graph has a node degree above the
+/// kernel's limit (1024).
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(name = "smocc2", signature = (graph, pop_size = smocc2::DEFAULT_POP_SIZE, num_gens = smocc2::DEFAULT_NUM_GENS, gap = smocc2::DEFAULT_GAP, turb = smocc2::DEFAULT_TURB, macro_cap = smocc2::DEFAULT_MACRO_CAP, gpu = false))]
+#[pyo3(name = "smocc2", signature = (graph, pop_size = smocc2::DEFAULT_POP_SIZE, num_gens = smocc2::DEFAULT_NUM_GENS, gap = smocc2::DEFAULT_GAP, turb = smocc2::DEFAULT_TURB, macro_cap = smocc2::DEFAULT_MACRO_CAP))]
 #[allow(clippy::too_many_arguments)]
 pub fn smocc2_fn(
     graph: &Bound<'_, PyAny>,
@@ -440,12 +440,11 @@ pub fn smocc2_fn(
     gap: usize,
     turb: f64,
     macro_cap: f64,
-    gpu: bool,
 ) -> PyResult<Py<PyAny>> {
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
-    let part = smocc2::smocc2(&nodes, &edges, pop_size, num_gens, gap, turb, macro_cap, gpu)
+    let part = smocc2::smocc2(&nodes, &edges, pop_size, num_gens, gap, turb, macro_cap)
         .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
     let d = PyDict::new(py);
     for (node, comm) in part {
@@ -467,10 +466,9 @@ pub fn smocc2_fn(
 ///         ``(intra, inter)`` / macro ``(KKM, RC)``.
 ///     macro_cap: multiplier on the macro swarm's centre ceiling
 ///         ``ceil(macro_cap * sqrt(n))`` (still hard-capped at ``n``).
-///     gpu: batched CUDA macro decodes; see `smocc2`.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(name = "smocc2_fronts", signature = (graph, pop_size = smocc2::DEFAULT_POP_SIZE, num_gens = smocc2::DEFAULT_NUM_GENS, gap = smocc2::DEFAULT_GAP, turb = smocc2::DEFAULT_TURB, refine = true, obj_mode = smocc2::DEFAULT_OBJ_MODE, macro_cap = smocc2::DEFAULT_MACRO_CAP, gpu = false))]
+#[pyo3(name = "smocc2_fronts", signature = (graph, pop_size = smocc2::DEFAULT_POP_SIZE, num_gens = smocc2::DEFAULT_NUM_GENS, gap = smocc2::DEFAULT_GAP, turb = smocc2::DEFAULT_TURB, refine = true, obj_mode = smocc2::DEFAULT_OBJ_MODE, macro_cap = smocc2::DEFAULT_MACRO_CAP))]
 #[allow(clippy::too_many_arguments)]
 pub fn smocc2_fronts_fn(
     graph: &Bound<'_, PyAny>,
@@ -481,13 +479,12 @@ pub fn smocc2_fronts_fn(
     refine: bool,
     obj_mode: u16,
     macro_cap: f64,
-    gpu: bool,
 ) -> PyResult<Py<PyAny>> {
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
     let fronts = smocc2::smocc2_fronts(
-        &nodes, &edges, pop_size, num_gens, gap, turb, refine, obj_mode, macro_cap, gpu,
+        &nodes, &edges, pop_size, num_gens, gap, turb, refine, obj_mode, macro_cap,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)?;
     let out = PyList::empty(py);

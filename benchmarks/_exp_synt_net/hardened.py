@@ -19,7 +19,7 @@ ALL_THREADS = int(os.environ.get("HARD_ALL_THREADS", "2" if SMOKE else "48"))
 # Rayon-parallel detectors: run one at a time with the whole machine, BEFORE
 # the single-threaded algorithms (which fan out one worker per core). Tuple
 # order = run order.
-PARALLEL_ALGS = ("SMOCC-II", "SMOCC-II-GPU", "HP-MOCD")
+PARALLEL_ALGS = ("SMOCC-II", "HP-MOCD")
 
 LFR_DIR = os.path.join(BENCH, "data", "lfr")
 OUT = os.path.join(BENCH, "results", "hardened")
@@ -40,10 +40,8 @@ else:
     NODES_SWEEP_MU = [0.3, 0.5]
 
 ALGORITHMS = {
-    "SMOCC-II":    dict(deterministic=False, max_nodes=None,      needs="shim"),
-    # CUDA macro decode; hub SNAP nets exceed the kernel's degree cap
-    "SMOCC-II-GPU": dict(deterministic=False, max_nodes=None,     needs="shim",
-                         real_max_nodes=400_000),
+    "SMOCC-II":    dict(deterministic=False, max_nodes=None,      needs="shim",
+                        real_max_nodes=400_000),
     "HP-MOCD":     dict(deterministic=False, max_nodes=None,      needs="shim"),
     "MMCoMO":      dict(deterministic=False, max_nodes=None,      needs="shim",
                         real_max_nodes=2_000),

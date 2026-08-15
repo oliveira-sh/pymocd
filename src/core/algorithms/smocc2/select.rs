@@ -3,29 +3,12 @@
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use rayon::prelude::*;
 use rustc_hash::FxHashMap;
 
 use crate::core::algorithms::smocc2::Labels;
-use crate::core::algorithms::smocc2::objectives;
 use crate::core::graph::CsrGraph;
 
-pub(crate) fn select_best(g: &CsrGraph, front: Vec<Labels>) -> Labels {
-    if front.is_empty() {
-        return vec![0; g.n];
-    }
-    let obj: Vec<[f64; 4]> = front
-        .par_iter()
-        .map(|p| {
-            let (kkm, rc) = objectives::kkm_rc(g, p);
-            let (intra, inter) = objectives::intra_inter(g, p);
-            [kkm, rc, intra, inter]
-        })
-        .collect();
-    pick_best(front, obj)
-}
-
-pub(crate) fn select_best_gpu(
+pub(crate) fn select_best(
     g: &CsrGraph,
     front: Vec<Labels>,
     dev: &mut crate::core::algorithms::smocc2::gpu::Gpu,
@@ -120,6 +103,18 @@ mod tests {
         e
     }
 
+    fn objs(g: &CsrGraph, front: &[Labels]) -> Vec<[f64; 4]> {
+        front
+            .iter()
+            .map(|p| {
+                let (kkm, rc) = crate::core::algorithms::smocc2::objectives::kkm_rc(g, p);
+                let (intra, inter) =
+                    crate::core::algorithms::smocc2::objectives::intra_inter(g, p);
+                [kkm, rc, intra, inter]
+            })
+            .collect()
+    }
+
     #[test]
     fn selector_normalises_and_breaks_ties_by_lowest_index() {
         let nodes: Vec<i32> = (0..10).collect();
@@ -128,14 +123,20 @@ mod tests {
         let split: Labels = (0..g.n).map(|i| if i < 5 { 0 } else { 1 }).collect();
         let one: Labels = vec![0; g.n];
         let sing: Labels = (0..g.n as i32).collect();
+
+        let f = vec![split.clone(), split.clone()];
+        let o = objs(&g, &f);
         assert_eq!(
-            select_best(&g, vec![split.clone(), split.clone()]),
+            pick_best(f, o),
             split,
             "a constant column must contribute 0, not NaN"
         );
-        assert_eq!(select_best(&g, vec![one.clone()]), one);
+        let f = vec![one.clone()];
+        let o = objs(&g, &f);
+        assert_eq!(pick_best(f, o), one);
 
-        let picked = select_best(&g, vec![one.clone(), sing.clone(), split.clone()]);
-        assert_eq!(picked, split, "normalised scalarisation missed the split");
+        let f = vec![one.clone(), sing.clone(), split.clone()];
+        let o = objs(&g, &f);
+        assert_eq!(pick_best(f, o), split, "normalised scalarisation missed the split");
     }
 }

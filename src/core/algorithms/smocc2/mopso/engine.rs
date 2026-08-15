@@ -14,8 +14,6 @@ use crate::core::algorithms::smocc2::config::objectives::Cfg;
 use crate::core::algorithms::smocc2::config::schedule::{inertia, turbulence};
 use crate::core::algorithms::smocc2::gpu::Gpu;
 
-use rayon::prelude::*;
-
 use super::archive::{arch_crowd, update_macro_archive, update_micro_archive};
 use super::coevo::{guidance, influence};
 use super::init::{init_macro_swarm, init_micro_swarm};
@@ -32,7 +30,7 @@ pub(crate) fn run_fronts(
     do_refine: bool,
     obj_mode: u16,
     macro_cap: f64,
-    mut dev: Option<&mut Gpu>,
+    dev: &mut Gpu,
 ) -> Result<Vec<Labels>, String> {
     if g.n == 0 {
         return Ok(vec![Vec::new()]);
@@ -47,11 +45,12 @@ pub(crate) fn run_fronts(
     let mut wadj = init_weights(g);
 
     let mut mic = init_micro_swarm(g, pop, &cfg);
-    if let Some(d) = dev.as_deref_mut() {
+    {
         let xs: Vec<&Labels> = mic.iter().map(|p| &p.x).collect();
-        d.micro_init(&xs).expect("CUDA runtime failure in micro init");
+        dev.micro_init(&xs)
+            .expect("CUDA runtime failure in micro init");
     }
-    let mut mac = init_macro_swarm(g, &wadj, pop, &cfg, macro_cap, dev.as_deref_mut());
+    let mut mac = init_macro_swarm(g, pop, &cfg, macro_cap, dev);
 
     let mut mic_arch = update_micro_archive(
         Vec::new(),
@@ -81,10 +80,7 @@ pub(crate) fn run_fronts(
 
         let mic_objs: Vec<Obj> = mic_arch.iter().map(|a| a.obj.clone()).collect();
         let crowd = arch_crowd(&mic_objs);
-        match dev.as_deref_mut() {
-            Some(d) => steps::micro_step_gpu(d, &mut mic, &mic_arch, &crowd, &cfg, w, p_t),
-            None => steps::micro_step(g, &mut mic, &mic_arch, &crowd, &cfg, w, p_t),
-        }
+        steps::micro_step(dev, &mut mic, &mic_arch, &crowd, &cfg, w, p_t);
         mic_arch = update_micro_archive(
             mic_arch,
             mic.iter()
@@ -98,10 +94,7 @@ pub(crate) fn run_fronts(
 
         let mac_objs: Vec<Obj> = mac_arch.iter().map(|a| a.obj.clone()).collect();
         let crowd = arch_crowd(&mac_objs);
-        match dev.as_deref_mut() {
-            Some(d) => steps::macro_step_gpu(g, d, &mut mac, &mac_arch, &crowd, &cfg, w, p_t),
-            None => steps::macro_step(g, &wadj, &mut mac, &mac_arch, &crowd, &cfg, w, p_t),
-        }
+        steps::macro_step(g, dev, &mut mac, &mac_arch, &crowd, &cfg, w, p_t);
         mac_arch = update_macro_archive(
             mac_arch,
             mac.iter()
@@ -117,13 +110,12 @@ pub(crate) fn run_fronts(
         if t % gap == 0 {
             mic_arch = guidance(
                 g,
-                &wadj,
                 &mac_arch,
                 mic_arch,
                 &mut mic,
                 pop,
                 &cfg,
-                dev.as_deref_mut(),
+                dev,
             );
             mac_arch = influence(
                 g,
@@ -134,7 +126,7 @@ pub(crate) fn run_fronts(
                 num_gens,
                 pop,
                 &cfg,
-                dev.as_deref_mut(),
+                dev,
             );
         }
     }
@@ -160,24 +152,17 @@ pub(crate) fn run_fronts(
     let mut mac_all_objs: Vec<Obj> = mac_objs_own;
     mac_all_objs.extend(arch_objs_own);
     if het {
-        match dev.as_deref_mut() {
-            Some(d) => {
-                let mut het_objs: Vec<Obj> = Vec::with_capacity(mac_all.len());
-                for chunk in mac_all.chunks(pop.max(1)) {
-                    let refs: Vec<&Labels> = chunk.iter().collect();
-                    het_objs.extend(
-                        d.eval_labels(&refs)
-                            .expect("CUDA runtime failure in final eval")
-                            .into_iter()
-                            .map(|o| cfg.pick_micro(&o)),
-                    );
-                }
-                mac_all_objs = het_objs;
-            }
-            None => {
-                mac_all_objs = mac_all.par_iter().map(|l| cfg.eval_micro(g, l)).collect();
-            }
+        let mut het_objs: Vec<Obj> = Vec::with_capacity(mac_all.len());
+        for chunk in mac_all.chunks(pop.max(1)) {
+            let refs: Vec<&Labels> = chunk.iter().collect();
+            het_objs.extend(
+                dev.eval_labels(&refs)
+                    .expect("CUDA runtime failure in final eval")
+                    .into_iter()
+                    .map(|o| cfg.pick_micro(&o)),
+            );
         }
+        mac_all_objs = het_objs;
     }
     labels.extend(mac_all);
     objs.extend(mac_all_objs);

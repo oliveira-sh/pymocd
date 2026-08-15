@@ -7,7 +7,7 @@
 //
 
 .version 7.5
-.target sm_75
+.target sm_60
 .address_size 64
 
 	// .globl	lp_init

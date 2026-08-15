@@ -10,7 +10,6 @@ use std::collections::HashSet;
 
 use crate::core::graph::CsrGraph;
 
-use crate::core::algorithms::smocc2::sim::decode;
 use crate::core::algorithms::smocc2::config::defaults::DEFAULT_MACRO_CAP;
 use crate::core::algorithms::smocc2::{Genome, Labels};
 use crate::core::algorithms::smocc2::config::objectives::Cfg;
@@ -59,11 +58,10 @@ pub(crate) fn init_micro_swarm(g: &CsrGraph, pop: usize, cfg: &Cfg) -> Vec<MicPa
 
 pub(crate) fn init_macro_swarm(
     g: &CsrGraph,
-    wadj: &[f64],
     pop: usize,
     cfg: &Cfg,
     macro_cap: f64,
-    gpu: Option<&mut Gpu>,
+    gpu: &mut Gpu,
 ) -> Vec<MacParticle> {
     let n = g.n;
     let mut by_deg: Vec<usize> = (0..n).collect();
@@ -98,44 +96,22 @@ pub(crate) fn init_macro_swarm(
         })
         .collect();
 
-    match gpu {
-        Some(dev) => {
-            let refs: Vec<&Genome> = genomes.iter().collect();
-            let (labels, objs) = dev
-                .decode_eval(g, &refs)
-                .expect("CUDA runtime failure in init decode");
-            genomes
-                .into_iter()
-                .zip(labels.into_iter().zip(objs))
-                .map(|(genome, (labels, o))| {
-                    let obj = cfg.pick_macro(&o);
-                    MacParticle {
-                        pbest: genome.clone(),
-                        pbest_obj: obj.clone(),
-                        genome,
-                        labels,
-                        obj,
-                    }
-                })
-                .collect()
-        }
-        None => {
-            let labels: Vec<Labels> =
-                genomes.par_iter().map(|gn| decode(g, wadj, gn)).collect();
-            genomes
-                .into_par_iter()
-                .zip(labels)
-                .map(|(genome, labels)| {
-                    let obj = cfg.eval_macro(g, &labels);
-                    MacParticle {
-                        pbest: genome.clone(),
-                        pbest_obj: obj.clone(),
-                        genome,
-                        labels,
-                        obj,
-                    }
-                })
-                .collect()
-        }
-    }
+    let refs: Vec<&Genome> = genomes.iter().collect();
+    let (labels, objs) = gpu
+        .decode_eval(g, &refs)
+        .expect("CUDA runtime failure in init decode");
+    genomes
+        .into_iter()
+        .zip(labels.into_iter().zip(objs))
+        .map(|(genome, (labels, o))| {
+            let obj = cfg.pick_macro(&o);
+            MacParticle {
+                pbest: genome.clone(),
+                pbest_obj: obj.clone(),
+                genome,
+                labels,
+                obj,
+            }
+        })
+        .collect()
 }
