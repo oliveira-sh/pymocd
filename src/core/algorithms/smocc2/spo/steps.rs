@@ -37,6 +37,7 @@ fn pbest_wants_new(new: &[f64], pbest: &[f64], r: &mut impl Rng) -> bool {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn micro_step(
     g: &CsrGraph,
     parts: &mut [MicParticle],
@@ -187,6 +188,7 @@ fn macro_finish(g: &CsrGraph, p: &mut MacParticle, labels: Labels, cfg: &Cfg) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn macro_step(
     g: &CsrGraph,
     wadj: &[f64],
