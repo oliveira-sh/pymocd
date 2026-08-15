@@ -1,3 +1,8 @@
+//! SMOCC: Sparse Multi-Objective Co-evolutionary Community detection,
+//! This Source Code Form is subject to the terms of The GNU General Public License v3.0
+//! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+
 use crate::core::algorithms::smocc::{select_best, to_output};
 use crate::core::graph::CsrGraph;
 
@@ -51,10 +56,10 @@ pub fn smocc2_fronts(
     if g.n == 0 {
         return Ok(Vec::new());
     }
-    Ok(
-        run_fronts(&g, pop, num_gens, gap, turb, refine, obj_mode, macro_cap, gpu)?
-            .iter()
-            .map(|l| to_output(&g, l))
-            .collect(),
-    )
+    Ok(run_fronts(
+        &g, pop, num_gens, gap, turb, refine, obj_mode, macro_cap, gpu,
+    )?
+    .iter()
+    .map(|l| to_output(&g, l))
+    .collect())
 }
