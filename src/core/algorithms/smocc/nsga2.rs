@@ -1,7 +1,7 @@
 pub type Obj = Vec<f64>;
 
 #[inline]
-fn dominates(a: &[f64], b: &[f64]) -> bool {
+pub(crate) fn dominates(a: &[f64], b: &[f64]) -> bool {
     let le = a.iter().zip(b).all(|(x, y)| x <= y);
     let lt = a.iter().zip(b).any(|(x, y)| x < y);
     le && lt

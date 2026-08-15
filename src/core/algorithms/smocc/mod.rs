@@ -20,11 +20,11 @@ use std::collections::HashSet;
 use crate::core::graph::CsrGraph;
 
 mod defaults;
-mod nsga2;
-mod objectives;
-mod operators;
-mod refine;
-mod sim;
+pub(crate) mod nsga2;
+pub(crate) mod objectives;
+pub(crate) mod operators;
+pub(crate) mod refine;
+pub(crate) mod sim;
 
 pub use defaults::*;
 
@@ -125,7 +125,7 @@ pub const DEFAULT_MACRO_CAP: f64 = 1.0;
 const MACRO_CAP_MIN: f64 = 1e-6;
 const MACRO_CAP_MAX: f64 = 1e6;
 
-fn macro_cmax(n: usize, macro_cap: f64) -> usize {
+pub(crate) fn macro_cmax(n: usize, macro_cap: f64) -> usize {
     let mult = if macro_cap.is_nan() {
         DEFAULT_MACRO_CAP
     } else {
@@ -355,7 +355,7 @@ fn run_fronts(
     }
 }
 
-fn to_output(g: &CsrGraph, labels: &Labels) -> Vec<(i32, i32)> {
+pub(crate) fn to_output(g: &CsrGraph, labels: &Labels) -> Vec<(i32, i32)> {
     let mut remap: FxHashMap<i32, i32> = FxHashMap::default();
     let mut next = 0i32;
     let mut out = Vec::with_capacity(g.n);
@@ -435,7 +435,7 @@ pub fn smocc_capped(
     to_output(&g, &best)
 }
 
-fn select_best(g: &CsrGraph, front: Vec<Labels>) -> Labels {
+pub(crate) fn select_best(g: &CsrGraph, front: Vec<Labels>) -> Labels {
     if front.is_empty() {
         return vec![0; g.n];
     }

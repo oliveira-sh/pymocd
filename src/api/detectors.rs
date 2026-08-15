@@ -15,6 +15,7 @@ use crate::core::algorithms::mmcomo;
 use crate::core::algorithms::mocd;
 use crate::core::algorithms::moganet;
 use crate::core::algorithms::smocc;
+use crate::core::algorithms::smocc2;
 use crate::core::graph::{Graph, Partition, get_edges, get_nodes};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
@@ -452,6 +453,88 @@ pub fn smocc_fn(
         d.set_item(node, comm)?;
     }
     Ok(d.into_any().unbind())
+}
+
+/// `smocc2` (SMOCC-II) — SMOCC with the NSGA-II genetic search replaced by
+/// multi-objective particle swarm optimization (MOPSO, Gong et al. 2014
+/// lineage). Graph representation, decode/encode, objectives, co-evolution,
+/// refinement and final selection are SMOCC's; only the search operators
+/// differ, so the two are directly comparable at equal (pop, gens). Returns
+/// the label-free-selected member of the merged rank-1 front. Isolated nodes
+/// get -1.
+///
+/// Args:
+///     turb: per-node turbulence probability at the first generation; it
+///         decays linearly with the inertia weight. Diversity insurance — a
+///         mutation-free discrete swarm collapses; raise it if high-mu
+///         accuracy regresses.
+///     macro_cap: multiplier on the macro swarm's centre ceiling
+///         ``ceil(macro_cap * sqrt(n))`` (still hard-capped at ``n``),
+///         exactly as in `smocc`.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "smocc2", signature = (graph, pop_size = smocc2::DEFAULT_POP_SIZE, num_gens = smocc2::DEFAULT_NUM_GENS, gap = smocc2::DEFAULT_GAP, turb = smocc2::DEFAULT_TURB, macro_cap = smocc2::DEFAULT_MACRO_CAP))]
+pub fn smocc2_fn(
+    graph: &Bound<'_, PyAny>,
+    pop_size: usize,
+    num_gens: usize,
+    gap: usize,
+    turb: f64,
+    macro_cap: f64,
+) -> PyResult<Py<PyAny>> {
+    let py = graph.py();
+    let nodes = get_nodes(graph)?;
+    let edges = get_edges(graph)?;
+    let part = smocc2::smocc2(&nodes, &edges, pop_size, num_gens, gap, turb, macro_cap);
+    let d = PyDict::new(py);
+    for (node, comm) in part {
+        d.set_item(node, comm)?;
+    }
+    Ok(d.into_any().unbind())
+}
+
+/// `smocc2`'s merged rank-1 front (after union-refinement), the candidate set
+/// `smocc2` selects from. Isolated nodes get -1.
+///
+/// Args:
+///     turb: per-node turbulence probability at the first generation; decays
+///         linearly with the inertia weight.
+///     obj_mode: objective placement, exactly as in `smocc_fronts`: ``0`` =
+///         ``(KKM, RC)``, ``6`` = ``(intra, inter)``, heterogeneous split for
+///         ``100 <= v < 1000`` (``micro = (v-100)//10``, ``macro =
+///         (v-100)%10``); the shipped default ``160`` is micro
+///         ``(intra, inter)`` / macro ``(KKM, RC)``.
+///     macro_cap: multiplier on the macro swarm's centre ceiling
+///         ``ceil(macro_cap * sqrt(n))`` (still hard-capped at ``n``).
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "smocc2_fronts", signature = (graph, pop_size = smocc2::DEFAULT_POP_SIZE, num_gens = smocc2::DEFAULT_NUM_GENS, gap = smocc2::DEFAULT_GAP, turb = smocc2::DEFAULT_TURB, refine = true, obj_mode = smocc2::DEFAULT_OBJ_MODE, macro_cap = smocc2::DEFAULT_MACRO_CAP))]
+#[allow(clippy::too_many_arguments)]
+pub fn smocc2_fronts_fn(
+    graph: &Bound<'_, PyAny>,
+    pop_size: usize,
+    num_gens: usize,
+    gap: usize,
+    turb: f64,
+    refine: bool,
+    obj_mode: u16,
+    macro_cap: f64,
+) -> PyResult<Py<PyAny>> {
+    let py = graph.py();
+    let nodes = get_nodes(graph)?;
+    let edges = get_edges(graph)?;
+    let fronts = smocc2::smocc2_fronts(
+        &nodes, &edges, pop_size, num_gens, gap, turb, refine, obj_mode, macro_cap,
+    );
+    let out = PyList::empty(py);
+    for part in fronts {
+        let d = PyDict::new(py);
+        for (node, comm) in part {
+            d.set_item(node, comm)?;
+        }
+        out.append(d)?;
+    }
+    Ok(out.into_any().unbind())
 }
 
 /// `smocc`'s merged rank-1 front (after union-refinement), the candidate set

@@ -33,7 +33,7 @@ impl MicroOps {
 
 const RNG_BASE: u64 = 0x5CA1_E5EED;
 
-pub(super) fn slot_rng(salt: u64, slot: usize) -> StdRng {
+pub(crate) fn slot_rng(salt: u64, slot: usize) -> StdRng {
     StdRng::seed_from_u64(
         RNG_BASE ^ salt.rotate_left(32) ^ (slot as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15),
     )
