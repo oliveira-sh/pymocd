@@ -30,13 +30,14 @@ pub(crate) fn guidance(
     let inj: Vec<MicElite> = match gpu {
         Some(dev) => {
             let refs: Vec<&Genome> = mac_arch.iter().map(|a| &a.genome).collect();
-            let labs = dev
-                .batch_decode(g, &refs)
+            let (labs, objs) = dev
+                .decode_eval(g, &refs)
                 .expect("CUDA runtime failure in guidance decode");
-            labs.into_par_iter()
-                .map(|labels| {
-                    let obj = cfg.eval_micro(g, &labels);
-                    MicElite { labels, obj }
+            labs.into_iter()
+                .zip(objs)
+                .map(|(labels, o)| MicElite {
+                    labels,
+                    obj: cfg.pick_micro(&o),
                 })
                 .collect()
         }
@@ -95,19 +96,16 @@ pub(crate) fn influence(
                 .expect("CUDA runtime failure in wadj upload");
             let genomes: Vec<Genome> = elites.par_iter().map(|e| encode(g, wadj_ro, e)).collect();
             let refs: Vec<&Genome> = genomes.iter().collect();
-            let labs = dev
-                .batch_decode(g, &refs)
+            let (labs, objs) = dev
+                .decode_eval(g, &refs)
                 .expect("CUDA runtime failure in influence decode");
             genomes
-                .into_par_iter()
-                .zip(labs)
-                .map(|(genome, labels)| {
-                    let obj = cfg.eval_macro(g, &labels);
-                    MacElite {
-                        genome,
-                        labels,
-                        obj,
-                    }
+                .into_iter()
+                .zip(labs.into_iter().zip(objs))
+                .map(|(genome, (labels, o))| MacElite {
+                    genome,
+                    obj: cfg.pick_macro(&o),
+                    labels,
                 })
                 .collect()
         }

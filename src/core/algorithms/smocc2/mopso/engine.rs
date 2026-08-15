@@ -80,7 +80,10 @@ pub(crate) fn run_fronts(
 
         let mic_objs: Vec<Obj> = mic_arch.iter().map(|a| a.obj.clone()).collect();
         let crowd = arch_crowd(&mic_objs);
-        steps::micro_step(g, &mut mic, &mic_arch, &crowd, &cfg, w, p_t);
+        match dev.as_mut() {
+            Some(d) => steps::micro_step_gpu(g, d, &mut mic, &mic_arch, &crowd, &cfg, w, p_t),
+            None => steps::micro_step(g, &mut mic, &mic_arch, &crowd, &cfg, w, p_t),
+        }
         mic_arch = update_micro_archive(
             mic_arch,
             mic.iter()

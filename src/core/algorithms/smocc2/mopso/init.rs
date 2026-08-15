@@ -98,27 +98,44 @@ pub(crate) fn init_macro_swarm(
         })
         .collect();
 
-    let labels: Vec<Labels> = match gpu {
+    match gpu {
         Some(dev) => {
             let refs: Vec<&Genome> = genomes.iter().collect();
-            dev.batch_decode(g, &refs)
-                .expect("CUDA runtime failure in init decode")
+            let (labels, objs) = dev
+                .decode_eval(g, &refs)
+                .expect("CUDA runtime failure in init decode");
+            genomes
+                .into_iter()
+                .zip(labels.into_iter().zip(objs))
+                .map(|(genome, (labels, o))| {
+                    let obj = cfg.pick_macro(&o);
+                    MacParticle {
+                        pbest: genome.clone(),
+                        pbest_obj: obj.clone(),
+                        genome,
+                        labels,
+                        obj,
+                    }
+                })
+                .collect()
         }
-        None => genomes.par_iter().map(|gn| decode(g, wadj, gn)).collect(),
-    };
-
-    genomes
-        .into_par_iter()
-        .zip(labels)
-        .map(|(genome, labels)| {
-            let obj = cfg.eval_macro(g, &labels);
-            MacParticle {
-                pbest: genome.clone(),
-                pbest_obj: obj.clone(),
-                genome,
-                labels,
-                obj,
-            }
-        })
-        .collect()
+        None => {
+            let labels: Vec<Labels> =
+                genomes.par_iter().map(|gn| decode(g, wadj, gn)).collect();
+            genomes
+                .into_par_iter()
+                .zip(labels)
+                .map(|(genome, labels)| {
+                    let obj = cfg.eval_macro(g, &labels);
+                    MacParticle {
+                        pbest: genome.clone(),
+                        pbest_obj: obj.clone(),
+                        genome,
+                        labels,
+                        obj,
+                    }
+                })
+                .collect()
+        }
+    }
 }

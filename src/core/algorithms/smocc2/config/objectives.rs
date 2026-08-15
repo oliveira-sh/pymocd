@@ -27,4 +27,19 @@ impl Cfg {
     pub fn eval_macro(&self, g: &CsrGraph, labels: &Labels) -> Obj {
         evaluate(g, labels, self.macro_)
     }
+
+    pub fn pick_micro(&self, o: &[f64; 4]) -> Obj {
+        pick(self.micro, o)
+    }
+
+    pub fn pick_macro(&self, o: &[f64; 4]) -> Obj {
+        pick(self.macro_, o)
+    }
+}
+
+fn pick(set: ObjSet, o: &[f64; 4]) -> Obj {
+    match set {
+        ObjSet::KkmRc => vec![o[0], o[1]],
+        ObjSet::HpIntraInter => vec![o[2], o[3]],
+    }
 }

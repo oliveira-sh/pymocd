@@ -42,22 +42,16 @@ fn pbest_wants_new(new: &[f64], pbest: &[f64], r: &mut impl Rng) -> bool {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn micro_step(
+fn micro_move(
     g: &CsrGraph,
-    parts: &mut [MicParticle],
+    p: &mut MicParticle,
     arch: &[MicElite],
     crowd: &[f64],
-    cfg: &Cfg,
     w: f64,
-    p_t: f64,
+    d_turb: &Bernoulli,
 ) {
     let n = g.n;
-    if arch.is_empty() {
-        return;
-    }
-    let d_turb = bernoulli(p_t);
-    parts.par_iter_mut().for_each(|p| {
+    {
         let mut r = rand::rng();
         let leader = &arch[leader_tournament(crowd, &mut r)].labels;
 
@@ -105,18 +99,72 @@ pub(crate) fn micro_step(
 
         for i in 0..n {
             let nbrs = g.neighbors(i);
-            if !nbrs.is_empty() && r.sample(d_turb) {
+            if !nbrs.is_empty() && r.sample(*d_turb) {
                 let j = nbrs[r.random_range(0..nbrs.len())] as usize;
                 p.x[i] = p.x[j];
             }
         }
+    }
+}
 
-        p.obj = cfg.eval_micro(g, &p.x);
-        if pbest_wants_new(&p.obj, &p.pbest_obj, &mut r) {
-            p.pbest.clone_from(&p.x);
-            p.pbest_obj.clone_from(&p.obj);
-        }
+fn micro_finish(g: &CsrGraph, p: &mut MicParticle, obj: Option<crate::core::algorithms::smocc2::mopso::pareto::Obj>, cfg: &Cfg) {
+    p.obj = match obj {
+        Some(o) => o,
+        None => cfg.eval_micro(g, &p.x),
+    };
+    let mut r = rand::rng();
+    if pbest_wants_new(&p.obj, &p.pbest_obj, &mut r) {
+        p.pbest.clone_from(&p.x);
+        p.pbest_obj.clone_from(&p.obj);
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn micro_step(
+    g: &CsrGraph,
+    parts: &mut [MicParticle],
+    arch: &[MicElite],
+    crowd: &[f64],
+    cfg: &Cfg,
+    w: f64,
+    p_t: f64,
+) {
+    if arch.is_empty() {
+        return;
+    }
+    let d_turb = bernoulli(p_t);
+    parts.par_iter_mut().for_each(|p| {
+        micro_move(g, p, arch, crowd, w, &d_turb);
+        micro_finish(g, p, None, cfg);
     });
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn micro_step_gpu(
+    g: &CsrGraph,
+    gpu: &mut Gpu,
+    parts: &mut [MicParticle],
+    arch: &[MicElite],
+    crowd: &[f64],
+    cfg: &Cfg,
+    w: f64,
+    p_t: f64,
+) {
+    if arch.is_empty() {
+        return;
+    }
+    let d_turb = bernoulli(p_t);
+    parts
+        .par_iter_mut()
+        .for_each(|p| micro_move(g, p, arch, crowd, w, &d_turb));
+    let xs: Vec<&Labels> = parts.iter().map(|p| &p.x).collect();
+    let objs = gpu
+        .eval_labels(&xs)
+        .expect("CUDA runtime failure in micro eval");
+    parts
+        .par_iter_mut()
+        .zip(objs)
+        .for_each(|(p, o)| micro_finish(g, p, Some(cfg.pick_micro(&o)), cfg));
 }
 
 fn macro_move(n: usize, p: &mut MacParticle, arch: &[MacElite], crowd: &[f64], w: f64, p_t: f64) {
@@ -234,11 +282,16 @@ pub(crate) fn macro_step_gpu(
         .par_iter_mut()
         .for_each(|p| macro_move(n, p, arch, crowd, w, p_t));
     let genomes: Vec<&Genome> = parts.iter().map(|p| &p.genome).collect();
-    let labels = gpu
-        .batch_decode(g, &genomes)
+    let (labels, objs) = gpu
+        .decode_eval(g, &genomes)
         .expect("CUDA runtime failure in macro decode");
-    parts
-        .par_iter_mut()
-        .zip(labels)
-        .for_each(|(p, l)| macro_finish(g, p, l, cfg));
+    for (p, (l, o)) in parts.iter_mut().zip(labels.into_iter().zip(objs)) {
+        p.labels = l;
+        p.obj = cfg.pick_macro(&o);
+        let mut r = rand::rng();
+        if pbest_wants_new(&p.obj, &p.pbest_obj, &mut r) {
+            p.pbest.clone_from(&p.genome);
+            p.pbest_obj.clone_from(&p.obj);
+        }
+    }
 }
