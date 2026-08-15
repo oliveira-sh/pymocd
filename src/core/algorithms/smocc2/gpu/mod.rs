@@ -17,7 +17,7 @@ use super::super::smocc2::{Genome, Labels};
 
 const PTX: &str = include_str!("decode.ptx");
 const MAX_DEG: u32 = 1024;
-const SWEEPS: usize = 64;
+const SWEEPS: usize = 16;
 const UNSET: i32 = -1;
 
 pub(crate) struct Gpu {
@@ -33,6 +33,7 @@ pub(crate) struct Gpu {
     staging: Vec<u8>,
     n: usize,
     cap: usize,
+    perm: i32,
 }
 
 impl Gpu {
@@ -64,6 +65,13 @@ impl Gpu {
         let genomes = stream.alloc_zeros::<u8>(total).map_err(err)?;
         let labels = stream.alloc_zeros::<i32>(total).map_err(err)?;
         let dirty = stream.alloc_zeros::<u8>(total).map_err(err)?;
+        let mut perm = 2654435761u64 % (g.n.max(1) as u64);
+        if perm == 0 {
+            perm = 1;
+        }
+        while gcd(perm, g.n.max(1) as u64) != 1 {
+            perm += 1;
+        }
         Ok(Gpu {
             stream,
             lp_init,
@@ -77,6 +85,7 @@ impl Gpu {
             staging: vec![0u8; total],
             n: g.n,
             cap,
+            perm: perm as i32,
         })
     }
 
@@ -149,6 +158,7 @@ impl Gpu {
                     .arg(&mut self.dirty)
                     .arg(&t_i64)
                     .arg(&n_i32)
+                    .arg(&self.perm)
                     .launch(cfg)
                     .map_err(err)?;
             }
@@ -170,6 +180,10 @@ impl Gpu {
             })
             .collect())
     }
+}
+
+fn gcd(a: u64, b: u64) -> u64 {
+    if b == 0 { a } else { gcd(b, a % b) }
 }
 
 fn fix_leftover(g: &CsrGraph, lab: &mut Labels) {

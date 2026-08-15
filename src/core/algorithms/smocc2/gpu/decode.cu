@@ -20,14 +20,15 @@ extern "C" __global__ void lp_sweep(
     const unsigned char* __restrict__ genomes,
     int* __restrict__ labels,
     unsigned char* __restrict__ dirty,
-    long long total, int n)
+    long long total, int n, int perm)
 {
-    long long idx = (long long)blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= total) return;
-    int u = (int)(idx % n);
+    long long tid = (long long)blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= total) return;
+    int slot = (int)(tid % n);
+    int u = (int)(((long long)slot * perm) % n);
+    long long base = tid - slot;
+    long long idx = base + u;
     if (genomes[idx]) return;
-
-    long long base = idx - u;
     unsigned char* D = dirty + base;
     if (!D[u]) return;
     D[u] = 0;
