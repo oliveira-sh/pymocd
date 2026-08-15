@@ -14,6 +14,8 @@ use crate::core::algorithms::smocc2::config::objectives::Cfg;
 use crate::core::algorithms::smocc2::config::schedule::{inertia, turbulence};
 use crate::core::algorithms::smocc2::gpu::Gpu;
 
+use rayon::prelude::*;
+
 use super::archive::{arch_crowd, update_macro_archive, update_micro_archive};
 use super::coevo::{guidance, influence};
 use super::init::{init_macro_swarm, init_micro_swarm};
@@ -149,24 +151,36 @@ pub(crate) fn run_fronts(
         labels.push(a.labels);
         objs.push(a.obj);
     }
-    for p in mac {
-        let obj = if het {
-            cfg.eval_micro(g, &p.labels)
-        } else {
-            p.obj
-        };
-        labels.push(p.labels);
-        objs.push(obj);
+    let mac_labels: Vec<Labels> = mac.iter().map(|p| p.labels.clone()).collect();
+    let mac_objs_own: Vec<Obj> = mac.into_iter().map(|p| p.obj).collect();
+    let arch_labels: Vec<Labels> = mac_arch.iter().map(|a| a.labels.clone()).collect();
+    let arch_objs_own: Vec<Obj> = mac_arch.into_iter().map(|a| a.obj).collect();
+    let mut mac_all: Vec<Labels> = mac_labels;
+    mac_all.extend(arch_labels);
+    let mut mac_all_objs: Vec<Obj> = mac_objs_own;
+    mac_all_objs.extend(arch_objs_own);
+    if het {
+        match dev.as_deref_mut() {
+            Some(d) => {
+                let mut het_objs: Vec<Obj> = Vec::with_capacity(mac_all.len());
+                for chunk in mac_all.chunks(pop.max(1)) {
+                    let refs: Vec<&Labels> = chunk.iter().collect();
+                    het_objs.extend(
+                        d.eval_labels(&refs)
+                            .expect("CUDA runtime failure in final eval")
+                            .into_iter()
+                            .map(|o| cfg.pick_micro(&o)),
+                    );
+                }
+                mac_all_objs = het_objs;
+            }
+            None => {
+                mac_all_objs = mac_all.par_iter().map(|l| cfg.eval_micro(g, l)).collect();
+            }
+        }
     }
-    for a in mac_arch {
-        let obj = if het {
-            cfg.eval_micro(g, &a.labels)
-        } else {
-            a.obj
-        };
-        labels.push(a.labels);
-        objs.push(obj);
-    }
+    labels.extend(mac_all);
+    objs.extend(mac_all_objs);
     let ranks = fast_nondominated_sort(&objs);
     let front: Vec<Labels> = labels
         .into_iter()

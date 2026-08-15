@@ -3,6 +3,7 @@
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
+use rayon::prelude::*;
 use rustc_hash::FxHashMap;
 use std::collections::HashSet;
 
@@ -101,25 +102,29 @@ pub fn refine_front(g: &CsrGraph, wadj: &[f64], front: Vec<Labels>, objset: ObjS
     }
     let mut seen: HashSet<Vec<i32>> = front.iter().cloned().collect();
     let mut all: Vec<Labels> = front.clone();
-    for p in &front {
-        if let Some(split) = split_components(g, p) {
-            let merged = refine_tiny(g, wadj, &split, 2);
-            if seen.insert(merged.clone()) {
-                all.push(merged);
+    let variants: Vec<Vec<Labels>> = front
+        .par_iter()
+        .map(|p| {
+            let mut v: Vec<Labels> = Vec::new();
+            if let Some(split) = split_components(g, p) {
+                v.push(refine_tiny(g, wadj, &split, 2));
+                v.push(split);
             }
-            if seen.insert(split.clone()) {
-                all.push(split);
+            v.push(refine_tiny(g, wadj, p, 2));
+            v
+        })
+        .collect();
+    for v in variants {
+        for cand in v {
+            if seen.insert(cand.clone()) {
+                all.push(cand);
             }
-        }
-        let refined = refine_tiny(g, wadj, p, 2);
-        if seen.insert(refined.clone()) {
-            all.push(refined);
         }
     }
     if all.len() == front.len() {
         return front;
     }
-    let objs: Vec<Vec<f64>> = all.iter().map(|p| evaluate(g, p, objset)).collect();
+    let objs: Vec<Vec<f64>> = all.par_iter().map(|p| evaluate(g, p, objset)).collect();
     let ranks = fast_nondominated_sort(&objs);
     all.into_iter()
         .zip(ranks)
