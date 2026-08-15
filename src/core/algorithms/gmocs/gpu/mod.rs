@@ -9,14 +9,13 @@ use std::sync::Arc;
 use cudarc::driver::{
     CudaContext, CudaFunction, CudaSlice, CudaStream, LaunchConfig, PushKernelArg,
 };
-use cudarc::nvrtc::Ptx;
+use cudarc::nvrtc::{CompileOptions, compile_ptx_with_opts};
 
 use crate::core::graph::CsrGraph;
 
 use super::super::gmocs::{Genome, Labels};
 
-const PTX_60: &str = include_str!("decode_60.ptx");
-const PTX_75: &str = include_str!("decode_75.ptx");
+const KERNELS: &str = include_str!("decode.cu");
 const SWEEPS: usize = 16;
 const FLOOD_SWEEPS: usize = 32;
 
@@ -76,10 +75,35 @@ impl Gpu {
         let cc = ctx
             .compute_capability()
             .map_err(|e| format!("compute capability query failed: {e:?}"))?;
-        let ptx = if cc >= (7, 5) { PTX_75 } else { PTX_60 };
+        let arch = if cc >= (7, 5) {
+            "compute_75"
+        } else {
+            "compute_60"
+        };
+        let ptx = std::panic::catch_unwind(|| {
+            compile_ptx_with_opts(
+                KERNELS,
+                CompileOptions {
+                    arch: Some(arch),
+                    ..Default::default()
+                },
+            )
+        })
+        .unwrap_or_else(|_| Err(cudarc::nvrtc::CompileError::CompileError {
+            nvrtc: cudarc::nvrtc::result::NvrtcError(
+                cudarc::nvrtc::sys::nvrtcResult::NVRTC_ERROR_INTERNAL_ERROR,
+            ),
+            options: Vec::new(),
+            log: std::ffi::CString::new("libnvrtc shared library not found").unwrap(),
+        }))
+        .map_err(|e| {
+            format!(
+                "kernel compilation failed (libnvrtc from the CUDA toolkit is                  required; install it or `pip install nvidia-cuda-nvrtc`): {e:?}"
+            )
+        })?;
         let module = ctx
-            .load_module(Ptx::from_src(ptx))
-            .map_err(|e| format!("PTX load failed: {e:?}"))?;
+            .load_module(ptx)
+            .map_err(|e| format!("kernel module load failed: {e:?}"))?;
         let f = |name: &str| {
             module
                 .load_function(name)
