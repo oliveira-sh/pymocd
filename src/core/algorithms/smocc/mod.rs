@@ -273,6 +273,7 @@ fn run_fronts(
         let micro_off: Vec<Mic> = if micro_ops.any() {
             micro_offspring_topo(
                 g,
+                &wadj,
                 &mlabels,
                 &mr,
                 &mc,

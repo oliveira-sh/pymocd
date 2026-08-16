@@ -64,7 +64,10 @@ fn propagate(g: &CsrGraph, wadj: &[f64], is_center: &[bool], lab: &mut [i32], n_
     // two, and no branch to mispredict.
     const CLEAN: u8 = 0;
     const DIRTY: u8 = 1;
-    let mut state: Vec<u8> = is_center.iter().map(|&c| if c { 2 } else { DIRTY }).collect();
+    let mut state: Vec<u8> = is_center
+        .iter()
+        .map(|&c| if c { 2 } else { DIRTY })
+        .collect();
 
     for _ in 0..n {
         let mut changed = false;
@@ -94,7 +97,11 @@ fn propagate(g: &CsrGraph, wadj: &[f64], is_center: &[bool], lab: &mut [i32], n_
                 vote[li] += w;
             }
             let mut best = cur;
-            let mut best_w = if cur != UNSET { vote[cur as usize] } else { -1.0 };
+            let mut best_w = if cur != UNSET {
+                vote[cur as usize]
+            } else {
+                -1.0
+            };
             // Argmax and reset are fused: same first-touch order, same strict
             // `>` first-to-the-max tie-break. A repeated slot reads 0.0 on its
             // second visit instead of the sum, which is equivalent exactly

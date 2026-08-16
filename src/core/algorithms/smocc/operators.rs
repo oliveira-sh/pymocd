@@ -169,6 +169,7 @@ pub fn micro_offspring(
 #[allow(clippy::too_many_arguments)]
 pub fn micro_offspring_topo(
     g: &CsrGraph,
+    wadj: &[f64],
     parents: &[Labels],
     ranks: &[usize],
     crowd: &[f64],
@@ -276,31 +277,37 @@ pub fn micro_offspring_topo(
             // Micro labels are always node ids in 0..n, so a dense counter with an
             // O(touched) reset replaces the hash map exactly: same neighbour scan
             // order, same strict `>` first-to-the-max tie-break.
-            let mut freq: Vec<u32> = if topo_mut { vec![0u32; n] } else { Vec::new() };
+            let mut freq: Vec<f64> = if topo_mut {
+                vec![0.0f64; n]
+            } else {
+                Vec::new()
+            };
             let mut touched: Vec<usize> = Vec::new();
             let d_mut = bernoulli(p_mut);
             for i in 0..n {
-                let nbrs = g.neighbors(i);
+                let start = g.xadj[i] as usize;
+                let end = g.xadj[i + 1] as usize;
+                let nbrs = &g.adj[start..end];
                 if !nbrs.is_empty() && r.sample(d_mut) {
                     if topo_mut {
                         touched.clear();
                         let mut best = child[i];
-                        let mut bestc = 0u32;
-                        for &v in nbrs {
+                        let mut bestc = 0.0f64;
+                        for (&v, &w) in nbrs.iter().zip(&wadj[start..end]) {
                             let l = child[v as usize];
                             let li = l as usize;
                             let e = &mut freq[li];
-                            if *e == 0 {
+                            if *e == 0.0 {
                                 touched.push(li);
                             }
-                            *e += 1;
+                            *e += w;
                             if *e > bestc {
                                 bestc = *e;
                                 best = l;
                             }
                         }
                         for &t in &touched {
-                            freq[t] = 0;
+                            freq[t] = 0.0;
                         }
                         child[i] = best;
                     } else {
@@ -339,6 +346,7 @@ mod tests {
     #[test]
     fn hpmocd_crossover_is_distinct_and_deterministic() {
         let g = ring_of_cliques(8, 5);
+        let w = vec![1.0f64; g.adj.len()];
         let n = g.n;
         let parents: Vec<Labels> = (0..8)
             .map(|k| {
@@ -349,7 +357,17 @@ mod tests {
         let ranks = vec![1usize; parents.len()];
         let crowd = vec![1.0f64; parents.len()];
         let run = |ops: MicroOps| {
-            micro_offspring_topo(&g, &parents, &ranks, &crowd, 1.0, QUIET_MICRO_MUT, 5, ops)
+            micro_offspring_topo(
+                &g,
+                &w,
+                &parents,
+                &ranks,
+                &crowd,
+                1.0,
+                QUIET_MICRO_MUT,
+                5,
+                ops,
+            )
         };
         let hp = run(MicroOps::from_topo(TOPO_HPMOCD_CROSS));
         let graft = run(MicroOps::default());
@@ -368,6 +386,7 @@ mod tests {
     #[test]
     fn majority_mutation_is_distinct_and_deterministic() {
         let g = ring_of_cliques(8, 5);
+        let w = vec![1.0f64; g.adj.len()];
         let n = g.n;
         let parents: Vec<Labels> = (0..8)
             .map(|k| {
@@ -377,8 +396,9 @@ mod tests {
             .collect();
         let ranks = vec![1usize; parents.len()];
         let crowd = vec![1.0f64; parents.len()];
-        let run =
-            |ops: MicroOps| micro_offspring_topo(&g, &parents, &ranks, &crowd, 0.0, 0.5, 13, ops);
+        let run = |ops: MicroOps| {
+            micro_offspring_topo(&g, &w, &parents, &ranks, &crowd, 0.0, 0.5, 13, ops)
+        };
         let maj = run(MicroOps::from_topo(TOPO_MAJORITY_MUT));
         let base = run(MicroOps::default());
         assert_eq!(
