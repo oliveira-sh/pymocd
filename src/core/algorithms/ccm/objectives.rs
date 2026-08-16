@@ -65,7 +65,7 @@ pub fn community_objectives(
 /// edges `l_c` counted once). Local so the hot loop never builds a `Partition`.
 pub fn modularity_labels(neighbor_pos: &[Vec<usize>], labels: &[i32]) -> f64 {
     let n = labels.len();
-    let two_m: usize = neighbor_pos.iter().map(|nb| nb.len()).sum();
+    let two_m: usize = neighbor_pos.iter().map(std::vec::Vec::len).sum();
     let m = two_m as f64 / 2.0;
     if m == 0.0 {
         return 0.0;

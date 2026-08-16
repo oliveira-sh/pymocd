@@ -67,7 +67,6 @@ pub fn encode(g: &Graph, sm: &Sm, labels: &Labels) -> Genome {
     }
 
     // Group node indices by community label, preserving first-seen order.
-    let mut order: Vec<i32> = Vec::new();
     let mut groups: Vec<Vec<usize>> = Vec::new();
     let mut pos: std::collections::HashMap<i32, usize> = std::collections::HashMap::new();
     for (i, &lab) in labels.iter().enumerate() {
@@ -75,7 +74,6 @@ pub fn encode(g: &Graph, sm: &Sm, labels: &Labels) -> Genome {
             Some(&p) => groups[p].push(i),
             None => {
                 pos.insert(lab, groups.len());
-                order.push(lab);
                 groups.push(vec![i]);
             }
         }
@@ -134,7 +132,7 @@ mod tests {
 
     // Block similarity: high within each triangle, low across.
     fn block_sm() -> Sm {
-        let tri = |x: usize| if x < 3 { 0 } else { 1 };
+        let tri = |x: usize| i32::from(x >= 3);
         (0..6)
             .map(|i| {
                 (0..6)
@@ -170,7 +168,7 @@ mod tests {
         assert_eq!(labels[4], 3);
         assert_eq!(labels[5], 3);
         assert_ne!(labels[0], labels[3]);
-        let mut uniq: Vec<i32> = labels.clone();
+        let mut uniq: Vec<i32> = labels;
         uniq.sort_unstable();
         uniq.dedup();
         assert_eq!(uniq.len(), 2);
@@ -182,7 +180,7 @@ mod tests {
         let sm = block_sm();
         let genome = vec![0u8; g.n];
         let labels = decode(&g, &sm, &genome);
-        let mut uniq = labels.clone();
+        let mut uniq = labels;
         uniq.sort_unstable();
         uniq.dedup();
         assert_eq!(uniq.len(), 1);

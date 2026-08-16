@@ -21,8 +21,8 @@ fn aligned_labels(
     let mut b = Vec::with_capacity(p.len());
     for (node, &c) in &p {
         if let Some(&cg) = g.get(node) {
-            a.push(c as i64);
-            b.push(cg as i64);
+            a.push(i64::from(c));
+            b.push(i64::from(cg));
         }
     }
     Ok((a, b))

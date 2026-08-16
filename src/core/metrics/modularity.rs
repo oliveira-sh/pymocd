@@ -16,7 +16,7 @@ pub fn modularity(graph: &Graph, partition: &Partition) -> f64 {
         return 0.0;
     }
     let mut communities: FxHashMap<i32, Vec<NodeId>> = FxHashMap::default();
-    for (&node, &comm) in partition.iter() {
+    for (&node, &comm) in partition {
         communities.entry(comm).or_default().push(node);
     }
 

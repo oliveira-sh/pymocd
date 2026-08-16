@@ -54,7 +54,7 @@ impl NodeIndex {
     }
 
     #[inline(always)]
-    pub fn n(&self) -> usize {
+    pub const fn n(&self) -> usize {
         self.index_to_node.len()
     }
 }

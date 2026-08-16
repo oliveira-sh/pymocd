@@ -27,7 +27,7 @@ pub struct Individual {
 
 impl Individual {
     #[inline]
-    fn dominates(&self, other: &Individual) -> bool {
+    fn dominates(&self, other: &Self) -> bool {
         let mut strictly_better = false;
         for i in 0..self.objectives.len() {
             if self.objectives[i] > other.objectives[i] {
@@ -164,12 +164,12 @@ where
     let mut pop: Vec<Individual> = (0..pop_size)
         .map(|_| new_individual(locus::random_genome(neighbor_pos, &mut r)))
         .collect();
-    for ind in pop.iter_mut() {
+    for ind in &mut pop {
         ind.objectives = evaluate(&ind.labels);
     }
     fast_non_dominated_sort(&mut pop);
 
-    let m = pop.first().map(|i| i.objectives.len()).unwrap_or(0);
+    let m = pop.first().map_or(0, |i| i.objectives.len());
     let ref_points = das_dennis(m, divisions);
 
     for _ in 0..num_gens {
@@ -191,7 +191,7 @@ where
             locus::mutate(&mut child_genome, neighbor_pos, mut_rate, &mut r);
             offspring.push(new_individual(child_genome));
         }
-        for ind in offspring.iter_mut() {
+        for ind in &mut offspring {
             ind.objectives = evaluate(&ind.labels);
         }
         let mut combined = pop;
@@ -382,15 +382,14 @@ fn niche_select(
     // Niche-preserving selection (Alg. 4).
     let mut picks = Vec::with_capacity(need);
     while picks.len() < need {
-        let min_rho = match rho
+        let Some(min_rho) = rho
             .iter()
             .enumerate()
             .filter(|(j, _)| !members[*j].is_empty())
             .map(|(_, &v)| v)
             .min()
-        {
-            Some(v) => v,
-            None => break,
+        else {
+            break;
         };
         let candidates: Vec<usize> = (0..ref_points.len())
             .filter(|&j| !members[j].is_empty() && rho[j] == min_rho)

@@ -23,7 +23,7 @@ pub struct Solution {
 
 impl Solution {
     /// Pareto dominance, both objectives minimised.
-    fn dominates(&self, other: &Solution) -> bool {
+    fn dominates(&self, other: &Self) -> bool {
         let mut better = false;
         for (a, b) in self.objectives.iter().zip(other.objectives.iter()) {
             if a > b {

@@ -24,7 +24,7 @@ pub fn calculate_objectives(
     }
 
     let mut communities: HashMap<i32, Vec<NodeId>> = HashMap::default();
-    for (&node, &comm) in partition.iter() {
+    for (&node, &comm) in partition {
         communities.entry(comm).or_default().push(node);
     }
 

@@ -24,7 +24,7 @@ pub fn max_cores(num_threads: usize) -> PyResult<()> {
         debug!(
             warn,
             "Using max_cores again has no effect, due to static ThreadPoolBuilder initialization"
-        )
+        );
     });
     Ok(())
 }

@@ -20,7 +20,7 @@ pub struct Individual {
 
 impl Individual {
     #[inline]
-    pub fn dominates(&self, other: &Individual) -> bool {
+    pub fn dominates(&self, other: &Self) -> bool {
         let mut at_least_one_better = false;
         for i in 0..self.objectives.len() {
             if self.objectives[i] > other.objectives[i] {

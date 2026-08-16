@@ -428,7 +428,7 @@ pub fn mmcomo_fronts_fn(
 /// implemented. It was removed outright, so there is no parameter to enable it.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(name = "smocc", signature = (graph, pop_size = smocc::DEFAULT_POP_SIZE, num_gens = smocc::DEFAULT_NUM_GENS, cross_rate = smocc::DEFAULT_CROSS_RATE, mut_rate = smocc::DEFAULT_MUT_RATE, gap = smocc::DEFAULT_GAP, beta = smocc::DEFAULT_BETA, macro_cap = smocc::DEFAULT_MACRO_CAP, micro_mut = smocc::DEFAULT_MICRO_MUT))]
+#[pyo3(name = "smocc", signature = (graph, pop_size = smocc::DEFAULT_POP_SIZE, num_gens = smocc::DEFAULT_NUM_GENS, cross_rate = smocc::DEFAULT_CROSS_RATE, mut_rate = smocc::DEFAULT_MUT_RATE, gap = smocc::DEFAULT_GAP, macro_cap = smocc::DEFAULT_MACRO_CAP, micro_mut = smocc::DEFAULT_MICRO_MUT))]
 #[allow(clippy::too_many_arguments)]
 pub fn smocc_fn(
     graph: &Bound<'_, PyAny>,
@@ -437,15 +437,14 @@ pub fn smocc_fn(
     cross_rate: f64,
     mut_rate: f64,
     gap: usize,
-    beta: f64,
     macro_cap: f64,
     micro_mut: f64,
 ) -> PyResult<Py<PyAny>> {
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
-    let part = smocc::smocc_capped(
-        &nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, beta, macro_cap, micro_mut,
+    let part = smocc::smocc(
+        &nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, macro_cap, micro_mut,
     );
     let d = PyDict::new(py);
     for (node, comm) in part {
@@ -494,7 +493,7 @@ pub fn smocc_fn(
 /// implemented. It was removed outright, so there is no parameter to enable it.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(name = "smocc_fronts", signature = (graph, pop_size = smocc::DEFAULT_POP_SIZE, num_gens = smocc::DEFAULT_NUM_GENS, cross_rate = smocc::DEFAULT_CROSS_RATE, mut_rate = smocc::DEFAULT_MUT_RATE, gap = smocc::DEFAULT_GAP, beta = smocc::DEFAULT_BETA, refine = true, topo_mode = smocc::DEFAULT_TOPO_MODE, obj_mode = smocc::DEFAULT_OBJ_MODE, macro_cap = smocc::DEFAULT_MACRO_CAP, micro_mut = smocc::DEFAULT_MICRO_MUT))]
+#[pyo3(name = "smocc_fronts", signature = (graph, pop_size = smocc::DEFAULT_POP_SIZE, num_gens = smocc::DEFAULT_NUM_GENS, cross_rate = smocc::DEFAULT_CROSS_RATE, mut_rate = smocc::DEFAULT_MUT_RATE, gap = smocc::DEFAULT_GAP, refine = true, topo_mode = smocc::DEFAULT_TOPO_MODE, obj_mode = smocc::DEFAULT_OBJ_MODE, macro_cap = smocc::DEFAULT_MACRO_CAP, micro_mut = smocc::DEFAULT_MICRO_MUT))]
 #[allow(clippy::too_many_arguments)]
 pub fn smocc_fronts_fn(
     graph: &Bound<'_, PyAny>,
@@ -503,7 +502,6 @@ pub fn smocc_fronts_fn(
     cross_rate: f64,
     mut_rate: f64,
     gap: usize,
-    beta: f64,
     refine: bool,
     topo_mode: u8,
     obj_mode: u16,
@@ -513,9 +511,9 @@ pub fn smocc_fronts_fn(
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
-    let fronts = smocc::smocc_fronts_capped(
-        &nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, beta, refine, topo_mode,
-        obj_mode, macro_cap, micro_mut,
+    let fronts = smocc::smocc_fronts(
+        &nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, refine, topo_mode, obj_mode,
+        macro_cap, micro_mut,
     );
     let out = PyList::empty(py);
     for part in fronts {

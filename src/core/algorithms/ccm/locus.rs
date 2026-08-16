@@ -88,7 +88,7 @@ struct UnionFind {
 
 impl UnionFind {
     fn new(n: usize) -> Self {
-        UnionFind {
+        Self {
             parent: (0..n).collect(),
             size: vec![1; n],
         }

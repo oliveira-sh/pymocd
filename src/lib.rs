@@ -3,6 +3,35 @@
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_possible_wrap)]
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::decimal_bitwise_operands)]
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::float_cmp)]
+#![allow(clippy::if_not_else)]
+#![allow(clippy::implicit_hasher)]
+#![allow(clippy::inline_always)]
+#![allow(clippy::items_after_statements)]
+#![allow(clippy::many_single_char_names)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::needless_pass_by_value)]
+#![allow(clippy::option_if_let_else)]
+#![allow(clippy::similar_names)]
+#![allow(clippy::single_match_else)]
+#![allow(clippy::suboptimal_flops)]
+#![allow(clippy::too_long_first_doc_paragraph)]
+#![allow(clippy::too_many_lines)]
+#![allow(clippy::trivially_copy_pass_by_ref)]
+#![allow(clippy::unnecessary_wraps)]
+#![allow(clippy::unreadable_literal)]
+#![allow(clippy::unused_self)]
+#![allow(clippy::while_float)]
+#![allow(clippy::wildcard_imports)]
+
 use pyo3::prelude::*;
 mod api;
 pub mod core;

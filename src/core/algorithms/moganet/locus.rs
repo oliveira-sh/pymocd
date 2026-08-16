@@ -32,11 +32,11 @@ impl Locus {
             .iter()
             .map(|v| graph.neighbors(v).iter().map(|u| index_of[u]).collect())
             .collect();
-        Locus { nodes, neighbors }
+        Self { nodes, neighbors }
     }
 
     #[inline]
-    pub fn n(&self) -> usize {
+    pub const fn n(&self) -> usize {
         self.nodes.len()
     }
 
