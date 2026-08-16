@@ -6,13 +6,10 @@
 
 use crate::core::graph::CsrGraph;
 
-use super::config::defaults::{
-    DEFAULT_MACRO_CAP, DEFAULT_MICRO_MUT, DEFAULT_OBJ_MODE, DEFAULT_TOPO_MODE,
-};
+use super::config::defaults::{DEFAULT_OBJ_MODE, DEFAULT_TOPO_MODE};
 use super::macro_micro::run_fronts;
 use super::select::{select_best, to_output};
 
-#[cfg_attr(not(test), allow(dead_code))]
 #[allow(clippy::too_many_arguments)]
 pub fn smocc(
     nodes: &[i32],
@@ -22,32 +19,6 @@ pub fn smocc(
     cross_rate: f64,
     mut_rate: f64,
     gap: usize,
-    beta: f64,
-) -> Vec<(i32, i32)> {
-    smocc_capped(
-        nodes,
-        edges,
-        pop,
-        num_gens,
-        cross_rate,
-        mut_rate,
-        gap,
-        beta,
-        DEFAULT_MACRO_CAP,
-        DEFAULT_MICRO_MUT,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn smocc_capped(
-    nodes: &[i32],
-    edges: &[(i32, i32)],
-    pop: usize,
-    num_gens: usize,
-    cross_rate: f64,
-    mut_rate: f64,
-    gap: usize,
-    beta: f64,
     macro_cap: f64,
     micro_mut: f64,
 ) -> Vec<(i32, i32)> {
@@ -62,7 +33,6 @@ pub fn smocc_capped(
         cross_rate,
         mut_rate,
         gap,
-        beta,
         true,
         DEFAULT_TOPO_MODE,
         DEFAULT_OBJ_MODE,
@@ -73,7 +43,6 @@ pub fn smocc_capped(
     to_output(&g, &best)
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
 #[allow(clippy::too_many_arguments)]
 pub fn smocc_fronts(
     nodes: &[i32],
@@ -83,38 +52,6 @@ pub fn smocc_fronts(
     cross_rate: f64,
     mut_rate: f64,
     gap: usize,
-    beta: f64,
-    refine: bool,
-    topo_mode: u8,
-    obj_mode: u16,
-) -> Vec<Vec<(i32, i32)>> {
-    smocc_fronts_capped(
-        nodes,
-        edges,
-        pop,
-        num_gens,
-        cross_rate,
-        mut_rate,
-        gap,
-        beta,
-        refine,
-        topo_mode,
-        obj_mode,
-        DEFAULT_MACRO_CAP,
-        DEFAULT_MICRO_MUT,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn smocc_fronts_capped(
-    nodes: &[i32],
-    edges: &[(i32, i32)],
-    pop: usize,
-    num_gens: usize,
-    cross_rate: f64,
-    mut_rate: f64,
-    gap: usize,
-    beta: f64,
     refine: bool,
     topo_mode: u8,
     obj_mode: u16,
@@ -126,7 +63,7 @@ pub fn smocc_fronts_capped(
         return Vec::new();
     }
     run_fronts(
-        &g, pop, num_gens, cross_rate, mut_rate, gap, beta, refine, topo_mode, obj_mode, macro_cap,
+        &g, pop, num_gens, cross_rate, mut_rate, gap, refine, topo_mode, obj_mode, macro_cap,
         micro_mut,
     )
     .iter()
@@ -190,7 +127,8 @@ mod tests {
             DEFAULT_CROSS_RATE,
             DEFAULT_MUT_RATE,
             DEFAULT_GAP,
-            DEFAULT_BETA,
+            DEFAULT_MACRO_CAP,
+            DEFAULT_MICRO_MUT,
         );
         let c: FxHashMap<i32, i32> = out.into_iter().collect();
         for i in 1..5 {
@@ -213,7 +151,8 @@ mod tests {
             DEFAULT_CROSS_RATE,
             DEFAULT_MUT_RATE,
             DEFAULT_GAP,
-            DEFAULT_BETA,
+            DEFAULT_MACRO_CAP,
+            DEFAULT_MICRO_MUT,
         );
         let c: FxHashMap<i32, i32> = out.into_iter().collect();
         assert_eq!(c[&6], -1);
@@ -230,10 +169,11 @@ mod tests {
             DEFAULT_CROSS_RATE,
             DEFAULT_MUT_RATE,
             DEFAULT_GAP,
-            DEFAULT_BETA,
             true,
             0,
             0,
+            DEFAULT_MACRO_CAP,
+            DEFAULT_MICRO_MUT,
         );
         assert!(!fronts.is_empty());
         assert!(fronts.iter().all(|f| f.len() == 6));
@@ -251,10 +191,11 @@ mod tests {
                 DEFAULT_CROSS_RATE,
                 DEFAULT_MUT_RATE,
                 DEFAULT_GAP,
-                DEFAULT_BETA,
                 true,
                 0,
                 0,
+                DEFAULT_MACRO_CAP,
+                DEFAULT_MICRO_MUT,
             )
         };
         assert_eq!(run(), run());
@@ -274,10 +215,11 @@ mod tests {
                     DEFAULT_CROSS_RATE,
                     DEFAULT_MUT_RATE,
                     DEFAULT_GAP,
-                    DEFAULT_BETA,
                     true,
                     0,
                     obj_mode,
+                    DEFAULT_MACRO_CAP,
+                    DEFAULT_MICRO_MUT,
                 )
             };
             let a = run();
@@ -300,10 +242,11 @@ mod tests {
                 DEFAULT_CROSS_RATE,
                 DEFAULT_MUT_RATE,
                 DEFAULT_GAP,
-                DEFAULT_BETA,
                 true,
                 0,
                 obj_mode,
+                DEFAULT_MACRO_CAP,
+                DEFAULT_MICRO_MUT,
             )
         };
         for v in 0..10u16 {
@@ -326,10 +269,11 @@ mod tests {
                 DEFAULT_CROSS_RATE,
                 DEFAULT_MUT_RATE,
                 5,
-                DEFAULT_BETA,
                 true,
                 0,
                 obj_mode,
+                DEFAULT_MACRO_CAP,
+                DEFAULT_MICRO_MUT,
             )
         };
         let kkm_rc = run(0);
@@ -349,91 +293,13 @@ mod tests {
     }
 
     #[test]
-    fn default_macro_cap_matches_the_unparameterized_wrapper() {
-        let nodes: Vec<i32> = (0..10).collect();
-        let edges = two_clique_edges();
-        for obj_mode in [0u16, 160] {
-            let legacy = || {
-                smocc_fronts(
-                    &nodes,
-                    &edges,
-                    40,
-                    15,
-                    DEFAULT_CROSS_RATE,
-                    DEFAULT_MUT_RATE,
-                    DEFAULT_GAP,
-                    DEFAULT_BETA,
-                    true,
-                    0,
-                    obj_mode,
-                )
-            };
-            let capped = |cap: f64| {
-                smocc_fronts_capped(
-                    &nodes,
-                    &edges,
-                    40,
-                    15,
-                    DEFAULT_CROSS_RATE,
-                    DEFAULT_MUT_RATE,
-                    DEFAULT_GAP,
-                    DEFAULT_BETA,
-                    true,
-                    0,
-                    obj_mode,
-                    cap,
-                    DEFAULT_MICRO_MUT,
-                )
-            };
-            let a = capped(DEFAULT_MACRO_CAP);
-            assert_eq!(
-                a,
-                capped(DEFAULT_MACRO_CAP),
-                "obj_mode {obj_mode}: unstable"
-            );
-            assert_eq!(
-                a,
-                legacy(),
-                "obj_mode {obj_mode}: default changed the front"
-            );
-            assert_eq!(legacy(), legacy());
-        }
-        let selected = smocc_capped(
-            &nodes,
-            &edges,
-            40,
-            15,
-            DEFAULT_CROSS_RATE,
-            DEFAULT_MUT_RATE,
-            DEFAULT_GAP,
-            DEFAULT_BETA,
-            DEFAULT_MACRO_CAP,
-            DEFAULT_MICRO_MUT,
-        );
-        let legacy = smocc(
-            &nodes,
-            &edges,
-            40,
-            15,
-            DEFAULT_CROSS_RATE,
-            DEFAULT_MUT_RATE,
-            DEFAULT_GAP,
-            DEFAULT_BETA,
-        );
-        assert_eq!(
-            selected, legacy,
-            "smocc/smocc_capped diverged at the default"
-        );
-    }
-
-    #[test]
     fn macro_cap_variants_deterministic_and_nonempty() {
         let nodes: Vec<i32> = (0..10).collect();
         let edges = two_clique_edges();
         for obj_mode in [0u16, 160] {
             for cap in [1.0f64, 2.0, 4.0] {
                 let run = || {
-                    smocc_fronts_capped(
+                    smocc_fronts(
                         &nodes,
                         &edges,
                         40,
@@ -441,7 +307,6 @@ mod tests {
                         DEFAULT_CROSS_RATE,
                         DEFAULT_MUT_RATE,
                         DEFAULT_GAP,
-                        DEFAULT_BETA,
                         true,
                         0,
                         obj_mode,
@@ -467,7 +332,7 @@ mod tests {
         assert_eq!(macro_cmax(n, 1.0), 8);
         assert_eq!(macro_cmax(n, 4.0), 31);
         let run = |cap: f64| {
-            smocc_fronts_capped(
+            smocc_fronts(
                 &nodes,
                 &edges,
                 40,
@@ -475,7 +340,6 @@ mod tests {
                 DEFAULT_CROSS_RATE,
                 DEFAULT_MUT_RATE,
                 DEFAULT_GAP,
-                DEFAULT_BETA,
                 true,
                 0,
                 0,
@@ -496,7 +360,7 @@ mod tests {
         let n = nodes.len();
         for topo_mode in [0u8, 2, 128, 130] {
             let run = || {
-                smocc_fronts_capped(
+                smocc_fronts(
                     &nodes,
                     &edges,
                     40,
@@ -504,7 +368,6 @@ mod tests {
                     DEFAULT_CROSS_RATE,
                     DEFAULT_MUT_RATE,
                     5,
-                    DEFAULT_BETA,
                     true,
                     topo_mode,
                     0,
@@ -526,7 +389,7 @@ mod tests {
     fn only_the_two_live_topo_bits_change_the_front() {
         let (nodes, edges) = grid(10, 10);
         let run = |topo_mode: u8| {
-            smocc_fronts_capped(
+            smocc_fronts(
                 &nodes,
                 &edges,
                 40,
@@ -534,7 +397,6 @@ mod tests {
                 DEFAULT_CROSS_RATE,
                 DEFAULT_MUT_RATE,
                 5,
-                DEFAULT_BETA,
                 true,
                 topo_mode,
                 0,

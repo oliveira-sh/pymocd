@@ -43,11 +43,12 @@ communities = pymocd.smocc(
     cross_rate=0.1,
     mut_rate=0.1,
     gap=10,
-    beta=0.05,
 )
 ```
 
-`gap` is the macro/micro co-evolution interval and `beta` the micro-stage perturbation strength. `num_gens` is the generation count: the search always runs all of them.
+`gap` is the macro/micro co-evolution interval. `num_gens` is the generation count: the search always runs all of them.
+
+`mmcomo` additionally takes `beta`, the exponent of its dense diffusion-kernel similarity. `smocc` has no such parameter: it replaces that kernel with a sparse edge similarity reinforced from the elite consensus.
 
 `hpmocd` runs with its published defaults and returns the max-*Q* partition from its Pareto front; the front itself is available via [`hpmocd_fronts`](api/fronts.md#pymocd.hpmocd_fronts).
 

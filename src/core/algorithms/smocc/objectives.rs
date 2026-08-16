@@ -11,9 +11,8 @@ use super::Labels;
 
 const UNSEEN: u32 = u32::MAX;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ObjSet {
-    #[default]
     KkmRc = 0,
 
     HpIntraInter = 6,

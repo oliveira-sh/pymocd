@@ -67,7 +67,6 @@ pub fn encode(g: &Graph, sm: &Sm, labels: &Labels) -> Genome {
     }
 
     // Group node indices by community label, preserving first-seen order.
-    let mut order: Vec<i32> = Vec::new();
     let mut groups: Vec<Vec<usize>> = Vec::new();
     let mut pos: std::collections::HashMap<i32, usize> = std::collections::HashMap::new();
     for (i, &lab) in labels.iter().enumerate() {
@@ -75,7 +74,6 @@ pub fn encode(g: &Graph, sm: &Sm, labels: &Labels) -> Genome {
             Some(&p) => groups[p].push(i),
             None => {
                 pos.insert(lab, groups.len());
-                order.push(lab);
                 groups.push(vec![i]);
             }
         }

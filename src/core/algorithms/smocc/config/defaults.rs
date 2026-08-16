@@ -19,6 +19,4 @@ pub const DEFAULT_TOPO_MODE: u8 = 130;
 
 pub const DEFAULT_GAP: usize = 10;
 
-pub const DEFAULT_BETA: f64 = 0.05;
-
 pub const DEFAULT_MACRO_CAP: f64 = 1.0;

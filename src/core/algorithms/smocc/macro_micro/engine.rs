@@ -35,7 +35,6 @@ pub fn run_fronts(
     p_c: f64,
     p_m: f64,
     gap: usize,
-    _beta: f64,
     do_refine: bool,
     topo_mode: u8,
     obj_mode: u16,

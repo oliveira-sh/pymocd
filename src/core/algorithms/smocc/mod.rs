@@ -29,5 +29,5 @@ mod fixtures;
 pub type Labels = Vec<i32>;
 pub type Genome = Vec<u8>;
 
-pub use api::{smocc, smocc_capped, smocc_fronts, smocc_fronts_capped};
+pub use api::{smocc, smocc_fronts};
 pub use config::defaults::*;

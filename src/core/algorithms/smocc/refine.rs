@@ -163,7 +163,7 @@ mod tests {
         let w = unit_weights(&g);
         let part: Labels = vec![0, 0, 0, 3, 3, 3, 6];
         let front = vec![part.clone()];
-        let refined = refine_front(&g, &w, front, ObjSet::default());
+        let refined = refine_front(&g, &w, front, ObjSet::KkmRc);
         assert!(!refined.is_empty());
         let absorbed = refined.iter().any(|p| p[6] == p[0]);
         assert!(
@@ -177,7 +177,7 @@ mod tests {
     fn refine_front_empty_is_empty() {
         let g = graph_with_pendant();
         let w = unit_weights(&g);
-        assert!(refine_front(&g, &w, Vec::new(), ObjSet::default()).is_empty());
+        assert!(refine_front(&g, &w, Vec::new(), ObjSet::KkmRc).is_empty());
     }
 
     #[test]
@@ -236,7 +236,7 @@ mod tests {
         let edges = vec![(0, 1), (1, 2), (0, 2), (3, 4), (4, 5), (3, 5)];
         let g = CsrGraph::from_edges(&nodes, &edges);
         let w = unit_weights(&g);
-        let refined = refine_front(&g, &w, vec![vec![0; 6]], ObjSet::default());
+        let refined = refine_front(&g, &w, vec![vec![0; 6]], ObjSet::KkmRc);
         assert!(!refined.is_empty());
         assert!(
             refined.iter().all(|p| p[0] != p[3]),

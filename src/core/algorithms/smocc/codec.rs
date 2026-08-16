@@ -199,8 +199,7 @@ pub fn encode(g: &CsrGraph, wadj: &[f64], labels: &Labels) -> Genome {
             }
         }
     }
-    for (c, (node, _)) in best_node {
-        let _ = c;
+    for (_, (node, _)) in best_node {
         genome[node] = 1;
     }
     genome
