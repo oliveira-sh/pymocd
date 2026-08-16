@@ -1,3 +1,9 @@
+//! NSGA-II primitives: non-dominated sorting, crowding distance and the
+//! crowding-based environment selection shared by both swarms.
+//! This Source Code Form is subject to the terms of The GNU General Public License v3.0
+//! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+
 pub type Obj = Vec<f64>;
 
 #[inline]
@@ -18,13 +24,6 @@ pub fn fast_nondominated_sort(objs: &[Obj]) -> Vec<usize> {
     }
 }
 
-// Jensen-style sweep for the two-objective case, O(n log n). Points are
-// processed in (f1 asc, f2 asc) order, so an earlier point q dominates the
-// current point p iff q.f2 <= p.f2; `front_min[k]` (the smallest f2 in front
-// k+1) is non-decreasing in k, so the first non-dominating front is found by
-// binary search. Exact duplicates do not dominate each other, so a duplicate
-// group is placed in one front together before `front_min` is consulted
-// again. Produces ranks identical to `generic_sort`.
 fn two_objective_sort(objs: &[Obj]) -> Vec<usize> {
     let n = objs.len();
     let mut idx: Vec<usize> = (0..n).collect();
@@ -250,8 +249,6 @@ mod tests {
 
     #[test]
     fn two_objective_sort_matches_generic_on_random_data() {
-        // LCG so the test needs no rng dependency; values are drawn from a
-        // small lattice to force plenty of ties and exact duplicates.
         let mut state = 0x9e3779b97f4a7c15u64;
         let mut next = move || {
             state = state.wrapping_mul(6364136223846793005).wrapping_add(1);

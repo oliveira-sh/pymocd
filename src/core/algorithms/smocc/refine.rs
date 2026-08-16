@@ -1,3 +1,9 @@
+//! Post-search front refinement: tiny-community reabsorption and disconnected
+//! community splitting.
+//! This Source Code Form is subject to the terms of The GNU General Public License v3.0
+//! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+
 use crate::core::graph::CsrGraph;
 use rustc_hash::FxHashMap;
 use std::collections::HashSet;
@@ -172,8 +178,6 @@ mod tests {
 
     #[test]
     fn refine_tiny_merge_target_follows_edge_weights() {
-        // Two triangles, singleton node 6 bridged to BOTH (one edge each): raw
-        // counts tie, so only the weights can decide the merge target.
         let nodes: Vec<i32> = (0..7).collect();
         let edges = vec![
             (0, 1),
@@ -208,8 +212,6 @@ mod tests {
 
     #[test]
     fn split_components_separates_disconnected_community() {
-        // Two disjoint triangles under ONE label: split must give two
-        // communities, each triangle whole.
         let nodes: Vec<i32> = (0..6).collect();
         let edges = vec![(0, 1), (1, 2), (0, 2), (3, 4), (4, 5), (3, 5)];
         let g = CsrGraph::from_edges(&nodes, &edges);
@@ -220,16 +222,12 @@ mod tests {
         assert_eq!(split[4], split[5]);
         assert_ne!(split[0], split[3]);
 
-        // A partition whose communities are all connected must return None so
-        // no duplicate-equivalent candidate is added.
         let connected: Labels = vec![0, 0, 0, 3, 3, 3];
         assert!(split_components(&g, &connected).is_none());
     }
 
     #[test]
     fn refine_front_split_copy_dominates_disconnected_member() {
-        // One community spanning two disjoint triangles: the split copy strictly
-        // dominates it under (KKM, RC), so the refined front drops the original.
         let nodes: Vec<i32> = (0..6).collect();
         let edges = vec![(0, 1), (1, 2), (0, 2), (3, 4), (4, 5), (3, 5)];
         let g = CsrGraph::from_edges(&nodes, &edges);

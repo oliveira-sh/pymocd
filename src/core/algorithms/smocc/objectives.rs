@@ -1,9 +1,14 @@
+//! Community objective functions (KKM/RC and intra/inter) and the objective
+//! set dispatch that selects between them.
+//! This Source Code Form is subject to the terms of The GNU General Public License v3.0
+//! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+
 use crate::core::graph::CsrGraph;
 use rustc_hash::FxHashMap;
 
 use super::Labels;
 
-/// Slot-array sentinel: this community label has not been seen yet.
 const UNSEEN: u32 = u32::MAX;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -56,18 +61,6 @@ pub fn evaluate(g: &CsrGraph, labels: &Labels, set: ObjSet) -> Vec<f64> {
 }
 
 pub fn kkm_rc(g: &CsrGraph, labels: &Labels) -> (f64, f64) {
-    // Accumulate into dense slot-indexed vectors: labels are node ids in
-    // [0, n), so `slot` replaces three hash lookups per node.
-    //
-    // `order` exists only to fix the sequence of the final reduction: it sums
-    // li/sz and (ds-li)/sz, both inexact, so the order is observable in the
-    // front. Its keys are inserted on exactly the first-touch subsequence of
-    // the label stream (repeat `entry()` hits never mutate the table), and its
-    // value is u64 so that (K, V) has the same size and alignment as the
-    // `FxHashMap<i32, f64>` it replaced -- hashbrown sizes its buckets from the
-    // table layout, so identical layout plus identical key sequence gives
-    // identical iteration order. `order_map_iterates_like_the_f64_map_it_replaced`
-    // guards that; widening or shrinking this value type can move the fronts.
     let mut slot: Vec<u32> = vec![UNSEEN; g.n];
     let mut order: FxHashMap<i32, u64> = FxHashMap::default();
     let mut size: Vec<f64> = Vec::new();
@@ -90,23 +83,6 @@ pub fn kkm_rc(g: &CsrGraph, labels: &Labels) -> (f64, f64) {
         deg_sum[b] += g.deg[v] as f64;
     }
 
-    // L(V_i, V_i) over the unique-edge list instead of over every node's
-    // neighbour list. `g.edges` holds each undirected edge exactly once as
-    // `(u, v)` with `u < v` and never a self-loop (`CsrGraph::from_edges`
-    // skips `du == dv`), while `adj` carries both directions of exactly those
-    // edges. The node scan added 1.0 per same-community half-edge, so its
-    // total for a community is 2 * (its intra-edge count) -- which is what
-    // `+= 2` per intra edge accumulates here, over the same multiset of edges.
-    //
-    // Reassociating is bit-exact. Every summand is a small non-negative
-    // integer, and a community's total is bounded by 2m = adj.len(), which is
-    // addressed by the u32 `xadj` and so is below 2^32. Every partial sum is
-    // therefore an integer below 2^53, where both integer addition and the
-    // final u64 -> f64 conversion are exact, and an exact integer sum does not
-    // depend on order. What is *not* reassociated is the reduction below:
-    // li/sz and (ds-li)/sz are inexact, and the node pass above still assigns
-    // every slot in node order, so `order`'s insertion sequence -- which pins
-    // that reduction -- is untouched.
     let mut l_in: Vec<u64> = vec![0; size.len()];
     for &(u, v) in &g.edges {
         let cu = labels[u as usize];
@@ -143,10 +119,6 @@ pub fn intra_inter(g: &CsrGraph, labels: &Labels) -> (f64, f64) {
     }
     let two_m = 2.0 * m;
 
-    // Community labels are dense node ids in [0, n), so a slot array replaces
-    // the hash remap. First-touch order is unchanged, so `d_c` is
-    // element-for-element identical and the reduction below sums in the same
-    // sequence.
     let mut slot: Vec<u32> = vec![UNSEEN; g.n];
     let mut d_c: Vec<f64> = Vec::new();
     for (&c, &k) in labels.iter().zip(g.deg.iter()) {
@@ -178,11 +150,6 @@ pub fn intra_inter(g: &CsrGraph, labels: &Labels) -> (f64, f64) {
 mod tests {
     use super::*;
 
-    /// `kkm_rc` reduces in `order`'s iteration order, and the fronts are only
-    /// byte-reproducible against pre-existing runs while that order matches the
-    /// `FxHashMap<i32, f64>` this map replaced. hashbrown derives its bucket
-    /// count from the table layout, so equal `(K, V)` size and alignment plus an
-    /// equal key sequence is what makes the two agree. Guard both halves.
     #[test]
     fn order_map_iterates_like_the_f64_map_it_replaced() {
         assert_eq!(size_of::<(i32, u64)>(), size_of::<(i32, f64)>());

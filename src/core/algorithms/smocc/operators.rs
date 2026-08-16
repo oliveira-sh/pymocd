@@ -1,3 +1,9 @@
+//! Variation operators: tournament selection, crossover and mutation for the
+//! macro genomes and the micro label vectors.
+//! This Source Code Form is subject to the terms of The GNU General Public License v3.0
+//! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+
 use crate::core::graph::CsrGraph;
 use rand::distr::Bernoulli;
 use rand::rngs::StdRng;
@@ -39,12 +45,6 @@ pub(super) fn slot_rng(salt: u64, slot: usize) -> StdRng {
     )
 }
 
-// `random_bool(p)` rebuilds a `Bernoulli` on every call: a reload of `p`, a
-// multiply, a saturating cast and a range check per draw. Every `p` below is
-// loop-invariant, so the distribution is built once and sampled instead.
-// `Bernoulli::sample` pulls the same single `u64` and compares it against the
-// same `p_int`, so the RNG stream is unchanged draw for draw — including
-// `p == 1.0`, which consumes nothing in either form.
 #[inline]
 fn bernoulli(p: f64) -> Bernoulli {
     match Bernoulli::new(p) {
@@ -86,8 +86,6 @@ pub fn macro_offspring(
             let (pa, pb) = (&parents[a], &parents[b]);
 
             let d_half = bernoulli(0.5);
-            // an empty genome draws nothing, so an invalid `p_m` must not be
-            // rejected here any earlier than `random_bool` would have
             let d_m = if n > 0 { bernoulli(p_m) } else { d_half };
 
             let mut child: Genome = Vec::with_capacity(n);
@@ -206,9 +204,6 @@ pub fn micro_offspring_topo(
                     }
                     child = Vec::with_capacity(n);
                     let pr: Vec<&Labels> = idx.iter().map(|&pi| &parents[pi]).collect();
-                    // At most ENSEMBLE distinct labels per node, so a linear scan
-                    // over a fixed array replaces the hash map exactly; the tie
-                    // set is emitted in ascending order, as map+sort produced it.
                     let mut labs = [0i32; ENSEMBLE];
                     let mut cnts = [0u32; ENSEMBLE];
                     let mut tied = [0i32; ENSEMBLE];
@@ -274,9 +269,6 @@ pub fn micro_offspring_topo(
             } else {
                 child = parents[a].clone();
             }
-            // Micro labels are always node ids in 0..n, so a dense counter with an
-            // O(touched) reset replaces the hash map exactly: same neighbour scan
-            // order, same strict `>` first-to-the-max tie-break.
             let mut freq: Vec<f64> = if topo_mut {
                 vec![0.0f64; n]
             } else {
