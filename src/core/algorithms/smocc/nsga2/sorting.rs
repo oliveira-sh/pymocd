@@ -1,27 +1,17 @@
-//! Front assignment: the Jensen sweep for the two-objective case and the
-//! reference pairwise-dominance sort it is validated against.
+//! Front assignment: the Jensen sweep that ranks a two-objective population
+//! by non-domination in O(n log n).
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use super::Obj;
 
-#[inline]
-fn dominates(a: &[f64], b: &[f64]) -> bool {
-    let le = a.iter().zip(b).all(|(x, y)| x <= y);
-    let lt = a.iter().zip(b).any(|(x, y)| x < y);
-    le && lt
-}
-
 pub fn fast_nondominated_sort(objs: &[Obj]) -> Vec<usize> {
     if objs.is_empty() {
         return Vec::new();
     }
-    if objs[0].len() == 2 {
-        two_objective_sort(objs)
-    } else {
-        generic_sort(objs)
-    }
+    debug_assert_eq!(objs[0].len(), 2, "the Jensen sweep is two-objective only");
+    two_objective_sort(objs)
 }
 
 fn two_objective_sort(objs: &[Obj]) -> Vec<usize> {
@@ -61,53 +51,60 @@ fn two_objective_sort(objs: &[Obj]) -> Vec<usize> {
     rank
 }
 
-fn generic_sort(objs: &[Obj]) -> Vec<usize> {
-    let n = objs.len();
-    let mut rank = vec![0usize; n];
-    if n == 0 {
-        return rank;
-    }
-
-    let mut dominated: Vec<Vec<usize>> = vec![Vec::new(); n];
-    let mut dom_count = vec![0usize; n];
-
-    for p in 0..n {
-        for q in 0..n {
-            if p == q {
-                continue;
-            }
-            if dominates(&objs[p], &objs[q]) {
-                dominated[p].push(q);
-            } else if dominates(&objs[q], &objs[p]) {
-                dom_count[p] += 1;
-            }
-        }
-    }
-
-    let mut front: Vec<usize> = (0..n).filter(|&p| dom_count[p] == 0).collect();
-    let mut r = 1usize;
-
-    while !front.is_empty() {
-        let mut next: Vec<usize> = Vec::new();
-        for &p in &front {
-            rank[p] = r;
-            for &q in &dominated[p] {
-                dom_count[q] -= 1;
-                if dom_count[q] == 0 {
-                    next.push(q);
-                }
-            }
-        }
-        r += 1;
-        front = next;
-    }
-
-    rank
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[inline]
+    fn dominates(a: &[f64], b: &[f64]) -> bool {
+        let le = a.iter().zip(b).all(|(x, y)| x <= y);
+        let lt = a.iter().zip(b).any(|(x, y)| x < y);
+        le && lt
+    }
+
+    fn generic_sort(objs: &[Obj]) -> Vec<usize> {
+        let n = objs.len();
+        let mut rank = vec![0usize; n];
+        if n == 0 {
+            return rank;
+        }
+
+        let mut dominated: Vec<Vec<usize>> = vec![Vec::new(); n];
+        let mut dom_count = vec![0usize; n];
+
+        for p in 0..n {
+            for q in 0..n {
+                if p == q {
+                    continue;
+                }
+                if dominates(&objs[p], &objs[q]) {
+                    dominated[p].push(q);
+                } else if dominates(&objs[q], &objs[p]) {
+                    dom_count[p] += 1;
+                }
+            }
+        }
+
+        let mut front: Vec<usize> = (0..n).filter(|&p| dom_count[p] == 0).collect();
+        let mut r = 1usize;
+
+        while !front.is_empty() {
+            let mut next: Vec<usize> = Vec::new();
+            for &p in &front {
+                rank[p] = r;
+                for &q in &dominated[p] {
+                    dom_count[q] -= 1;
+                    if dom_count[q] == 0 {
+                        next.push(q);
+                    }
+                }
+            }
+            r += 1;
+            front = next;
+        }
+
+        rank
+    }
 
     #[test]
     fn test_nondominated_sort_two_fronts() {
