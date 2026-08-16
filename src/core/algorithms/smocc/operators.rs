@@ -9,7 +9,7 @@ use rand::RngExt;
 use rayon::prelude::*;
 
 use super::config::MicroOps;
-use super::sampling::{bernoulli, slot_rng, tournament};
+use super::utils::sampling::{bernoulli, slot_rng, tournament};
 use super::{Genome, Labels};
 
 pub fn macro_offspring(

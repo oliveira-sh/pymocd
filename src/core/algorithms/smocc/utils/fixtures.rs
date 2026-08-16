@@ -5,7 +5,7 @@
 
 use crate::core::graph::CsrGraph;
 
-pub(super) fn two_clique_edges() -> Vec<(i32, i32)> {
+pub fn two_clique_edges() -> Vec<(i32, i32)> {
     let mut e = Vec::new();
     for (lo, hi) in [(0, 5), (5, 10)] {
         for a in lo..hi {
@@ -18,7 +18,7 @@ pub(super) fn two_clique_edges() -> Vec<(i32, i32)> {
     e
 }
 
-pub(super) fn two_triangles() -> CsrGraph {
+pub fn two_triangles() -> CsrGraph {
     let nodes: Vec<i32> = (0..6).collect();
     let edges = vec![(0, 1), (1, 2), (0, 2), (3, 4), (4, 5), (3, 5), (2, 3)];
     CsrGraph::from_edges(&nodes, &edges)

@@ -208,7 +208,7 @@ pub fn encode(g: &CsrGraph, wadj: &[f64], labels: &Labels) -> Genome {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::algorithms::smocc::fixtures::two_triangles;
+    use crate::core::algorithms::smocc::utils::fixtures::two_triangles;
     use crate::core::algorithms::smocc::weights::init_weights;
 
     #[test]

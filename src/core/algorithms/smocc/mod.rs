@@ -19,12 +19,9 @@ mod nsga2;
 mod objectives;
 mod operators;
 mod refine;
-mod sampling;
 mod select;
+mod utils;
 mod weights;
-
-#[cfg(test)]
-mod fixtures;
 
 pub type Labels = Vec<i32>;
 pub type Genome = Vec<u8>;

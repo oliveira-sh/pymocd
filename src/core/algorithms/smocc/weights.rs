@@ -44,7 +44,7 @@ pub fn update_weights(g: &CsrGraph, wadj: &mut [f64], elites: &[&Labels], rho: f
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::algorithms::smocc::fixtures::two_triangles;
+    use crate::core::algorithms::smocc::utils::fixtures::two_triangles;
 
     #[test]
     fn update_weights_raises_intra_lowers_inter() {

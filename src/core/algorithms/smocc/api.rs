@@ -8,7 +8,8 @@ use crate::core::graph::CsrGraph;
 
 use super::config::defaults::{DEFAULT_OBJ_MODE, DEFAULT_TOPO_MODE};
 use super::macro_micro::run_fronts;
-use super::select::{select_best, to_output};
+use super::select::select_best;
+use super::utils::to_output;
 
 #[allow(clippy::too_many_arguments)]
 pub fn smocc(
@@ -77,8 +78,8 @@ mod tests {
 
     use super::*;
     use crate::core::algorithms::smocc::config::defaults::*;
-    use crate::core::algorithms::smocc::fixtures::two_clique_edges;
     use crate::core::algorithms::smocc::macro_micro::macro_cmax;
+    use crate::core::algorithms::smocc::utils::fixtures::two_clique_edges;
 
     fn two_triangle_edges() -> Vec<(i32, i32)> {
         vec![(0, 1), (1, 2), (0, 2), (3, 4), (4, 5), (3, 5), (2, 3)]
