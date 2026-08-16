@@ -12,20 +12,19 @@
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 mod api;
-mod coevo;
+mod codec;
 mod config;
-mod engine;
-mod init;
+mod macro_micro;
 mod nsga2;
 mod objectives;
 mod operators;
-mod particles;
 mod refine;
+mod sampling;
 mod select;
-mod sim;
+mod weights;
 
 #[cfg(test)]
-mod tests;
+mod fixtures;
 
 pub type Labels = Vec<i32>;
 pub type Genome = Vec<u8>;

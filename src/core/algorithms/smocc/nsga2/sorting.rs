@@ -1,10 +1,10 @@
-//! NSGA-II primitives: non-dominated sorting, crowding distance and the
-//! crowding-based environment selection shared by both swarms.
+//! Front assignment: the Jensen sweep for the two-objective case and the
+//! reference pairwise-dominance sort it is validated against.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-pub type Obj = Vec<f64>;
+use super::Obj;
 
 #[inline]
 fn dominates(a: &[f64], b: &[f64]) -> bool {
@@ -105,105 +105,6 @@ fn generic_sort(objs: &[Obj]) -> Vec<usize> {
     rank
 }
 
-pub fn crowding_distance(objs: &[Obj], ranks: &[usize]) -> Vec<f64> {
-    let n = objs.len();
-    let mut dist = vec![0.0f64; n];
-    if n == 0 {
-        return dist;
-    }
-
-    let max_rank = *ranks.iter().max().unwrap_or(&0);
-    let mut groups: Vec<Vec<usize>> = vec![Vec::new(); max_rank + 1];
-    for i in 0..n {
-        groups[ranks[i]].push(i);
-    }
-
-    for group in groups.into_iter() {
-        if group.is_empty() {
-            continue;
-        }
-        let g = group.len();
-        if g == 1 {
-            dist[group[0]] = f64::INFINITY;
-            continue;
-        }
-
-        let m = objs[group[0]].len();
-        #[allow(clippy::needless_range_loop)]
-        for obj in 0..m {
-            let key = |idx: usize| -> f64 { objs[idx][obj] };
-
-            let mut order = group.clone();
-            order.sort_by(|&a, &b| {
-                key(a)
-                    .partial_cmp(&key(b))
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-
-            let f_min = key(order[0]);
-            let f_max = key(order[g - 1]);
-            let span = f_max - f_min;
-
-            dist[order[0]] = f64::INFINITY;
-            dist[order[g - 1]] = f64::INFINITY;
-
-            if span <= 0.0 {
-                continue;
-            }
-
-            for k in 1..(g - 1) {
-                if dist[order[k]].is_finite() {
-                    dist[order[k]] += (key(order[k + 1]) - key(order[k - 1])) / span;
-                }
-            }
-        }
-    }
-
-    dist
-}
-
-pub fn environment_selection(objs: &[Obj], keep: usize) -> Vec<usize> {
-    let n = objs.len();
-    let target = keep.min(n);
-    if target == 0 {
-        return Vec::new();
-    }
-
-    let ranks = fast_nondominated_sort(objs);
-    let crowd = crowding_distance(objs, &ranks);
-
-    let max_rank = *ranks.iter().max().unwrap();
-    let mut groups: Vec<Vec<usize>> = vec![Vec::new(); max_rank + 1];
-    for i in 0..n {
-        groups[ranks[i]].push(i);
-    }
-
-    let mut survivors: Vec<usize> = Vec::with_capacity(target);
-    for front in &groups[1..=max_rank] {
-        if front.is_empty() {
-            continue;
-        }
-        if survivors.len() + front.len() <= target {
-            survivors.extend_from_slice(front);
-        } else {
-            let remaining = target - survivors.len();
-            let mut ordered = front.clone();
-            ordered.sort_by(|&a, &b| {
-                crowd[b]
-                    .partial_cmp(&crowd[a])
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-            survivors.extend_from_slice(&ordered[..remaining]);
-            break;
-        }
-        if survivors.len() == target {
-            break;
-        }
-    }
-
-    survivors
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,30 +122,6 @@ mod tests {
         assert_eq!(ranks[1], 1);
         assert_eq!(ranks[2], 1);
         assert_eq!(ranks[3], 2);
-    }
-
-    #[test]
-    fn test_crowding_boundaries_infinite() {
-        let objs = vec![vec![1.0, 4.0], vec![2.0, 2.0], vec![4.0, 1.0]];
-        let ranks = fast_nondominated_sort(&objs);
-        let crowd = crowding_distance(&objs, &ranks);
-        assert!(crowd[0].is_infinite());
-        assert!(crowd[2].is_infinite());
-        assert!(crowd[1].is_finite());
-    }
-
-    #[test]
-    fn test_environment_selection_size_and_rank1_priority() {
-        let objs = vec![
-            vec![1.0, 4.0],
-            vec![2.0, 2.0],
-            vec![4.0, 1.0],
-            vec![3.0, 3.0],
-        ];
-        let surv = environment_selection(&objs, 3);
-        assert_eq!(surv.len(), 3);
-        assert!(!surv.contains(&3));
-        assert!(surv.contains(&0) && surv.contains(&1) && surv.contains(&2));
     }
 
     #[test]
@@ -272,13 +149,5 @@ mod tests {
     fn two_objective_sort_keeps_exact_duplicates_in_one_front() {
         let objs = vec![vec![1.0, 2.0], vec![1.0, 2.0], vec![0.5, 3.0]];
         assert_eq!(fast_nondominated_sort(&objs), vec![1, 1, 1]);
-    }
-
-    #[test]
-    fn test_environment_selection_clamps_to_len() {
-        let objs = vec![vec![1.0, 1.0], vec![2.0, 2.0]];
-        assert_eq!(environment_selection(&objs, 10).len(), 2);
-        assert_eq!(environment_selection(&objs, 0).len(), 0);
-        assert!(environment_selection(&[], 5).is_empty());
     }
 }

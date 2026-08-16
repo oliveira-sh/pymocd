@@ -4,8 +4,8 @@
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use super::nsga2::{Obj, environment_selection};
-use super::{Genome, Labels};
+use crate::core::algorithms::smocc::nsga2::{Obj, environment_selection};
+use crate::core::algorithms::smocc::{Genome, Labels};
 
 #[derive(Clone)]
 pub(super) struct Mic {

@@ -9,19 +9,20 @@ use rand::seq::SliceRandom;
 use rayon::prelude::*;
 use std::collections::HashSet;
 
+use crate::core::algorithms::smocc::Labels;
+use crate::core::algorithms::smocc::codec::decode;
+use crate::core::algorithms::smocc::config::Cfg;
+use crate::core::algorithms::smocc::config::defaults::DEFAULT_MACRO_CAP;
+use crate::core::algorithms::smocc::sampling::slot_rng;
 use crate::core::graph::CsrGraph;
 
-use super::Labels;
-use super::config::defaults::DEFAULT_MACRO_CAP;
-use super::config::objectives::Cfg;
-use super::operators;
-use super::particles::{Mac, Mic};
-use super::sim::decode;
+use super::swarms::{Mac, Mic};
 
 const MACRO_CAP_MIN: f64 = 1e-6;
+
 const MACRO_CAP_MAX: f64 = 1e6;
 
-pub(super) fn macro_cmax(n: usize, macro_cap: f64) -> usize {
+pub fn macro_cmax(n: usize, macro_cap: f64) -> usize {
     let mult = if macro_cap.is_nan() {
         DEFAULT_MACRO_CAP
     } else {
@@ -34,7 +35,7 @@ pub(super) fn init_micro(g: &CsrGraph, pop: usize, cfg: &Cfg) -> Vec<Mic> {
     (0..pop)
         .into_par_iter()
         .map(|k| {
-            let mut r = operators::slot_rng(u64::MAX, k);
+            let mut r = slot_rng(u64::MAX, k);
             let labels: Labels = (0..g.n)
                 .map(|i| {
                     let nbrs = g.neighbors(i);
@@ -65,7 +66,7 @@ pub(super) fn init_macro(
     (0..pop)
         .into_par_iter()
         .map(|k| {
-            let mut r = operators::slot_rng(u64::MAX - 1, k);
+            let mut r = slot_rng(u64::MAX - 1, k);
             let c = r.random_range(1..=cmax);
             let mut genome = vec![0u8; n];
             if k < pop / 2 {
@@ -96,4 +97,42 @@ pub(super) fn init_macro(
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::algorithms::smocc::config::defaults::DEFAULT_MACRO_CAP;
+
+    #[test]
+    fn macro_cmax_default_reproduces_hardcoded_sqrt_ceiling() {
+        for n in (1..600usize).chain([1000, 1999, 2000, 5000, 9999, 10_000, 65_536]) {
+            let old = ((n as f64).sqrt().ceil() as usize).clamp(1, n);
+            assert_eq!(
+                macro_cmax(n, DEFAULT_MACRO_CAP),
+                old,
+                "n={n}: macro_cap=1.0 diverged from the pre-change ceiling"
+            );
+        }
+        assert_eq!(DEFAULT_MACRO_CAP, 1.0);
+    }
+
+    #[test]
+    fn macro_cmax_table() {
+        assert_eq!(macro_cmax(250, 1.0), 16);
+        assert_eq!(macro_cmax(2000, 1.0), 45);
+        assert_eq!(macro_cmax(10_000, 1.0), 100);
+        assert_eq!(macro_cmax(10_000, 4.0), 400);
+        assert_eq!(macro_cmax(10_000, 1e9), 10_000);
+        assert_eq!(macro_cmax(10_000, f64::INFINITY), 10_000);
+        assert_eq!(macro_cmax(100, 50.0), 100);
+        for bad in [0.0, -1.0, -1e30, f64::NEG_INFINITY, f64::NAN] {
+            assert!(
+                macro_cmax(10_000, bad) >= 1,
+                "macro_cap={bad} produced a zero ceiling"
+            );
+            assert!(macro_cmax(1, bad) >= 1);
+        }
+        assert_eq!(macro_cmax(0, 1.0), 1);
+    }
 }

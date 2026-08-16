@@ -78,3 +78,28 @@ pub(super) fn select_best(g: &CsrGraph, front: Vec<Labels>) -> Labels {
     }
     front.into_iter().nth(pick).unwrap()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::algorithms::smocc::fixtures::two_clique_edges;
+
+    #[test]
+    fn selector_normalises_and_breaks_ties_by_lowest_index() {
+        let nodes: Vec<i32> = (0..10).collect();
+        let g = CsrGraph::from_edges(&nodes, &two_clique_edges());
+
+        let split: Labels = (0..g.n).map(|i| if i < 5 { 0 } else { 1 }).collect();
+        let one: Labels = vec![0; g.n];
+        let sing: Labels = (0..g.n as i32).collect();
+        assert_eq!(
+            select_best(&g, vec![split.clone(), split.clone()]),
+            split,
+            "a constant column must contribute 0, not NaN"
+        );
+        assert_eq!(select_best(&g, vec![one.clone()]), one);
+
+        let picked = select_best(&g, vec![one.clone(), sing.clone(), split.clone()]);
+        assert_eq!(picked, split, "normalised scalarisation missed the split");
+    }
+}

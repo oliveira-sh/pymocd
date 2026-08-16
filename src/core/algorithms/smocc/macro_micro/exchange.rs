@@ -6,13 +6,14 @@
 
 use rayon::prelude::*;
 
+use crate::core::algorithms::smocc::Labels;
+use crate::core::algorithms::smocc::codec::{decode, encode};
+use crate::core::algorithms::smocc::config::Cfg;
+use crate::core::algorithms::smocc::nsga2::fast_nondominated_sort;
+use crate::core::algorithms::smocc::weights::update_weights;
 use crate::core::graph::CsrGraph;
 
-use super::Labels;
-use super::config::objectives::Cfg;
-use super::nsga2::fast_nondominated_sort;
-use super::particles::{Mac, Mic, macro_objs, micro_objs, select_macro, select_micro};
-use super::sim::{decode, encode, update_weights};
+use super::swarms::{Mac, Mic, macro_objs, micro_objs, select_macro, select_micro};
 
 pub(super) fn guidance(
     g: &CsrGraph,

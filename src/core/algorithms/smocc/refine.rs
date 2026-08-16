@@ -12,7 +12,7 @@ use super::Labels;
 use super::nsga2::fast_nondominated_sort;
 use super::objectives::{ObjSet, evaluate};
 
-pub(crate) fn refine_tiny(g: &CsrGraph, wadj: &[f64], part: &[i32], max_size: usize) -> Vec<i32> {
+fn refine_tiny(g: &CsrGraph, wadj: &[f64], part: &[i32], max_size: usize) -> Vec<i32> {
     let mut p = part.to_vec();
     for _ in 0..5 {
         let mut members: FxHashMap<i32, Vec<usize>> = FxHashMap::default();
@@ -69,7 +69,7 @@ pub(crate) fn refine_tiny(g: &CsrGraph, wadj: &[f64], part: &[i32], max_size: us
     p
 }
 
-pub(crate) fn split_components(g: &CsrGraph, part: &[i32]) -> Option<Vec<i32>> {
+fn split_components(g: &CsrGraph, part: &[i32]) -> Option<Vec<i32>> {
     let n = g.n;
     let mut lab = vec![-1i32; n];
     let mut stack: Vec<usize> = Vec::new();
@@ -96,7 +96,12 @@ pub(crate) fn split_components(g: &CsrGraph, part: &[i32]) -> Option<Vec<i32>> {
     (k_new > k_old).then_some(lab)
 }
 
-pub fn refine_front(g: &CsrGraph, wadj: &[f64], front: Vec<Labels>, objset: ObjSet) -> Vec<Labels> {
+pub(super) fn refine_front(
+    g: &CsrGraph,
+    wadj: &[f64],
+    front: Vec<Labels>,
+    objset: ObjSet,
+) -> Vec<Labels> {
     if front.is_empty() {
         return front;
     }
@@ -132,7 +137,6 @@ pub fn refine_front(g: &CsrGraph, wadj: &[f64], front: Vec<Labels>, objset: ObjS
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::graph::CsrGraph;
 
     fn graph_with_pendant() -> CsrGraph {
         let nodes: Vec<i32> = (0..7).collect();

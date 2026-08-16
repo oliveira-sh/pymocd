@@ -6,26 +6,29 @@
 
 use rayon::prelude::*;
 
+use crate::core::algorithms::smocc::codec::decode;
+use crate::core::algorithms::smocc::config::{Cfg, MicroOps};
+use crate::core::algorithms::smocc::nsga2::{Obj, crowding_distance, fast_nondominated_sort};
+use crate::core::algorithms::smocc::operators::{
+    macro_offspring, micro_offspring, micro_offspring_topo,
+};
+use crate::core::algorithms::smocc::refine;
+use crate::core::algorithms::smocc::weights::init_weights;
+use crate::core::algorithms::smocc::{Genome, Labels};
 use crate::core::graph::CsrGraph;
 
-use super::coevo::{guidance, influence};
-use super::config::objectives::Cfg;
+use super::exchange::{guidance, influence};
 use super::init::{init_macro, init_micro};
-use super::nsga2::{Obj, crowding_distance, fast_nondominated_sort};
-use super::operators::{MicroOps, macro_offspring, micro_offspring, micro_offspring_topo};
-use super::particles::{Mac, Mic, macro_objs, micro_objs, select_macro, select_micro};
-use super::refine;
-use super::sim::{decode, init_weights};
-use super::{Genome, Labels};
+use super::swarms::{Mac, Mic, macro_objs, micro_objs, select_macro, select_micro};
 
-pub(super) fn ranks_and_crowd(objs: &[Obj]) -> (Vec<usize>, Vec<f64>) {
+fn ranks_and_crowd(objs: &[Obj]) -> (Vec<usize>, Vec<f64>) {
     let ranks = fast_nondominated_sort(objs);
     let crowd = crowding_distance(objs, &ranks);
     (ranks, crowd)
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn run_fronts(
+pub fn run_fronts(
     g: &CsrGraph,
     pop: usize,
     num_gens: usize,
