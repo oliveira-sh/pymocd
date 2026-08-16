@@ -22,7 +22,7 @@ pub fn refine_front(g: &CsrGraph, wadj: &[f64], front: Vec<Labels>, objset: ObjS
     let mut all: Vec<Labels> = front.clone();
     for p in &front {
         if let Some(split) = split_components(g, p) {
-            let merged = refine_tiny(g, wadj, &split, 2);
+            let merged = refine_tiny(g, wadj, &split);
             if seen.insert(merged.clone()) {
                 all.push(merged);
             }
@@ -30,7 +30,7 @@ pub fn refine_front(g: &CsrGraph, wadj: &[f64], front: Vec<Labels>, objset: ObjS
                 all.push(split);
             }
         }
-        let refined = refine_tiny(g, wadj, p, 2);
+        let refined = refine_tiny(g, wadj, p);
         if seen.insert(refined.clone()) {
             all.push(refined);
         }

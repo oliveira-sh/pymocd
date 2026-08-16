@@ -174,9 +174,7 @@ pub fn encode(g: &CsrGraph, wadj: &[f64], labels: &Labels) -> Genome {
     }
 
     let mut internal = vec![0.0f64; n];
-    let mut size: rustc_hash::FxHashMap<i32, usize> = rustc_hash::FxHashMap::default();
     for u in 0..n {
-        *size.entry(labels[u]).or_insert(0) += 1;
         let start = g.xadj[u] as usize;
         let end = g.xadj[u + 1] as usize;
         let cu = labels[u];

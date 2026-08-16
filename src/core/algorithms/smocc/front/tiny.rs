@@ -8,7 +8,9 @@ use rustc_hash::FxHashMap;
 
 use crate::core::graph::CsrGraph;
 
-pub(super) fn refine_tiny(g: &CsrGraph, wadj: &[f64], part: &[i32], max_size: usize) -> Vec<i32> {
+const MAX_TINY: usize = 2;
+
+pub(super) fn refine_tiny(g: &CsrGraph, wadj: &[f64], part: &[i32]) -> Vec<i32> {
     let mut p = part.to_vec();
     for _ in 0..5 {
         let mut members: FxHashMap<i32, Vec<usize>> = FxHashMap::default();
@@ -17,7 +19,7 @@ pub(super) fn refine_tiny(g: &CsrGraph, wadj: &[f64], part: &[i32], max_size: us
         }
         let tiny: Vec<i32> = members
             .iter()
-            .filter(|(_, v)| v.len() <= max_size)
+            .filter(|(_, v)| v.len() <= MAX_TINY)
             .map(|(&c, _)| c)
             .collect();
         if tiny.is_empty() {
@@ -98,9 +100,9 @@ mod tests {
         };
         let mut w = vec![1.0; g.adj.len()];
         weight_edge(&mut w, 3, 6, 5.0);
-        assert_eq!(refine_tiny(&g, &w, &part, 2)[6], 3, "heavier side lost");
+        assert_eq!(refine_tiny(&g, &w, &part)[6], 3, "heavier side lost");
         let mut w = vec![1.0; g.adj.len()];
         weight_edge(&mut w, 2, 6, 5.0);
-        assert_eq!(refine_tiny(&g, &w, &part, 2)[6], 0, "heavier side lost");
+        assert_eq!(refine_tiny(&g, &w, &part)[6], 0, "heavier side lost");
     }
 }
