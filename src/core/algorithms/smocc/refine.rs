@@ -49,8 +49,8 @@ fn refine_tiny(g: &CsrGraph, wadj: &[f64], part: &[i32], max_size: usize) -> Vec
                 a.1.partial_cmp(b.1)
                     .unwrap_or(std::cmp::Ordering::Equal)
                     .then_with(|| {
-                        let sa = members.get(a.0).map_or(0, |v| v.len());
-                        let sb = members.get(b.0).map_or(0, |v| v.len());
+                        let sa = members.get(a.0).map_or(0, std::vec::Vec::len);
+                        let sb = members.get(b.0).map_or(0, std::vec::Vec::len);
                         sa.cmp(&sb)
                     })
             });
@@ -162,7 +162,7 @@ mod tests {
         let g = graph_with_pendant();
         let w = unit_weights(&g);
         let part: Labels = vec![0, 0, 0, 3, 3, 3, 6];
-        let front = vec![part.clone()];
+        let front = vec![part];
         let refined = refine_front(&g, &w, front, ObjSet::KkmRc);
         assert!(!refined.is_empty());
         let absorbed = refined.iter().any(|p| p[6] == p[0]);
@@ -199,8 +199,8 @@ mod tests {
             for (u, v) in [(a, b), (b, a)] {
                 let start = g.xadj[u] as usize;
                 let end = g.xadj[u + 1] as usize;
-                for p in start..end {
-                    if g.adj[p] as usize == v {
+                for (p, &node) in g.adj.iter().enumerate().take(end).skip(start) {
+                    if node as usize == v {
                         w[p] = val;
                     }
                 }
@@ -219,7 +219,7 @@ mod tests {
         let nodes: Vec<i32> = (0..6).collect();
         let edges = vec![(0, 1), (1, 2), (0, 2), (3, 4), (4, 5), (3, 5)];
         let g = CsrGraph::from_edges(&nodes, &edges);
-        let split = split_components(&g, &vec![0; 6]).expect("no split produced");
+        let split = split_components(&g, &[0; 6]).expect("no split produced");
         assert_eq!(split[0], split[1]);
         assert_eq!(split[1], split[2]);
         assert_eq!(split[3], split[4]);

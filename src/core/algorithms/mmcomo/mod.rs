@@ -38,7 +38,7 @@ pub type Genome = Vec<u8>; // macro medoid representation
 
 impl Graph {
     /// Build from index-space `edges` (deduped, self-loops dropped).
-    fn from_indexed(n: usize, edges: &[(usize, usize)]) -> Graph {
+    fn from_indexed(n: usize, edges: &[(usize, usize)]) -> Self {
         let mut sets: Vec<HashSet<usize>> = vec![HashSet::new(); n];
         for &(u, v) in edges {
             if u != v && u < n && v < n {
@@ -56,7 +56,7 @@ impl Graph {
             .collect();
         let deg: Vec<f64> = adj.iter().map(|a| a.len() as f64).collect();
         let m2 = deg.iter().sum();
-        Graph { n, adj, deg, m2 }
+        Self { n, adj, deg, m2 }
     }
 }
 

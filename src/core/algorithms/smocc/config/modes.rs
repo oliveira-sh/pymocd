@@ -16,9 +16,9 @@ pub struct Cfg {
 }
 
 impl Cfg {
-    pub fn new(obj_mode: u16) -> Self {
+    pub const fn new(obj_mode: u16) -> Self {
         let (micro, macro_) = objectives::split_mode(obj_mode);
-        Cfg { micro, macro_ }
+        Self { micro, macro_ }
     }
 
     pub fn eval_micro(&self, g: &CsrGraph, labels: &Labels) -> Obj {

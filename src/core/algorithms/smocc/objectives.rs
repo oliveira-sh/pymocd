@@ -19,15 +19,15 @@ pub enum ObjSet {
 }
 
 impl ObjSet {
-    pub fn from_u8(v: u8) -> Self {
+    pub const fn from_u8(v: u8) -> Self {
         match v {
-            6 => ObjSet::HpIntraInter,
-            _ => ObjSet::KkmRc,
+            6 => Self::HpIntraInter,
+            _ => Self::KkmRc,
         }
     }
 }
 
-pub fn split_mode(v: u16) -> (ObjSet, ObjSet) {
+pub const fn split_mode(v: u16) -> (ObjSet, ObjSet) {
     if v < 100 {
         let s = ObjSet::from_u8(v as u8);
         (s, s)
@@ -71,7 +71,7 @@ pub fn kkm_rc(g: &CsrGraph, labels: &Labels) -> (f64, f64) {
         let b = if s == UNSEEN {
             let b = size.len() as u32;
             slot[c as usize] = b;
-            order.entry(c).or_insert(b as u64);
+            order.entry(c).or_insert_with(|| u64::from(b));
             size.push(0.0);
             deg_sum.push(0.0);
             b
@@ -79,7 +79,7 @@ pub fn kkm_rc(g: &CsrGraph, labels: &Labels) -> (f64, f64) {
             s
         } as usize;
         size[b] += 1.0;
-        deg_sum[b] += g.deg[v] as f64;
+        deg_sum[b] += f64::from(g.deg[v]);
     }
 
     let mut l_in: Vec<u64> = vec![0; size.len()];
@@ -96,7 +96,7 @@ pub fn kkm_rc(g: &CsrGraph, labels: &Labels) -> (f64, f64) {
 
     let mut kkm_internal = 0.0;
     let mut rc = 0.0;
-    for (_, &b) in order.iter() {
+    for &b in order.values() {
         let b = b as usize;
         let sz = size[b];
         if sz == 0.0 {
@@ -131,7 +131,7 @@ pub fn intra_inter(g: &CsrGraph, labels: &Labels) -> (f64, f64) {
         } else {
             s
         } as usize;
-        d_c[b] += k as f64;
+        d_c[b] += f64::from(k);
     }
 
     let mut l_intra = 0.0f64;

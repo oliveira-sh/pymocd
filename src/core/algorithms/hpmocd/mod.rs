@@ -80,11 +80,11 @@ impl HpMocd {
             let graph_ref = py_graph.bind(py);
             for ind in individuals.iter_mut() {
                 partition_dict.clear();
-                for (&node, &comm) in ind.partition.iter() {
+                for (&node, &comm) in &ind.partition {
                     partition_dict.set_item(node, comm)?;
                 }
                 let mut objectives = Vec::with_capacity(py_objs.len());
-                for obj in py_objs.iter() {
+                for obj in py_objs {
                     let value = obj
                         .bind(py)
                         .call1((graph_ref, &partition_dict))?
@@ -175,10 +175,10 @@ impl HpMocd {
         // Always store the Python graph so set_objectives() works after construction.
         let py_graph = Some(graph.clone().unbind());
         let py_objectives: Vec<Py<PyAny>> = objectives
-            .map(|obj_list| obj_list.iter().map(|item| item.unbind()).collect())
+            .map(|obj_list| obj_list.iter().map(pyo3::Bound::unbind).collect())
             .unwrap_or_default();
 
-        Ok(HpMocd {
+        Ok(Self {
             graph: rust_graph,
             debug_level,
             pop_size,
@@ -194,7 +194,7 @@ impl HpMocd {
     /// Replace the objectives. Empty list reverts to built-in intra/inter.
     #[pyo3(signature = (objectives))]
     pub fn set_objectives(&mut self, objectives: &Bound<'_, PyList>) -> PyResult<()> {
-        self.py_objectives = objectives.iter().map(|item| item.unbind()).collect();
+        self.py_objectives = objectives.iter().map(pyo3::Bound::unbind).collect();
         Ok(())
     }
 
@@ -207,7 +207,7 @@ impl HpMocd {
     }
 
     #[getter]
-    pub fn num_gens(&self) -> usize {
+    pub const fn num_gens(&self) -> usize {
         self.num_gens
     }
 

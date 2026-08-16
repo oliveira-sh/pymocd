@@ -17,7 +17,7 @@ pub fn gammln(xx: f64) -> f64 {
     let mut tmp = x + 5.5;
     tmp -= (x + 0.5) * tmp.ln();
     let mut ser = 1.000000000190015;
-    for c in COF.iter() {
+    for c in &COF {
         y += 1.0;
         ser += c / y;
     }

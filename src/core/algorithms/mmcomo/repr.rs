@@ -132,7 +132,7 @@ mod tests {
 
     // Block similarity: high within each triangle, low across.
     fn block_sm() -> Sm {
-        let tri = |x: usize| if x < 3 { 0 } else { 1 };
+        let tri = |x: usize| i32::from(x >= 3);
         (0..6)
             .map(|i| {
                 (0..6)
@@ -168,7 +168,7 @@ mod tests {
         assert_eq!(labels[4], 3);
         assert_eq!(labels[5], 3);
         assert_ne!(labels[0], labels[3]);
-        let mut uniq: Vec<i32> = labels.clone();
+        let mut uniq: Vec<i32> = labels;
         uniq.sort_unstable();
         uniq.dedup();
         assert_eq!(uniq.len(), 2);
@@ -180,7 +180,7 @@ mod tests {
         let sm = block_sm();
         let genome = vec![0u8; g.n];
         let labels = decode(&g, &sm, &genome);
-        let mut uniq = labels.clone();
+        let mut uniq = labels;
         uniq.sort_unstable();
         uniq.dedup();
         assert_eq!(uniq.len(), 1);

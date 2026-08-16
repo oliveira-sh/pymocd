@@ -30,7 +30,7 @@ pub struct Individual {
 
 impl Individual {
     pub fn new(partition: Partition) -> Self {
-        Individual {
+        Self {
             partition,
             objectives: vec![0.0, 0.0],
             rank: usize::MAX,
@@ -38,7 +38,7 @@ impl Individual {
         }
     }
     #[inline(always)]
-    pub fn dominates(&self, other: &Individual) -> bool {
+    pub fn dominates(&self, other: &Self) -> bool {
         let mut at_least_one_better = false;
 
         for i in 0..self.objectives.len() {

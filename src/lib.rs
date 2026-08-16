@@ -2,6 +2,41 @@
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+//!
+//! The lint budget below is deliberate. `suboptimal_flops`, `float_cmp` and
+//! `while_float` are refused outright: fusing a multiply-add, epsilon-ising an
+//! exact-duplicate test or reshaping the AMI hypergeometric loop each move a
+//! published number. The cast family is the CSR graph's own arithmetic, whose
+//! only compilable repair would be a panicking `try_from`. The rest is house
+//! style: paper notation, `//!` headers and `use super::*` in test modules.
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_possible_wrap)]
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::decimal_bitwise_operands)]
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::float_cmp)]
+#![allow(clippy::if_not_else)]
+#![allow(clippy::implicit_hasher)]
+#![allow(clippy::inline_always)]
+#![allow(clippy::items_after_statements)]
+#![allow(clippy::many_single_char_names)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::needless_pass_by_value)]
+#![allow(clippy::option_if_let_else)]
+#![allow(clippy::similar_names)]
+#![allow(clippy::single_match_else)]
+#![allow(clippy::suboptimal_flops)]
+#![allow(clippy::too_long_first_doc_paragraph)]
+#![allow(clippy::too_many_lines)]
+#![allow(clippy::trivially_copy_pass_by_ref)]
+#![allow(clippy::unnecessary_wraps)]
+#![allow(clippy::unreadable_literal)]
+#![allow(clippy::unused_self)]
+#![allow(clippy::while_float)]
+#![allow(clippy::wildcard_imports)]
 
 use pyo3::prelude::*;
 mod api;

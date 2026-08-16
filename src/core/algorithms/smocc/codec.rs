@@ -128,7 +128,7 @@ pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
             .all(|&l| l == UNSET || (l as usize) < center_node.len()),
         "propagate left a non-slot label behind"
     );
-    for l in lab.iter_mut() {
+    for l in &mut lab {
         if *l != UNSET {
             *l = center_node[*l as usize];
         }
@@ -224,7 +224,7 @@ mod tests {
         assert_eq!(lab[3], lab[4]);
         assert_eq!(lab[4], lab[5]);
         assert_ne!(lab[0], lab[3]);
-        let mut uniq = lab.clone();
+        let mut uniq = lab;
         uniq.sort_unstable();
         uniq.dedup();
         assert_eq!(uniq.len(), 2);
@@ -240,7 +240,7 @@ mod tests {
         let mut genome = vec![0u8; g.n];
         genome[0] = 1;
         let lab = decode(&g, &w, &genome);
-        let mut uniq = lab.clone();
+        let mut uniq = lab;
         uniq.sort_unstable();
         uniq.dedup();
         assert_eq!(
@@ -263,7 +263,7 @@ mod tests {
         assert_eq!(lab[3], lab[4]);
         assert_eq!(lab[4], lab[5]);
         assert_ne!(lab[0], lab[3]);
-        let mut uniq = lab.clone();
+        let mut uniq = lab;
         uniq.sort_unstable();
         uniq.dedup();
         assert_eq!(uniq.len(), 2);
@@ -274,7 +274,7 @@ mod tests {
         let g = two_triangles();
         let w = init_weights(&g);
         let lab = decode(&g, &w, &vec![0u8; g.n]);
-        let mut uniq = lab.clone();
+        let mut uniq = lab;
         uniq.sort_unstable();
         uniq.dedup();
         assert_eq!(uniq.len(), 1);

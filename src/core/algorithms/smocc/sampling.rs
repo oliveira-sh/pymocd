@@ -20,7 +20,7 @@ pub(super) fn slot_rng(salt: u64, slot: usize) -> StdRng {
 pub(super) fn bernoulli(p: f64) -> Bernoulli {
     match Bernoulli::new(p) {
         Ok(d) => d,
-        Err(_) => panic!("p={p:?} is outside range [0.0, 1.0]"),
+        Err(e) => panic!("p={p:?} is outside range [0.0, 1.0]: {e:?}"),
     }
 }
 

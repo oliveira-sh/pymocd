@@ -91,7 +91,7 @@ impl Mocd {
     ) -> PyResult<Self> {
         let graph = Graph::from_python(graph);
 
-        Ok(Mocd {
+        Ok(Self {
             graph,
             debug_level,
             rand_networks,

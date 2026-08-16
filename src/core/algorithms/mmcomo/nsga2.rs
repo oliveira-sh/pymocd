@@ -65,7 +65,7 @@ pub fn crowding_distance(objs: &[(f64, f64)], ranks: &[usize]) -> Vec<f64> {
         groups[ranks[i]].push(i);
     }
 
-    for group in groups.into_iter() {
+    for group in groups {
         if group.is_empty() {
             continue;
         }

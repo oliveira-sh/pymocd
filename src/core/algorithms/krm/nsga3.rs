@@ -71,7 +71,7 @@ pub fn run(
         .collect();
     fast_non_dominated_sort(&mut pop);
 
-    let m = pop.first().map(|i| i.objectives.len()).unwrap_or(0);
+    let m = pop.first().map_or(0, |i| i.objectives.len());
     let ref_points = das_dennis(m, divisions);
 
     for _generation in 0..num_gens {
@@ -267,15 +267,14 @@ fn niche_select(
     let mut picks = Vec::with_capacity(need);
     while picks.len() < need {
         // argmin ρ over refs with an unselected Fl member; ties → random.
-        let min_rho = match rho
+        let Some(min_rho) = rho
             .iter()
             .enumerate()
             .filter(|(j, _)| !members[*j].is_empty())
             .map(|(_, &v)| v)
             .min()
-        {
-            Some(v) => v,
-            None => break,
+        else {
+            break;
         };
         let candidates: Vec<usize> = (0..ref_points.len())
             .filter(|&j| !members[j].is_empty() && rho[j] == min_rho)

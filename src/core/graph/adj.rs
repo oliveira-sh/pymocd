@@ -91,7 +91,7 @@ pub fn get_edges(graph: &Bound<'_, PyAny>) -> PyResult<Vec<(NodeId, NodeId)>> {
 
 impl Graph {
     pub fn new() -> Self {
-        Graph {
+        Self {
             edges: Vec::new(),
             nodes: FxHashSet::default(),
             adjacency_list: FxHashMap::default(),
@@ -104,7 +104,7 @@ impl Graph {
     }
 
     pub fn from_python(pygraph: &Bound<'_, PyAny>) -> Self {
-        let mut graph = Graph::new();
+        let mut graph = Self::new();
         let nodes = get_nodes(pygraph).unwrap();
         let edges = get_edges(pygraph).unwrap();
 
@@ -206,7 +206,7 @@ impl Graph {
     }
 
     #[inline(always)]
-    pub fn nodes_vec(&self) -> &Vec<NodeId> {
+    pub const fn nodes_vec(&self) -> &Vec<NodeId> {
         &self.node_vec
     }
 
@@ -216,12 +216,12 @@ impl Graph {
     }
 
     #[inline(always)]
-    pub fn num_edges(&self) -> usize {
+    pub const fn num_edges(&self) -> usize {
         self.edges.len()
     }
 
     #[inline(always)]
-    pub fn precompute_degrees(&self) -> &FxHashMap<NodeId, usize> {
+    pub const fn precompute_degrees(&self) -> &FxHashMap<NodeId, usize> {
         &self.degrees
     }
 }
@@ -252,7 +252,7 @@ mod test {
         graph.finalize();
 
         let mut neighbors: Vec<NodeId> = graph.neighbors(&0).to_vec();
-        neighbors.sort();
+        neighbors.sort_unstable();
         assert_eq!(neighbors, [1, 2, 4]);
     }
 
@@ -291,7 +291,7 @@ mod test {
         graph.finalize();
 
         let mut nodes: Vec<NodeId> = graph.nodes_vec().clone();
-        nodes.sort();
+        nodes.sort_unstable();
         assert_eq!(nodes, [0, 1, 2, 3]);
     }
 }

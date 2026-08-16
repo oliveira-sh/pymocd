@@ -37,11 +37,11 @@ impl Locus {
                 c
             })
             .collect();
-        Locus { nodes, candidates }
+        Self { nodes, candidates }
     }
 
     #[inline]
-    pub fn n(&self) -> usize {
+    pub const fn n(&self) -> usize {
         self.nodes.len()
     }
 

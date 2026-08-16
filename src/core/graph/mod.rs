@@ -26,7 +26,7 @@ pub fn normalize_community_ids(graph: &Graph, partition: Partition) -> Partition
     let mut id_mapping: FxHashMap<CommunityId, CommunityId> = FxHashMap::default();
     let mut next_id: CommunityId = 0;
 
-    for &node in graph.nodes.iter() {
+    for &node in &graph.nodes {
         let is_isolated = match graph.adjacency_list.get(&node) {
             Some(neighbors) => neighbors.is_empty(),
             None => true,

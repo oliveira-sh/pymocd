@@ -29,7 +29,7 @@ pub fn min_max_selection<'a>(
                 random_front
                     .iter()
                     .map(|rand_sol| euclidean_distance(&real_sol.objectives, &rand_sol.objectives))
-                    .fold(f64::MAX, |acc, val| acc.min(val))
+                    .fold(f64::MAX, f64::min)
             })
             .collect();
 

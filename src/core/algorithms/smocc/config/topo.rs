@@ -17,16 +17,16 @@ pub struct MicroOps {
 }
 
 impl MicroOps {
-    pub fn from_topo(topo_mode: u8) -> Self {
+    pub const fn from_topo(topo_mode: u8) -> Self {
         let t = topo_mode & MICRO_BITS;
-        MicroOps {
+        Self {
             majority_mut: t & TOPO_MAJORITY_MUT != 0,
             hpmocd_cross: t & TOPO_HPMOCD_CROSS != 0,
         }
     }
 
     pub fn any(self) -> bool {
-        self != MicroOps::default()
+        self != Self::default()
     }
 }
 

@@ -62,7 +62,7 @@ mod tests {
     fn karate_ground_truth_against_itself() {
         let club: Vec<i64> = crate::core::graph::karate::KARATE_CLUB
             .iter()
-            .map(|&c| c as i64)
+            .map(|&c| i64::from(c))
             .collect();
         let (nmi, ami, ari, f1) = gt_metrics(&club, &club);
         assert!((nmi - 1.0).abs() < 1e-12);

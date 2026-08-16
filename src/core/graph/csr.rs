@@ -85,7 +85,7 @@ impl CsrGraph {
         }
         let m = edges.len();
 
-        CsrGraph {
+        Self {
             n,
             m,
             xadj,
