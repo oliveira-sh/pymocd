@@ -6,7 +6,7 @@
 
 use crate::core::graph::CsrGraph;
 
-use super::{Genome, Labels};
+use crate::core::algorithms::smocc::{Genome, Labels};
 
 const UNSET: i32 = -1;
 
@@ -207,9 +207,9 @@ pub fn encode(g: &CsrGraph, wadj: &[f64], labels: &Labels) -> Genome {
 
 #[cfg(test)]
 mod tests {
+    use super::super::weights::init_weights;
     use super::*;
     use crate::core::algorithms::smocc::utils::fixtures::two_triangles;
-    use crate::core::algorithms::smocc::weights::init_weights;
 
     #[test]
     fn decode_one_centre_per_triangle_splits_two() {

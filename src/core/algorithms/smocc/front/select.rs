@@ -1,17 +1,16 @@
-//! Final partition choice from a Pareto front: the label-free scalarisation
-//! that picks one member out of the merged rank-1 front.
+//! The label-free selector: min-max normalise all four objectives over the
+//! front and keep the member of least total normalised cost.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use rayon::prelude::*;
 
+use crate::core::algorithms::smocc::Labels;
+use crate::core::algorithms::smocc::objectives;
 use crate::core::graph::CsrGraph;
 
-use super::Labels;
-use super::objectives;
-
-pub(super) fn select_best(g: &CsrGraph, front: Vec<Labels>) -> Labels {
+pub fn select_best(g: &CsrGraph, front: Vec<Labels>) -> Labels {
     if front.is_empty() {
         return vec![0; g.n];
     }

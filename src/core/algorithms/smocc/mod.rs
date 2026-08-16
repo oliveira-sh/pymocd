@@ -12,16 +12,14 @@
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 mod api;
-mod codec;
 mod config;
+mod front;
 mod macro_micro;
 mod nsga2;
 mod objectives;
 mod operators;
-mod refine;
-mod select;
+mod similarity;
 mod utils;
-mod weights;
 
 pub type Labels = Vec<i32>;
 pub type Genome = Vec<u8>;

@@ -1,13 +1,13 @@
-//! The sparse edge similarity: unit initialisation and the elite-consensus
+//! Unit initialisation of the edge weights and the elite-consensus
 //! reinforcement that closes the co-evolutionary loop.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use crate::core::graph::CsrGraph;
 use rayon::prelude::*;
 
-use super::Labels;
+use crate::core::algorithms::smocc::Labels;
+use crate::core::graph::CsrGraph;
 
 pub fn init_weights(g: &CsrGraph) -> Vec<f64> {
     vec![1.0f64; g.adj.len()]

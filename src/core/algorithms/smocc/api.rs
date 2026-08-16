@@ -7,8 +7,8 @@
 use crate::core::graph::CsrGraph;
 
 use super::config::defaults::{DEFAULT_OBJ_MODE, DEFAULT_TOPO_MODE};
+use super::front::select_best;
 use super::macro_micro::run_fronts;
-use super::select::select_best;
 use super::utils::to_output;
 
 #[allow(clippy::too_many_arguments)]

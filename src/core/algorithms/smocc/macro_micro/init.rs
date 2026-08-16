@@ -10,9 +10,9 @@ use rayon::prelude::*;
 use std::collections::HashSet;
 
 use crate::core::algorithms::smocc::Labels;
-use crate::core::algorithms::smocc::codec::decode;
 use crate::core::algorithms::smocc::config::Cfg;
 use crate::core::algorithms::smocc::config::defaults::DEFAULT_MACRO_CAP;
+use crate::core::algorithms::smocc::similarity::decode;
 use crate::core::algorithms::smocc::utils::sampling::slot_rng;
 use crate::core::graph::CsrGraph;
 

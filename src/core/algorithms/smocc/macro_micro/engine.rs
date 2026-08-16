@@ -6,14 +6,14 @@
 
 use rayon::prelude::*;
 
-use crate::core::algorithms::smocc::codec::decode;
 use crate::core::algorithms::smocc::config::{Cfg, MicroOps};
+use crate::core::algorithms::smocc::front::refine_front;
 use crate::core::algorithms::smocc::nsga2::{Obj, crowding_distance, fast_nondominated_sort};
 use crate::core::algorithms::smocc::operators::{
     macro_offspring, micro_offspring, micro_offspring_topo,
 };
-use crate::core::algorithms::smocc::refine;
-use crate::core::algorithms::smocc::weights::init_weights;
+use crate::core::algorithms::smocc::similarity::decode;
+use crate::core::algorithms::smocc::similarity::init_weights;
 use crate::core::algorithms::smocc::{Genome, Labels};
 use crate::core::graph::CsrGraph;
 
@@ -134,7 +134,7 @@ pub fn run_fronts(
     };
 
     if do_refine {
-        refine::refine_front(g, &wadj, front, cfg.micro)
+        refine_front(g, &wadj, front, cfg.micro)
     } else {
         front
     }

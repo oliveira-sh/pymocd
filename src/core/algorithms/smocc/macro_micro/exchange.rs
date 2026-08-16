@@ -7,10 +7,10 @@
 use rayon::prelude::*;
 
 use crate::core::algorithms::smocc::Labels;
-use crate::core::algorithms::smocc::codec::{decode, encode};
 use crate::core::algorithms::smocc::config::Cfg;
 use crate::core::algorithms::smocc::nsga2::fast_nondominated_sort;
-use crate::core::algorithms::smocc::weights::update_weights;
+use crate::core::algorithms::smocc::similarity::update_weights;
+use crate::core::algorithms::smocc::similarity::{decode, encode};
 use crate::core::graph::CsrGraph;
 
 use super::swarms::{Mac, Mic, macro_objs, micro_objs, select_macro, select_micro};
