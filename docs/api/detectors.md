@@ -2,6 +2,8 @@
 
 Every detector takes a graph and returns a partition as `dict[node, community]`. Isolated nodes are assigned community `-1`.
 
+::: pymocd.mopso
+
 ::: pymocd.smocc
 
 ::: pymocd.hpmocd
