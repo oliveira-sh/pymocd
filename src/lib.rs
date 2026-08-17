@@ -59,6 +59,7 @@ fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(krm_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mmcomo_fn, m)?)?;
     m.add_function(wrap_pyfunction!(smocc_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(mopso_fn, m)?)?;
 
     // detectors -> pareto frontier
     m.add_function(wrap_pyfunction!(ccm_fronts_fn, m)?)?;
@@ -66,6 +67,7 @@ fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(moga_net_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mmcomo_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(smocc_fronts_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(mopso_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(smocc_probe_fn, m)?)?;
     m.add_function(wrap_pyfunction!(smocc_postprocess_fn, m)?)?;
     m.add_function(wrap_pyfunction!(smocc_decode_media_fn, m)?)?;

@@ -6,5 +6,6 @@ pub mod hpmocd;
 pub mod krm;
 pub mod mmcomo;
 pub mod mocd;
+pub mod mopso;
 pub mod moganet;
 pub mod smocc;

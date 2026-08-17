@@ -14,6 +14,7 @@ use crate::core::algorithms::krm;
 use crate::core::algorithms::mmcomo;
 use crate::core::algorithms::mocd;
 use crate::core::algorithms::moganet;
+use crate::core::algorithms::mopso;
 use crate::core::algorithms::smocc;
 use crate::core::graph::{Graph, Partition, get_edges, get_nodes};
 use pyo3::prelude::*;
@@ -407,6 +408,108 @@ pub fn mmcomo_fronts_fn(
         out.append(d)?;
     }
     Ok(out.into_any().unbind())
+}
+
+/// `mopso` — multi-objective particle swarm optimisation over the Constant
+/// Potts Model. Returns the selected partition as ``dict[node, community]``;
+/// isolated nodes get ``-1``.
+///
+/// CPM, `H(gamma) = sum_c [e_c - gamma * C(n_c,2)]`, is split the way HP-MOCD
+/// splits modularity, into a cut fraction and a pair coverage. Every resolution
+/// `gamma` is a weighted sum of that same pair, so the Pareto front the swarm
+/// builds is the graph's whole resolution profile and `gamma` stops being a
+/// parameter the caller has to guess.
+///
+/// Deterministic: the same graph and parameters give the same partition on any
+/// number of threads.
+///
+/// Args:
+///     inertia: fraction of a node's instability carried to the next iteration.
+///     cognitive: pull toward the particle's own best partition.
+///     social: pull toward a leader drawn from the archive by binary
+///         tournament on crowding distance.
+///     local_rate: per-node rate of the resolution-directed CPM local move.
+///     archive: capacity of the external Pareto archive.
+///     seed_rounds: alternating node-move and community-merge rounds used to
+///         drive each particle to its rung of the resolution ladder.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "mopso", signature = (graph, pop_size = mopso::DEFAULT_POP_SIZE, num_gens = mopso::DEFAULT_NUM_GENS, inertia = mopso::DEFAULT_INERTIA, cognitive = mopso::DEFAULT_COGNITIVE, social = mopso::DEFAULT_SOCIAL, local_rate = mopso::DEFAULT_LOCAL_RATE, archive = mopso::DEFAULT_POP_SIZE, seed_rounds = mopso::DEFAULT_SEED_ROUNDS))]
+#[allow(clippy::too_many_arguments)]
+pub fn mopso_fn(
+    graph: &Bound<'_, PyAny>,
+    pop_size: usize,
+    num_gens: usize,
+    inertia: f64,
+    cognitive: f64,
+    social: f64,
+    local_rate: f64,
+    archive: usize,
+    seed_rounds: usize,
+) -> PyResult<Py<PyAny>> {
+    let py = graph.py();
+    let nodes = get_nodes(graph)?;
+    let edges = get_edges(graph)?;
+    let part = mopso::mopso(
+        &nodes, &edges, pop_size, num_gens, inertia, cognitive, social, local_rate, archive,
+        seed_rounds,
+    );
+    let d = PyDict::new(py);
+    for (node, comm) in part {
+        d.set_item(node, comm)?;
+    }
+    Ok(d.into_any().unbind())
+}
+
+/// `mopso`'s archive: the graph's resolution profile.
+///
+/// Returns ``(fronts, objectives, selected)`` where ``fronts`` is a list of
+/// ``dict[node, community]``, ``objectives`` the matching ``(cut, pair)`` pairs,
+/// and ``selected`` the index the selector picks. ``cut`` is the fraction of
+/// edges leaving their community — the partition's own mixing parameter — and
+/// ``pair`` the fraction of node pairs sharing one.
+///
+/// Args:
+///     select_mode: ``1`` keeps the granularity holding the widest span of
+///         `gamma` (the resolution plateau); ``0`` takes the equal-weight sum,
+///         which is CPM at `gamma` = the graph's density and the same operating
+///         point as the Leiden-CPM baseline.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "mopso_fronts", signature = (graph, pop_size = mopso::DEFAULT_POP_SIZE, num_gens = mopso::DEFAULT_NUM_GENS, inertia = mopso::DEFAULT_INERTIA, cognitive = mopso::DEFAULT_COGNITIVE, social = mopso::DEFAULT_SOCIAL, local_rate = mopso::DEFAULT_LOCAL_RATE, archive = mopso::DEFAULT_POP_SIZE, seed_rounds = mopso::DEFAULT_SEED_ROUNDS, select_mode = mopso::DEFAULT_SELECT_MODE))]
+#[allow(clippy::too_many_arguments)]
+pub fn mopso_fronts_fn(
+    graph: &Bound<'_, PyAny>,
+    pop_size: usize,
+    num_gens: usize,
+    inertia: f64,
+    cognitive: f64,
+    social: f64,
+    local_rate: f64,
+    archive: usize,
+    seed_rounds: usize,
+    select_mode: u8,
+) -> PyResult<Py<PyAny>> {
+    let py = graph.py();
+    let nodes = get_nodes(graph)?;
+    let edges = get_edges(graph)?;
+    let (fronts, objs, selected) = mopso::mopso_fronts(
+        &nodes, &edges, pop_size, num_gens, inertia, cognitive, social, local_rate, archive,
+        seed_rounds, select_mode,
+    );
+    let parts = PyList::empty(py);
+    for part in fronts {
+        let d = PyDict::new(py);
+        for (node, comm) in part {
+            d.set_item(node, comm)?;
+        }
+        parts.append(d)?;
+    }
+    let points = PyList::empty(py);
+    for o in objs {
+        points.append((o[0], o[1]))?;
+    }
+    Ok((parts, points, selected).into_pyobject(py)?.into_any().unbind())
 }
 
 /// `smocc` — optimized MMCoMO variant (sparse-CSR similarity, Rayon-parallel,
