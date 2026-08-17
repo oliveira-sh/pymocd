@@ -19,7 +19,7 @@ ALL_THREADS = int(os.environ.get("HARD_ALL_THREADS", "2" if SMOKE else "48"))
 # Rayon-parallel detectors: run one at a time with the whole machine, BEFORE
 # the single-threaded algorithms (which fan out one worker per core). Tuple
 # order = run order.
-PARALLEL_ALGS = ("SMOCC", "HP-MOCD")
+PARALLEL_ALGS = ("MOPSO", "SMOCC", "HP-MOCD")
 
 # HARD_GRAPHS picks the graph source: "networkx" is the original campaign
 # cache, "reference" the corrected Lancichinetti generator of the revision.
@@ -52,6 +52,7 @@ else:
     NODES_SWEEP_MU = _grid("HARD_SIZE_MU", [0.3, 0.5])
 
 ALGORITHMS = {
+    "MOPSO":       dict(deterministic=True,  max_nodes=None,      needs="shim"),
     "SMOCC":       dict(deterministic=True,  max_nodes=None,      needs="shim"),
     "HP-MOCD":     dict(deterministic=False, max_nodes=None,      needs="shim"),
     "MMCoMO":      dict(deterministic=False, max_nodes=None,      needs="shim",

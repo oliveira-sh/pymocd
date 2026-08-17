@@ -36,6 +36,7 @@ def run_algorithm(alg, n, edges, seed, threads):
     pymocd.max_cores(threads)
     shim = Shim(n, edges)
     lib = {
+        "MOPSO": lambda: pymocd.mopso(shim),
         "SMOCC": lambda: pymocd.smocc(shim),
         "HP-MOCD": lambda: pymocd.hpmocd(shim),
         "MMCoMO": lambda: pymocd.mmcomo(shim),

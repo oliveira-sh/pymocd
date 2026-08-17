@@ -22,6 +22,14 @@ def _restore_labels(part, inverse):
     return {inverse[n]: c for n, c in part.items()}
 
 
+@algorithm("MOPSO", needs_conversion=False, parallel=False)
+@_safe
+@_with_seed
+def mopso_algorithm(G):
+    H, inverse = _ensure_int_nodes(G)
+    return _restore_labels(pymocd.mopso(H), inverse)
+
+
 @algorithm("SMOCC", needs_conversion=False, parallel=False)
 @_safe
 @_with_seed
