@@ -7,6 +7,7 @@
 use rayon::prelude::*;
 
 use crate::core::algorithms::smocc::Labels;
+use crate::core::algorithms::smocc::config::defaults::DEFAULT_W_FLOOR;
 use crate::core::graph::CsrGraph;
 
 pub fn init_weights(g: &CsrGraph) -> Vec<f64> {
@@ -14,6 +15,25 @@ pub fn init_weights(g: &CsrGraph) -> Vec<f64> {
 }
 
 pub fn update_weights(g: &CsrGraph, wadj: &mut [f64], elites: &[&Labels], rho: f64) {
+    update_weights_floor(g, wadj, elites, rho, DEFAULT_W_FLOOR);
+}
+
+/// Smallest weight the consensus update may leave on an edge.
+///
+/// Without a floor the update has an absorbing state. An edge every elite cuts
+/// takes `c = 0`, so its weight decays geometrically; once it is near zero the
+/// decoder cannot propagate a label across it, no later elite can join its
+/// endpoints, and `c` stays zero forever. The split is then permanent whatever
+/// the objectives later prefer, which is one reason the delivered partition is
+/// finer than the graph warrants (\autoref{sec:camp_ablation}). A floor keeps
+/// every edge traversable, so a merge stays reachable.
+pub fn update_weights_floor(
+    g: &CsrGraph,
+    wadj: &mut [f64],
+    elites: &[&Labels],
+    rho: f64,
+    floor: f64,
+) {
     let two_m = g.adj.len();
     if two_m == 0 || elites.is_empty() {
         return;
@@ -36,8 +56,9 @@ pub fn update_weights(g: &CsrGraph, wadj: &mut [f64], elites: &[&Labels], rho: f
             })
         })
         .collect();
+    let floor = floor.clamp(0.0, 1.0);
     wadj.par_iter_mut().zip(cov.par_iter()).for_each(|(w, &c)| {
-        *w = (1.0 - rho) * *w + rho * c;
+        *w = ((1.0 - rho) * *w + rho * c).max(floor);
     });
 }
 
@@ -51,7 +72,7 @@ mod tests {
         let g = two_triangles();
         let mut w = init_weights(&g);
         let elite: Labels = vec![0, 0, 0, 1, 1, 1];
-        update_weights(&g, &mut w, &[&elite], 1.0);
+        update_weights_floor(&g, &mut w, &[&elite], 1.0, 0.0);
         for u in 0..g.n {
             let start = g.xadj[u] as usize;
             let end = g.xadj[u + 1] as usize;
@@ -59,6 +80,27 @@ mod tests {
                 let same = (u < 3) == ((v as usize) < 3);
                 assert!((wp - if same { 1.0 } else { 0.0 }).abs() < 1e-9);
             }
+        }
+    }
+
+    #[test]
+    fn the_floor_stops_a_cut_edge_reaching_zero() {
+        let g = two_triangles();
+        let elite: Labels = vec![0, 0, 0, 1, 1, 1];
+        for (floor, want_zero) in [(0.0, true), (0.05, false)] {
+            let mut w = init_weights(&g);
+            // Twenty rounds at the shipped rate is far past the point where an
+            // unfloored cut edge is numerically dead.
+            for _ in 0..20 {
+                update_weights_floor(&g, &mut w, &[&elite], 0.5, floor);
+            }
+            let cut = w.iter().copied().fold(f64::INFINITY, f64::min);
+            assert_eq!(
+                cut < 1e-3,
+                want_zero,
+                "floor {floor} left the cut edge at {cut}"
+            );
+            assert!(cut >= floor - 1e-12, "floor {floor} violated: {cut}");
         }
     }
 }

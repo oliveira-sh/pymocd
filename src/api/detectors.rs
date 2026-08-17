@@ -547,12 +547,22 @@ pub fn smocc_fronts_fn(
 ///         micro objective pair, the shipped behaviour; ``1`` rank-1 under all
 ///         four objectives, so the selector scores the set its own criteria
 ///         define.
+///     seeds: partitions to place in the initial micro population, each a dict
+///         node -> community. They occupy the first slots and then compete for
+///         survival like any other individual, so a poor seed costs one slot
+///         for one generation.
+///     select_mode: selector normalisation. ``1`` anchors each objective's
+///         scale at the 5th and 95th percentiles of the non-degenerate front,
+///         ``0`` is min-max over the whole front.
+///     w_floor: smallest weight the consensus update leaves on an edge. Zero
+///         reproduces the shipped behaviour, in which an edge every elite cuts
+///         decays to zero and can never be crossed again.
 ///
 /// Returns a dict with ``front`` (list of partitions), ``selected`` (index of
 /// the member the deployed selector returns) and ``diag``.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(name = "smocc_probe", signature = (graph, pop_size = smocc::DEFAULT_POP_SIZE, num_gens = smocc::DEFAULT_NUM_GENS, cross_rate = smocc::DEFAULT_CROSS_RATE, mut_rate = smocc::DEFAULT_MUT_RATE, gap = smocc::DEFAULT_GAP, refine = true, topo_mode = smocc::DEFAULT_TOPO_MODE, obj_mode = smocc::DEFAULT_OBJ_MODE, macro_cap = smocc::DEFAULT_MACRO_CAP, micro_mut = smocc::DEFAULT_MICRO_MUT, abl = 0u32, sim_mode = 0u8, beta = 0.05, mac_mode = smocc::DEFAULT_MAC_MODE, front_mode = 0u8, want_w = false))]
+#[pyo3(name = "smocc_probe", signature = (graph, pop_size = smocc::DEFAULT_POP_SIZE, num_gens = smocc::DEFAULT_NUM_GENS, cross_rate = smocc::DEFAULT_CROSS_RATE, mut_rate = smocc::DEFAULT_MUT_RATE, gap = smocc::DEFAULT_GAP, refine = true, topo_mode = smocc::DEFAULT_TOPO_MODE, obj_mode = smocc::DEFAULT_OBJ_MODE, macro_cap = smocc::DEFAULT_MACRO_CAP, micro_mut = smocc::DEFAULT_MICRO_MUT, abl = 0u32, sim_mode = 0u8, beta = 0.05, mac_mode = smocc::DEFAULT_MAC_MODE, front_mode = 0u8, seeds = Vec::new(), select_mode = smocc::DEFAULT_SELECT_MODE, w_floor = smocc::DEFAULT_W_FLOOR, want_w = false))]
 #[allow(clippy::too_many_arguments)]
 pub fn smocc_probe_fn(
     graph: &Bound<'_, PyAny>,
@@ -571,14 +581,49 @@ pub fn smocc_probe_fn(
     beta: f64,
     mac_mode: u8,
     front_mode: u8,
+    seeds: Vec<std::collections::HashMap<i32, i32>>,
+    select_mode: u8,
+    w_floor: f64,
     want_w: bool,
 ) -> PyResult<Py<PyAny>> {
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
+    let idx: rustc_hash::FxHashMap<i32, usize> =
+        nodes.iter().enumerate().map(|(i, &v)| (v, i)).collect();
+    let seed_vecs: Vec<Vec<i32>> = seeds
+        .iter()
+        .map(|p| {
+            let mut v = vec![0i32; nodes.len()];
+            for (node, comm) in p {
+                if let Some(&i) = idx.get(node) {
+                    v[i] = *comm;
+                }
+            }
+            v
+        })
+        .collect();
     let out = smocc::smocc_probe(
-        &nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, refine, topo_mode, obj_mode,
-        macro_cap, micro_mut, abl, sim_mode, beta, mac_mode, front_mode,
+        &nodes,
+        &edges,
+        pop_size,
+        num_gens,
+        cross_rate,
+        mut_rate,
+        gap,
+        refine,
+        topo_mode,
+        obj_mode,
+        macro_cap,
+        micro_mut,
+        abl,
+        sim_mode,
+        beta,
+        mac_mode,
+        front_mode,
+        &seed_vecs,
+        select_mode,
+        w_floor,
     );
 
     let front = PyList::empty(py);
@@ -616,6 +661,7 @@ pub fn smocc_probe_fn(
     diag.set_item("t_exchange", d.t_exchange)?;
     diag.set_item("t_post", d.t_post)?;
     diag.set_item("cmax", d.cmax)?;
+    diag.set_item("seeds_used", d.seeds_used)?;
 
     let res = PyDict::new(py);
     res.set_item("front", front)?;

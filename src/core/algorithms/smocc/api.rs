@@ -8,7 +8,7 @@ use crate::core::graph::CsrGraph;
 
 use super::Labels;
 use super::config::defaults::{DEFAULT_OBJ_MODE, DEFAULT_TOPO_MODE};
-use super::front::{refine_front, select_best, select_index};
+use super::front::{refine_front, select_best, select_index, select_index_mode};
 use super::macro_micro::run_fronts;
 use super::objectives::ObjSet;
 use super::probe::{Diag, run_probe};
@@ -44,6 +44,9 @@ pub fn smocc_probe(
     beta: f64,
     mac_mode: u8,
     front_mode: u8,
+    seeds: &[Labels],
+    select_mode: u8,
+    w_floor: f64,
 ) -> ProbeOut {
     let g = CsrGraph::from_edges(nodes, edges);
     if g.n == 0 {
@@ -57,9 +60,9 @@ pub fn smocc_probe(
     }
     let (front, mut diag) = run_probe(
         &g, pop, num_gens, cross_rate, mut_rate, gap, refine, topo_mode, obj_mode, macro_cap,
-        micro_mut, abl, sim_mode, beta, mac_mode, front_mode,
+        micro_mut, abl, sim_mode, beta, mac_mode, front_mode, seeds, w_floor,
     );
-    let selected = select_index(&g, &front);
+    let selected = select_index_mode(&g, &front, select_mode);
     let w_values = std::mem::take(&mut diag.w_final);
     let mut w_edges = Vec::with_capacity(w_values.len());
     if !w_values.is_empty() {

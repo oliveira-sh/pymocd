@@ -5,6 +5,8 @@ hands to its selector. The oracle row is an upper bound, not an achievable
 result. Rules:
 
     deployed   min-max normalised sum of the four objectives (the shipped rule)
+    robust     the same sum, with each objective's scale anchored at the 5th
+               and 95th percentiles of the non-degenerate members
     maxq       maximum Newman-Girvan modularity
     knee       least Euclidean distance to the utopia point of the normalised
                four-objective front
@@ -93,10 +95,21 @@ def dcsbm_dl(n, edges, lab):
 
 def pick(rule, n, edges, fronts, gt):
     obj = np.array([objectives(n, edges, p)[:4] for p in fronts])
-    if rule == "deployed":
+    if rule in ("deployed", "robust"):
+        keep = np.ones(len(fronts), dtype=bool)
         lo, hi = obj.min(axis=0), obj.max(axis=0)
-        rng = hi - lo
-        z = np.where(rng > 0, (obj - lo) / np.where(rng > 0, rng, 1.0), 0.0)
+        if rule == "robust":
+            # Drop the degenerate members before setting each objective's
+            # scale, then anchor it at the 5th and 95th percentiles of what
+            # remains, so the extremes of a front spanning one community to
+            # all singletons cannot compress every real candidate.
+            ks = np.array([len(np.unique(p)) for p in fronts])
+            keep = (ks > 1) & (ks < max(n / 2, 2))
+            if keep.sum() >= 16:
+                lo = np.percentile(obj[keep], 5, axis=0)
+                hi = np.percentile(obj[keep], 95, axis=0)
+        rng = np.where(hi - lo > 0, hi - lo, 1.0)
+        z = np.clip((obj - lo) / rng, 0.0, 1.0)
         return int(z.sum(axis=1).argmin())
     if rule == "maxq":
         return int(np.argmax([modularity(n, edges, p) for p in fronts]))
@@ -118,7 +131,8 @@ def pick(rule, n, edges, fronts, gt):
     raise ValueError(rule)
 
 
-RULES = ["deployed", "maxq", "knee", "knee2", "mdl", "kmed", "oracle"]
+RULES = ["deployed", "robust", "maxq", "knee", "knee2", "mdl", "kmed",
+         "oracle"]
 
 
 def evaluate(sink, net, kind, n_cfg, mu, seed, n, edges, gt, fronts, elapsed):

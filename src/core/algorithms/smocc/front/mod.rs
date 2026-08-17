@@ -4,10 +4,11 @@
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
+mod agglom;
 mod components;
 mod refine;
 mod select;
 mod tiny;
 
-pub(super) use refine::refine_front;
-pub(super) use select::{select_best, select_index};
+pub(super) use refine::{refine_front, refine_front_mode};
+pub(super) use select::{select_best, select_index, select_index_mode};

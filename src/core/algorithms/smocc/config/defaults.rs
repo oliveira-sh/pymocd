@@ -24,3 +24,12 @@ pub const DEFAULT_MACRO_CAP: f64 = 1.0;
 /// Macro mutation: `1` is the centre-preserving flip, `0` the flat per-bit
 /// flip that drives the centre count upward without bound.
 pub const DEFAULT_MAC_MODE: u8 = 1;
+
+/// Smallest weight the consensus update leaves on an edge, which keeps every
+/// edge traversable by the decoder and stops a cut from becoming permanent.
+pub const DEFAULT_W_FLOOR: f64 = 0.0;
+
+/// Selector normalisation: `1` anchors each objective's scale at the 5th and
+/// 95th percentiles of the non-degenerate front, `0` is min-max over the whole
+/// front.
+pub const DEFAULT_SELECT_MODE: u8 = 1;

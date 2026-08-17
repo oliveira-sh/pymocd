@@ -11,10 +11,24 @@ use crate::core::algorithms::smocc::nsga2::fast_nondominated_sort;
 use crate::core::algorithms::smocc::objectives::{ObjSet, evaluate};
 use crate::core::graph::CsrGraph;
 
+use super::agglom::agglomerate;
 use super::components::split_components;
 use super::tiny::refine_tiny;
 
 pub fn refine_front(g: &CsrGraph, wadj: &[f64], front: Vec<Labels>, objset: ObjSet) -> Vec<Labels> {
+    refine_front_mode(g, wadj, front, objset, true)
+}
+
+/// `coarsen` adds the agglomerative chain of `agglom` to the candidate pool.
+/// The search returns pure but over-numerous communities, and nothing else in
+/// the pipeline builds coarser ones.
+pub fn refine_front_mode(
+    g: &CsrGraph,
+    wadj: &[f64],
+    front: Vec<Labels>,
+    objset: ObjSet,
+    coarsen: bool,
+) -> Vec<Labels> {
     if front.is_empty() {
         return front;
     }
@@ -33,6 +47,13 @@ pub fn refine_front(g: &CsrGraph, wadj: &[f64], front: Vec<Labels>, objset: ObjS
         let refined = refine_tiny(g, wadj, p);
         if seen.insert(refined.clone()) {
             all.push(refined);
+        }
+        if coarsen {
+            for c in agglomerate(g, p) {
+                if seen.insert(c.clone()) {
+                    all.push(c);
+                }
+            }
         }
     }
     if all.len() == front.len() {

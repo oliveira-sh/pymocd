@@ -8,4 +8,4 @@ mod codec;
 mod weights;
 
 pub(super) use codec::{centre_count, decode, decode_counted, encode};
-pub(super) use weights::{init_weights, update_weights};
+pub(super) use weights::{init_weights, update_weights, update_weights_floor};

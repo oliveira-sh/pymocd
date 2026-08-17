@@ -13,12 +13,12 @@ use crate::core::algorithms::mmcomo::linalg::diffusion_kernel_csr;
 use crate::core::graph::CsrGraph;
 
 use super::config::{Cfg, MicroOps};
-use super::front::refine_front;
+use super::front::refine_front_mode;
 use super::macro_micro::{init_macro_genomes, init_micro_labels, macro_cmax};
 use super::nsga2::{Obj, crowding_distance, environment_selection, fast_nondominated_sort};
 use super::objectives::{ObjSet, evaluate};
 use super::operators::{macro_offspring_mode, micro_offspring, micro_offspring_topo};
-use super::similarity::{centre_count, decode_counted, encode, init_weights, update_weights};
+use super::similarity::{centre_count, decode_counted, encode, init_weights, update_weights_floor};
 use super::{Genome, Labels};
 
 /// Drop the macro population entirely. The consensus update of the similarity
@@ -28,6 +28,8 @@ pub const ABL_NO_MACRO: u32 = 1;
 pub const ABL_NO_GUIDANCE: u32 = 1 << 1;
 pub const ABL_NO_INFLUENCE: u32 = 1 << 2;
 pub const ABL_NO_W_UPDATE: u32 = 1 << 3;
+/// Drop the agglomerative coarsening from the refinement.
+pub const ABL_NO_COARSEN: u32 = 1 << 4;
 
 /// Which object supplies the similarity that macro decoding and encoding read.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -79,6 +81,7 @@ pub struct Diag {
     pub t_exchange: f64,
     pub t_post: f64,
     pub cmax: u32,
+    pub seeds_used: u32,
     /// The final edge similarity, filled only when the graph is small enough
     /// that carrying `2m` doubles back to Python is cheap.
     pub w_final: Vec<f64>,
@@ -90,6 +93,7 @@ pub struct Diag {
 struct Sim {
     edge: Vec<f64>,
     dense: Option<Vec<f64>>,
+    floor: f64,
 }
 
 pub fn restrict_pub(g: &CsrGraph, sm: &[f64]) -> Vec<f64> {
@@ -218,7 +222,7 @@ impl Sim {
 
     fn update(&mut self, g: &CsrGraph, elites: &[&Labels], rho: f64) {
         match &mut self.dense {
-            None => update_weights(g, &mut self.edge, elites, rho),
+            None => update_weights_floor(g, &mut self.edge, elites, rho, self.floor),
             Some(sm) => {
                 dense_update(g.n, sm, elites, rho);
                 self.edge = restrict(g, sm);
@@ -292,6 +296,8 @@ pub fn run_probe(
     beta: f64,
     mac_mode: u8,
     front_mode: u8,
+    seeds: &[Labels],
+    w_floor: f64,
 ) -> (Vec<Labels>, Diag) {
     let t_start = Instant::now();
     let mut d = Diag::default();
@@ -312,12 +318,14 @@ pub fn run_probe(
         SimMode::Learned => Sim {
             edge: init_weights(g),
             dense: None,
+            floor: w_floor,
         },
         SimMode::KernelOnEdges => {
             let sm = diffusion_kernel_csr(g, beta);
             Sim {
                 edge: restrict(g, &sm),
                 dense: None,
+                floor: w_floor,
             }
         }
         SimMode::Dense => {
@@ -325,13 +333,24 @@ pub fn run_probe(
             Sim {
                 edge: restrict(g, &sm),
                 dense: Some(sm),
+                floor: w_floor,
             }
         }
     };
 
     d.cmax = macro_cmax(g.n, macro_cap) as u32;
 
-    let mut micro: Vec<Mic> = init_micro_labels(g, pop)
+    let mut seeded = init_micro_labels(g, pop);
+    // External seeds replace the first slots of the initial micro population.
+    // Elitist environmental selection keeps them only while nothing dominates
+    // them, so a poor seed costs one slot for one generation.
+    for (slot, seed) in seeded.iter_mut().zip(seeds.iter().take(pop)) {
+        if seed.len() == g.n {
+            slot.clone_from(seed);
+        }
+    }
+    d.seeds_used = seeds.len().min(pop) as u32;
+    let mut micro: Vec<Mic> = seeded
         .into_par_iter()
         .map(|labels| {
             let obj = cfg.eval_micro(g, &labels);
@@ -603,7 +622,7 @@ pub fn run_probe(
     d.front_size = front.len() as u32;
 
     let out = if do_refine {
-        refine_front(g, &sim.edge, front, cfg.micro)
+        refine_front_mode(g, &sim.edge, front, cfg.micro, abl & ABL_NO_COARSEN == 0)
     } else {
         front
     };
@@ -674,6 +693,8 @@ mod tests {
                 0.05,
                 DEFAULT_MAC_MODE,
                 0,
+                &[],
+                0.0,
             );
             assert_eq!(shipped, probed, "probe diverged from the shipped engine");
         }
@@ -705,6 +726,8 @@ mod tests {
                 0.05,
                 0,
                 0,
+                &[],
+                0.0,
             );
             assert!(!front.is_empty());
             assert!(front.iter().all(|p| p.len() == g.n));
@@ -713,6 +736,44 @@ mod tests {
                 assert!(d.centres_init.is_empty());
             }
         }
+    }
+
+    #[test]
+    fn a_seed_survives_when_nothing_dominates_it() {
+        let g = ring(6, 7);
+        let planted: Labels = (0..g.n as i32).map(|i| i / 7).collect();
+        let (front, d) = run_probe(
+            &g,
+            30,
+            5,
+            DEFAULT_CROSS_RATE,
+            DEFAULT_MUT_RATE,
+            DEFAULT_GAP,
+            true,
+            DEFAULT_TOPO_MODE,
+            DEFAULT_OBJ_MODE,
+            DEFAULT_MACRO_CAP,
+            DEFAULT_MICRO_MUT,
+            0,
+            0,
+            0.05,
+            DEFAULT_MAC_MODE,
+            0,
+            std::slice::from_ref(&planted),
+            0.0,
+        );
+        assert_eq!(d.seeds_used, 1);
+        let best = front
+            .iter()
+            .map(|p| {
+                let mut u = p.clone();
+                u.sort_unstable();
+                u.dedup();
+                u.len()
+            })
+            .min()
+            .unwrap();
+        assert!(best <= 6, "the planted seed left no coarse member: {best}");
     }
 
     #[test]
@@ -736,6 +797,8 @@ mod tests {
                 0.05,
                 0,
                 0,
+                &[],
+                0.0,
             );
             assert!(!front.is_empty());
             assert!(d.decode_calls > 0);
