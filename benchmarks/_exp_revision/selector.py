@@ -167,10 +167,13 @@ def main():
     pymocd.max_cores(int(os.environ.get("REV_THREADS", "48")))
     sink = Sink("selector.csv", FIELDS, KEY)
 
+    # A front is |F| partitions of n labels; materialising one for a graph of
+    # a million vertices costs tens of gigabytes in Python objects, so the
+    # real-network arm stops at the two SNAP graphs that fit comfortably.
     small = os.environ.get(
         "REV_SEL_NETS",
         "karate,dolphins,polbooks,football,email_eu,lesmis,florentine,"
-        "dblp,amazon,youtube").split(",")
+        "dblp,amazon").split(",")
     for net in small:
         if net not in LOADERS:
             print(f"skip unknown net {net}", flush=True)

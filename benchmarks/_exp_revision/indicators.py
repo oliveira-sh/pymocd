@@ -145,6 +145,7 @@ def main():
     nets = os.environ.get(
         "REV_IND_NETS",
         "karate,dolphins,polbooks,football,lesmis,florentine,email_eu").split(",")
+    nets = [n for n in nets if n]
     for net in nets:
         edges, n, _gt, _ev = LOADERS[net]()
         algs = small if n <= 2000 else big

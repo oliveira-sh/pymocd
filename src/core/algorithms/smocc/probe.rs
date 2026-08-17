@@ -21,6 +21,9 @@ use super::operators::{macro_offspring_mode, micro_offspring, micro_offspring_to
 use super::similarity::{centre_count, decode_counted, encode, init_weights, update_weights};
 use super::{Genome, Labels};
 
+/// Drop the macro population entirely. The consensus update of the similarity
+/// still runs at every transfer generation, since the micro elites alone drive
+/// it; removing the update as well is `ABL_NO_W_UPDATE`.
 pub const ABL_NO_MACRO: u32 = 1;
 pub const ABL_NO_GUIDANCE: u32 = 1 << 1;
 pub const ABL_NO_INFLUENCE: u32 = 1 << 2;
@@ -431,9 +434,9 @@ pub fn run_probe(
         };
         d.t_macro += t_mac.elapsed().as_secs_f64();
 
-        if t % gap == 0 && !no_macro {
+        if t % gap == 0 {
             let t_ex = Instant::now();
-            if no_guidance {
+            if no_guidance || no_macro {
                 micro.extend(micro_off);
                 let objs: Vec<Obj> = micro.iter().map(|x| x.obj.clone()).collect();
                 micro = keep(micro, &objs, pop).0;
@@ -484,7 +487,7 @@ pub fn run_probe(
                 sim.update(g, &elites, rho);
             }
 
-            if no_influence {
+            if no_influence || no_macro {
                 macro_pop.extend(macro_off);
                 let objs: Vec<Obj> = macro_pop.iter().map(|x| x.obj.clone()).collect();
                 macro_pop = keep(macro_pop, &objs, pop).0;
