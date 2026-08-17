@@ -18,11 +18,15 @@ mod macro_micro;
 mod nsga2;
 mod objectives;
 mod operators;
+pub mod probe;
 mod similarity;
 mod utils;
 
 pub type Labels = Vec<i32>;
 pub type Genome = Vec<u8>;
 
-pub use api::{smocc, smocc_fronts};
+pub use api::{
+    DecodeMedia, smocc, smocc_decode_media, smocc_fronts, smocc_postprocess, smocc_probe,
+};
 pub use config::defaults::*;
+pub use probe::{Diag, run_probe};

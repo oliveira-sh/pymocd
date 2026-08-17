@@ -21,8 +21,12 @@ ALL_THREADS = int(os.environ.get("HARD_ALL_THREADS", "2" if SMOKE else "48"))
 # order = run order.
 PARALLEL_ALGS = ("SMOCC", "HP-MOCD")
 
-LFR_DIR = os.path.join(BENCH, "data", "lfr")
-OUT = os.path.join(BENCH, "results", "hardened")
+# HARD_GRAPHS picks the graph source: "networkx" is the original campaign
+# cache, "reference" the corrected Lancichinetti generator of the revision.
+GRAPHS = os.environ.get("HARD_GRAPHS", "networkx")
+LFR_DIR = os.path.join(BENCH, "data",
+                       "lfr" if GRAPHS == "networkx" else "lfr_ref")
+OUT = os.environ.get("HARD_OUT", os.path.join(BENCH, "results", "hardened"))
 RESULTS_CSV = os.path.join(OUT, "results.csv")
 
 LFR_PARAMS = dict(tau1=2.5, tau2=1.5, average_degree=20, max_degree=50,
@@ -34,10 +38,18 @@ if SMOKE:
     NODES_SWEEP_N = [300, 600]
     NODES_SWEEP_MU = [0.3]
 else:
-    MU_SWEEP_N = [50_000, 100_000]
-    MU_SWEEP_MU = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
-    NODES_SWEEP_N = [10_000, 50_000, 100_000, 250_000, 500_000, 1_000_000]
-    NODES_SWEEP_MU = [0.3, 0.5]
+    def _grid(name, default):
+        raw = os.environ.get(name)
+        if not raw:
+            return default
+        return [float(x) if "." in x else int(x) for x in raw.split(",")]
+
+    MU_SWEEP_N = _grid("HARD_MU_N", [50_000, 100_000])
+    MU_SWEEP_MU = _grid("HARD_MU", [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8])
+    NODES_SWEEP_N = _grid("HARD_SIZE_N",
+                          [10_000, 50_000, 100_000, 250_000, 500_000,
+                           1_000_000])
+    NODES_SWEEP_MU = _grid("HARD_SIZE_MU", [0.3, 0.5])
 
 ALGORITHMS = {
     "SMOCC":       dict(deterministic=True,  max_nodes=None,      needs="shim"),
@@ -55,6 +67,11 @@ ALGORITHMS = {
     "Leiden-CPM":  dict(deterministic=False, max_nodes=None,      needs="ig"),
     "ASYN-LPA":    dict(deterministic=False, max_nodes=2_000_000, needs="nx"),
 }
+
+_ALG_FILTER = {a.strip() for a in os.environ.get("HARD_ALGS", "").split(",")
+               if a.strip()}
+if _ALG_FILTER:
+    ALGORITHMS = {k: v for k, v in ALGORITHMS.items() if k in _ALG_FILTER}
 
 CSV_FIELDS = ["alg", "kind", "net", "n_cfg", "mu", "seed", "status", "n", "m",
               "k", "time", "nmi", "ami", "ari", "hom", "cmp", "vm", "gt_k",

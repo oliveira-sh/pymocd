@@ -1,5 +1,6 @@
 import gzip
 import os
+import shutil
 import sys
 import urllib.request
 import zipfile
@@ -18,12 +19,22 @@ DOLPHINS_GT_URL = ("https://raw.githubusercontent.com/vlivashkin/"
 
 
 def _fetch(url, fname=None):
+    """Download once, atomically. Concurrent workers race on the same target,
+    so the body lands in a per-process temporary and is renamed into place; a
+    zero-length file from an interrupted earlier run is refetched."""
     os.makedirs(DATA, exist_ok=True)
     path = os.path.join(DATA, fname or os.path.basename(url))
-    if not os.path.exists(path):
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req) as resp, open(path, "wb") as out:
-            out.write(resp.read())
+    if os.path.exists(path) and os.path.getsize(path) > 0:
+        return path
+    tmp = f"{path}.{os.getpid()}.part"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with urllib.request.urlopen(req) as resp, open(tmp, "wb") as out:
+            shutil.copyfileobj(resp, out, 1 << 20)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
     return path
 
 

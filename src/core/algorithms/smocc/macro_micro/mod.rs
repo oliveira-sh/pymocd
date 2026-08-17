@@ -10,6 +10,4 @@ mod init;
 mod swarms;
 
 pub(super) use engine::run_fronts;
-
-#[cfg(test)]
-pub(super) use init::macro_cmax;
+pub(super) use init::{init_macro_genomes, init_micro_labels, macro_cmax};

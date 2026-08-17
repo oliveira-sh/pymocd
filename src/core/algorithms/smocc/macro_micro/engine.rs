@@ -6,11 +6,12 @@
 
 use rayon::prelude::*;
 
+use crate::core::algorithms::smocc::config::defaults::DEFAULT_MAC_MODE;
 use crate::core::algorithms::smocc::config::{Cfg, MicroOps};
 use crate::core::algorithms::smocc::front::refine_front;
 use crate::core::algorithms::smocc::nsga2::{Obj, crowding_distance, fast_nondominated_sort};
 use crate::core::algorithms::smocc::operators::{
-    macro_offspring, micro_offspring, micro_offspring_topo,
+    macro_offspring_mode, micro_offspring, micro_offspring_topo,
 };
 use crate::core::algorithms::smocc::similarity::decode;
 use crate::core::algorithms::smocc::similarity::init_weights;
@@ -78,18 +79,19 @@ pub fn run_fronts(
 
         let (ar, ac) = ranks_and_crowd(&macro_objs(&macro_pop));
         let agen: Vec<Genome> = macro_pop.iter().map(|x| x.genome.clone()).collect();
-        let macro_off: Vec<Mac> = macro_offspring(&agen, &ar, &ac, p_m, 2 * t as u64 + 1)
-            .into_par_iter()
-            .map(|gn| {
-                let labels = decode(g, &wadj, &gn);
-                let obj = cfg.eval_macro(g, &labels);
-                Mac {
-                    genome: gn,
-                    labels,
-                    obj,
-                }
-            })
-            .collect();
+        let macro_off: Vec<Mac> =
+            macro_offspring_mode(&agen, &ar, &ac, p_m, 2 * t as u64 + 1, DEFAULT_MAC_MODE)
+                .into_par_iter()
+                .map(|gn| {
+                    let labels = decode(g, &wadj, &gn);
+                    let obj = cfg.eval_macro(g, &labels);
+                    Mac {
+                        genome: gn,
+                        labels,
+                        obj,
+                    }
+                })
+                .collect();
 
         if t % gap == 0 {
             micro = guidance(g, &wadj, &macro_pop, micro, micro_off, pop, &cfg);

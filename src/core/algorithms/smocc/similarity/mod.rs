@@ -7,5 +7,5 @@
 mod codec;
 mod weights;
 
-pub(super) use codec::{decode, encode};
+pub(super) use codec::{centre_count, decode, decode_counted, encode};
 pub(super) use weights::{init_weights, update_weights};

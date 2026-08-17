@@ -9,7 +9,7 @@ pub const DEFAULT_NUM_GENS: usize = 100;
 
 pub const DEFAULT_CROSS_RATE: f64 = 0.7;
 
-pub const DEFAULT_MUT_RATE: f64 = 0.5;
+pub const DEFAULT_MUT_RATE: f64 = 0.1;
 
 pub const DEFAULT_MICRO_MUT: f64 = 0.5;
 
@@ -20,3 +20,7 @@ pub const DEFAULT_TOPO_MODE: u8 = 130;
 pub const DEFAULT_GAP: usize = 10;
 
 pub const DEFAULT_MACRO_CAP: f64 = 1.0;
+
+/// Macro mutation: `1` is the centre-preserving flip, `0` the flat per-bit
+/// flip that drives the centre count upward without bound.
+pub const DEFAULT_MAC_MODE: u8 = 1;

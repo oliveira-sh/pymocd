@@ -66,6 +66,9 @@ fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(moga_net_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mmcomo_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(smocc_fronts_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(smocc_probe_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(smocc_postprocess_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(smocc_decode_media_fn, m)?)?;
 
     // deprecated aliases (pre-rename API)
     m.add("scale", m.getattr("smocc")?)?;

@@ -10,12 +10,23 @@ use rayon::prelude::*;
 use crate::core::algorithms::smocc::Genome;
 use crate::core::algorithms::smocc::utils::sampling::{bernoulli, slot_rng, tournament};
 
-pub fn macro_offspring(
+/// `mac_mode` selects the mutation.
+///
+/// `0` is the flat per-bit flip: every position of the crossover child flips
+/// with probability `p_m`. At `p_m = 0.5` the child is a uniform random genome,
+/// independent of both parents, with `n/2` centres.
+///
+/// `1` is the centre-preserving flip: a centre is dropped with probability
+/// `p_m` and the same expected number of new centres is drawn from the
+/// non-centres, so `p_m` is the fraction of centres resampled per generation
+/// and the expected centre count is unchanged.
+pub fn macro_offspring_mode(
     parents: &[Genome],
     ranks: &[usize],
     crowd: &[f64],
     p_m: f64,
     salt: u64,
+    mac_mode: u8,
 ) -> Vec<Genome> {
     let pop = parents.len();
     if pop == 0 {
@@ -31,15 +42,34 @@ pub fn macro_offspring(
             let (pa, pb) = (&parents[a], &parents[b]);
 
             let d_half = bernoulli(0.5);
-            let d_m = if n > 0 { bernoulli(p_m) } else { d_half };
-
             let mut child: Genome = Vec::with_capacity(n);
             for i in 0..n {
-                let mut bit = if r.sample(d_half) { pa[i] } else { pb[i] };
-                if r.sample(d_m) {
-                    bit ^= 1;
+                child.push(if r.sample(d_half) { pa[i] } else { pb[i] });
+            }
+
+            if mac_mode == 1 {
+                let c = child.iter().filter(|&&b| b != 0).count();
+                let p_on = p_m.clamp(0.0, 1.0);
+                let p_off = if n > c {
+                    (p_on * c as f64 / (n - c) as f64).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                let d_on = bernoulli(p_on);
+                let d_off = bernoulli(p_off);
+                for bit in &mut child {
+                    let d = if *bit != 0 { d_on } else { d_off };
+                    if r.sample(d) {
+                        *bit ^= 1;
+                    }
                 }
-                child.push(bit);
+            } else {
+                let d_m = bernoulli(p_m);
+                for bit in &mut child {
+                    if r.sample(d_m) {
+                        *bit ^= 1;
+                    }
+                }
             }
 
             if child.iter().all(|&b| b == 0) && n > 0 {

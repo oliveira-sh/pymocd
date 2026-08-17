@@ -6,10 +6,163 @@
 
 use crate::core::graph::CsrGraph;
 
+use super::Labels;
 use super::config::defaults::{DEFAULT_OBJ_MODE, DEFAULT_TOPO_MODE};
-use super::front::select_best;
+use super::front::{refine_front, select_best, select_index};
 use super::macro_micro::run_fronts;
+use super::objectives::ObjSet;
+use super::probe::{Diag, run_probe};
+use super::similarity::init_weights;
 use super::utils::to_output;
+
+/// One instrumented run: the refined front, the selected member's index, the
+/// diagnostics, and (optionally) the final edge similarity with its endpoints.
+pub struct ProbeOut {
+    pub front: Vec<Vec<(i32, i32)>>,
+    pub selected: usize,
+    pub diag: Diag,
+    pub w_edges: Vec<(i32, i32)>,
+    pub w_values: Vec<f64>,
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn smocc_probe(
+    nodes: &[i32],
+    edges: &[(i32, i32)],
+    pop: usize,
+    num_gens: usize,
+    cross_rate: f64,
+    mut_rate: f64,
+    gap: usize,
+    refine: bool,
+    topo_mode: u8,
+    obj_mode: u16,
+    macro_cap: f64,
+    micro_mut: f64,
+    abl: u32,
+    sim_mode: u8,
+    beta: f64,
+    mac_mode: u8,
+    front_mode: u8,
+) -> ProbeOut {
+    let g = CsrGraph::from_edges(nodes, edges);
+    if g.n == 0 {
+        return ProbeOut {
+            front: Vec::new(),
+            selected: 0,
+            diag: Diag::default(),
+            w_edges: Vec::new(),
+            w_values: Vec::new(),
+        };
+    }
+    let (front, mut diag) = run_probe(
+        &g, pop, num_gens, cross_rate, mut_rate, gap, refine, topo_mode, obj_mode, macro_cap,
+        micro_mut, abl, sim_mode, beta, mac_mode, front_mode,
+    );
+    let selected = select_index(&g, &front);
+    let w_values = std::mem::take(&mut diag.w_final);
+    let mut w_edges = Vec::with_capacity(w_values.len());
+    if !w_values.is_empty() {
+        for u in 0..g.n {
+            let (s, e) = (g.xadj[u] as usize, g.xadj[u + 1] as usize);
+            for &v in &g.adj[s..e] {
+                w_edges.push((g.labels[u], g.labels[v as usize]));
+            }
+        }
+    }
+    ProbeOut {
+        front: front.iter().map(|l| to_output(&g, l)).collect(),
+        selected,
+        diag,
+        w_edges,
+        w_values,
+    }
+}
+
+/// Run SMOCC's post-search stages over an externally supplied set of
+/// partitions: the monotone refinement under unit edge weights, then the
+/// label-free selector. Lets any detector's front go through the same
+/// refinement and selection pipeline.
+pub fn smocc_postprocess(
+    nodes: &[i32],
+    edges: &[(i32, i32)],
+    fronts: &[Vec<i32>],
+    refine: bool,
+) -> (Vec<Vec<(i32, i32)>>, usize) {
+    let g = CsrGraph::from_edges(nodes, edges);
+    if g.n == 0 || fronts.is_empty() {
+        return (Vec::new(), 0);
+    }
+    let w = init_weights(&g);
+    let front: Vec<Labels> = fronts.to_vec();
+    let front = if refine {
+        refine_front(&g, &w, front, ObjSet::HpIntraInter)
+    } else {
+        front
+    };
+    let selected = select_index(&g, &front);
+    (front.iter().map(|l| to_output(&g, l)).collect(), selected)
+}
+
+/// Decode one macro genome under each similarity medium, so the sparse
+/// reformulation can be compared against the dense kernel it replaces on the
+/// same graph and the same centre set.
+pub struct DecodeMedia {
+    pub unit: Vec<Labels>,
+    pub kernel_edge: Vec<Labels>,
+    pub dense: Vec<Labels>,
+    pub w_kernel_edge: Vec<f64>,
+    pub w_edges: Vec<(i32, i32)>,
+}
+
+pub fn smocc_decode_media(
+    nodes: &[i32],
+    edges: &[(i32, i32)],
+    genomes: &[Vec<u8>],
+    beta: f64,
+) -> DecodeMedia {
+    use super::probe::{decode_dense_pub, restrict_pub};
+    use super::similarity::decode;
+    use crate::core::algorithms::mmcomo::linalg::diffusion_kernel_csr;
+
+    let g = CsrGraph::from_edges(nodes, edges);
+    let n = g.n;
+    if n == 0 {
+        return DecodeMedia {
+            unit: Vec::new(),
+            kernel_edge: Vec::new(),
+            dense: Vec::new(),
+            w_kernel_edge: Vec::new(),
+            w_edges: Vec::new(),
+        };
+    }
+    let unit = init_weights(&g);
+    let sm = diffusion_kernel_csr(&g, beta);
+    let ke = restrict_pub(&g, &sm);
+
+    let mut a = Vec::new();
+    let mut b = Vec::new();
+    let mut c = Vec::new();
+    for gn in genomes {
+        a.push(decode(&g, &unit, gn));
+        b.push(decode(&g, &ke, gn));
+        c.push(decode_dense_pub(&g, &sm, gn));
+    }
+    let mut ep = Vec::with_capacity(g.adj.len());
+    for u in 0..n {
+        let (s, e) = (g.xadj[u] as usize, g.xadj[u + 1] as usize);
+        for &v in &g.adj[s..e] {
+            ep.push((g.labels[u], g.labels[v as usize]));
+        }
+    }
+    DecodeMedia {
+        unit: a,
+        kernel_edge: b,
+        dense: c,
+        w_kernel_edge: ke,
+        w_edges: ep,
+    }
+}
 
 #[allow(clippy::too_many_arguments)]
 pub fn smocc(

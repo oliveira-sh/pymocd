@@ -23,7 +23,13 @@ fn max_degree_node(g: &CsrGraph) -> usize {
 }
 
 #[inline(never)]
-fn propagate(g: &CsrGraph, wadj: &[f64], is_center: &[bool], lab: &mut [i32], n_slots: usize) {
+fn propagate(
+    g: &CsrGraph,
+    wadj: &[f64],
+    is_center: &[bool],
+    lab: &mut [i32],
+    n_slots: usize,
+) -> usize {
     let n = g.n;
     let mut vote = vec![0.0f64; n_slots];
     let max_deg = g.deg.iter().copied().max().unwrap_or(0) as usize;
@@ -41,7 +47,9 @@ fn propagate(g: &CsrGraph, wadj: &[f64], is_center: &[bool], lab: &mut [i32], n_
         .map(|&c| if c { CENTER } else { DIRTY })
         .collect();
 
+    let mut sweeps = 0usize;
     for _ in 0..n {
+        sweeps += 1;
         let mut changed = false;
         for u in 0..n {
             if state[u] != DIRTY {
@@ -91,12 +99,20 @@ fn propagate(g: &CsrGraph, wadj: &[f64], is_center: &[bool], lab: &mut [i32], n_
             break;
         }
     }
+    sweeps
 }
 
 pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
+    decode_counted(g, wadj, genome).0
+}
+
+/// `decode` plus its two sweep counts: the propagation sweeps to the fixed
+/// point (the quantity `S` in the complexity analysis) and the rounds of the
+/// min-label pass that collapses components holding no centre.
+pub fn decode_counted(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> (Labels, usize, usize) {
     let n = g.n;
     if n == 0 {
-        return Vec::new();
+        return (Vec::new(), 0, 0);
     }
 
     let mut is_center = vec![false; n];
@@ -121,7 +137,7 @@ pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
         }
     }
 
-    propagate(g, wadj, &is_center, &mut lab, n_centers);
+    let sweeps = propagate(g, wadj, &is_center, &mut lab, n_centers);
 
     debug_assert!(
         lab.iter()
@@ -134,6 +150,7 @@ pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
         }
     }
 
+    let mut rounds = 0usize;
     if lab.contains(&UNSET) {
         let leftover: Vec<bool> = lab.iter().map(|&l| l == UNSET).collect();
         for u in 0..n {
@@ -142,6 +159,7 @@ pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
             }
         }
         for _ in 0..n {
+            rounds += 1;
             let mut changed = false;
             for u in 0..n {
                 if !leftover[u] {
@@ -163,7 +181,13 @@ pub fn decode(g: &CsrGraph, wadj: &[f64], genome: &Genome) -> Labels {
             }
         }
     }
-    lab
+    (lab, sweeps, rounds)
+}
+
+/// Number of centres a genome marks, after the empty-genome repair `decode`
+/// applies.
+pub fn centre_count(genome: &Genome) -> usize {
+    genome.iter().filter(|&&b| b != 0).count().max(1)
 }
 
 pub fn encode(g: &CsrGraph, wadj: &[f64], labels: &Labels) -> Genome {

@@ -525,3 +525,174 @@ pub fn smocc_fronts_fn(
     }
     Ok(out.into_any().unbind())
 }
+
+/// `smocc_probe` — one instrumented SMOCC run. Same search as `smocc_fronts`
+/// at default `abl`/`sim_mode`, plus the per-stage counters the paper reports
+/// and switches that disable individual components.
+///
+/// Args:
+///     abl: ablation bitmask. ``1`` drops the macro population entirely,
+///         ``2`` drops the macro-to-micro guidance transfer, ``4`` drops the
+///         micro-to-macro influence injection, ``8`` freezes the similarity at
+///         its unit initialisation. Bits combine.
+///     sim_mode: similarity medium. ``0`` the shipped learned per-edge vector,
+///         ``1`` the dense diffusion kernel restricted to the edges and held
+///         fixed, ``2`` the full dense kernel with nearest-centre decoding
+///         (``O(n^2)`` memory, small graphs only).
+///     beta: diffusion parameter, read only when ``sim_mode`` is 1 or 2.
+///     mac_mode: macro mutation. ``0`` the shipped flat per-bit flip, ``1`` the
+///         centre-preserving flip in which ``mut_rate`` is the fraction of
+///         centres resampled per generation.
+///     front_mode: which non-dominated set is delivered. ``0`` rank-1 under the
+///         micro objective pair, the shipped behaviour; ``1`` rank-1 under all
+///         four objectives, so the selector scores the set its own criteria
+///         define.
+///
+/// Returns a dict with ``front`` (list of partitions), ``selected`` (index of
+/// the member the deployed selector returns) and ``diag``.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "smocc_probe", signature = (graph, pop_size = smocc::DEFAULT_POP_SIZE, num_gens = smocc::DEFAULT_NUM_GENS, cross_rate = smocc::DEFAULT_CROSS_RATE, mut_rate = smocc::DEFAULT_MUT_RATE, gap = smocc::DEFAULT_GAP, refine = true, topo_mode = smocc::DEFAULT_TOPO_MODE, obj_mode = smocc::DEFAULT_OBJ_MODE, macro_cap = smocc::DEFAULT_MACRO_CAP, micro_mut = smocc::DEFAULT_MICRO_MUT, abl = 0u32, sim_mode = 0u8, beta = 0.05, mac_mode = smocc::DEFAULT_MAC_MODE, front_mode = 0u8, want_w = false))]
+#[allow(clippy::too_many_arguments)]
+pub fn smocc_probe_fn(
+    graph: &Bound<'_, PyAny>,
+    pop_size: usize,
+    num_gens: usize,
+    cross_rate: f64,
+    mut_rate: f64,
+    gap: usize,
+    refine: bool,
+    topo_mode: u8,
+    obj_mode: u16,
+    macro_cap: f64,
+    micro_mut: f64,
+    abl: u32,
+    sim_mode: u8,
+    beta: f64,
+    mac_mode: u8,
+    front_mode: u8,
+    want_w: bool,
+) -> PyResult<Py<PyAny>> {
+    let py = graph.py();
+    let nodes = get_nodes(graph)?;
+    let edges = get_edges(graph)?;
+    let out = smocc::smocc_probe(
+        &nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, refine, topo_mode, obj_mode,
+        macro_cap, micro_mut, abl, sim_mode, beta, mac_mode, front_mode,
+    );
+
+    let front = PyList::empty(py);
+    for part in &out.front {
+        let d = PyDict::new(py);
+        for &(node, comm) in part {
+            d.set_item(node, comm)?;
+        }
+        front.append(d)?;
+    }
+
+    let d = &out.diag;
+    let diag = PyDict::new(py);
+    diag.set_item("sweeps", d.sweeps.clone())?;
+    diag.set_item("fallback_rounds", d.fallback_rounds.clone())?;
+    diag.set_item("centres_init", d.centres_init.clone())?;
+    diag.set_item("centres_off", d.centres_off.clone())?;
+    diag.set_item("centres_pop", d.centres_pop.clone())?;
+    diag.set_item("centres_influence", d.centres_influence.clone())?;
+    diag.set_item("guidance_injected", d.guidance_injected.clone())?;
+    diag.set_item("guidance_survived", d.guidance_survived.clone())?;
+    diag.set_item("influence_injected", d.influence_injected.clone())?;
+    diag.set_item("influence_survived", d.influence_survived.clone())?;
+    diag.set_item("front_from_micro", d.front_from_micro)?;
+    diag.set_item("front_from_macro", d.front_from_macro)?;
+    diag.set_item("front_from_guidance", d.front_from_guidance)?;
+    diag.set_item("front_size", d.front_size)?;
+    diag.set_item("front_size_refined", d.front_size_refined)?;
+    diag.set_item("front4_size", d.front4_size)?;
+    diag.set_item("front4_only", d.front4_only)?;
+    diag.set_item("decode_calls", d.decode_calls)?;
+    diag.set_item("t_total", d.t_total)?;
+    diag.set_item("t_micro", d.t_micro)?;
+    diag.set_item("t_macro", d.t_macro)?;
+    diag.set_item("t_exchange", d.t_exchange)?;
+    diag.set_item("t_post", d.t_post)?;
+    diag.set_item("cmax", d.cmax)?;
+
+    let res = PyDict::new(py);
+    res.set_item("front", front)?;
+    res.set_item("selected", out.selected)?;
+    res.set_item("diag", diag)?;
+    if want_w {
+        res.set_item("w_edges", out.w_edges.clone())?;
+        res.set_item("w_values", out.w_values.clone())?;
+    }
+    Ok(res.into_any().unbind())
+}
+
+/// Push an externally produced set of partitions through SMOCC's post-search
+/// stages (monotone refinement under unit edge weights, then the label-free
+/// selector). `fronts` is a list of dicts node -> community.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "smocc_postprocess", signature = (graph, fronts, refine = true))]
+pub fn smocc_postprocess_fn(
+    graph: &Bound<'_, PyAny>,
+    fronts: Vec<std::collections::HashMap<i32, i32>>,
+    refine: bool,
+) -> PyResult<Py<PyAny>> {
+    let py = graph.py();
+    let nodes = get_nodes(graph)?;
+    let edges = get_edges(graph)?;
+    let idx: rustc_hash::FxHashMap<i32, usize> =
+        nodes.iter().enumerate().map(|(i, &v)| (v, i)).collect();
+    let dense: Vec<Vec<i32>> = fronts
+        .iter()
+        .map(|p| {
+            let mut v = vec![0i32; nodes.len()];
+            for (node, comm) in p {
+                if let Some(&i) = idx.get(node) {
+                    v[i] = *comm;
+                }
+            }
+            v
+        })
+        .collect();
+    let (front, selected) = smocc::smocc_postprocess(&nodes, &edges, &dense, refine);
+    let out = PyList::empty(py);
+    for part in &front {
+        let d = PyDict::new(py);
+        for &(node, comm) in part {
+            d.set_item(node, comm)?;
+        }
+        out.append(d)?;
+    }
+    let res = PyDict::new(py);
+    res.set_item("front", out)?;
+    res.set_item("selected", selected)?;
+    Ok(res.into_any().unbind())
+}
+
+/// Decode the same macro genomes under each similarity medium: the unit
+/// per-edge vector, the dense diffusion kernel restricted to the edges, and the
+/// full dense kernel with nearest-centre assignment. Returns the three label
+/// vectors per genome plus the restricted kernel values and their endpoints.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "smocc_decode_media", signature = (graph, genomes, beta = 0.05))]
+pub fn smocc_decode_media_fn(
+    graph: &Bound<'_, PyAny>,
+    genomes: Vec<Vec<u8>>,
+    beta: f64,
+) -> PyResult<Py<PyAny>> {
+    let py = graph.py();
+    let nodes = get_nodes(graph)?;
+    let edges = get_edges(graph)?;
+    let m = smocc::smocc_decode_media(&nodes, &edges, &genomes, beta);
+    let res = PyDict::new(py);
+    res.set_item("nodes", nodes)?;
+    res.set_item("unit", m.unit)?;
+    res.set_item("kernel_edge", m.kernel_edge)?;
+    res.set_item("dense", m.dense)?;
+    res.set_item("w_kernel_edge", m.w_kernel_edge)?;
+    res.set_item("w_edges", m.w_edges)?;
+    Ok(res.into_any().unbind())
+}

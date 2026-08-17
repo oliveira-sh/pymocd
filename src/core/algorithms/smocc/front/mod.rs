@@ -10,4 +10,4 @@ mod select;
 mod tiny;
 
 pub(super) use refine::refine_front;
-pub(super) use select::select_best;
+pub(super) use select::{select_best, select_index};

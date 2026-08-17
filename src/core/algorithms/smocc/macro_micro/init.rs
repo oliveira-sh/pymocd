@@ -9,11 +9,11 @@ use rand::seq::SliceRandom;
 use rayon::prelude::*;
 use std::collections::HashSet;
 
-use crate::core::algorithms::smocc::Labels;
 use crate::core::algorithms::smocc::config::Cfg;
 use crate::core::algorithms::smocc::config::defaults::DEFAULT_MACRO_CAP;
 use crate::core::algorithms::smocc::similarity::decode;
 use crate::core::algorithms::smocc::utils::sampling::slot_rng;
+use crate::core::algorithms::smocc::{Genome, Labels};
 use crate::core::graph::CsrGraph;
 
 use super::swarms::{Mac, Mic};
@@ -31,12 +31,13 @@ pub fn macro_cmax(n: usize, macro_cap: f64) -> usize {
     ((mult * (n as f64).sqrt()).ceil() as usize).clamp(1, n.max(1))
 }
 
-pub(super) fn init_micro(g: &CsrGraph, pop: usize, cfg: &Cfg) -> Vec<Mic> {
+/// The `pop` seed label vectors of the micro population, before evaluation.
+pub fn init_micro_labels(g: &CsrGraph, pop: usize) -> Vec<Labels> {
     (0..pop)
         .into_par_iter()
         .map(|k| {
             let mut r = slot_rng(u64::MAX, k);
-            let labels: Labels = (0..g.n)
+            (0..g.n)
                 .map(|i| {
                     let nbrs = g.neighbors(i);
                     if nbrs.is_empty() {
@@ -45,20 +46,13 @@ pub(super) fn init_micro(g: &CsrGraph, pop: usize, cfg: &Cfg) -> Vec<Mic> {
                         nbrs[r.random_range(0..nbrs.len())] as i32
                     }
                 })
-                .collect();
-            let obj = cfg.eval_micro(g, &labels);
-            Mic { labels, obj }
+                .collect()
         })
         .collect()
 }
 
-pub(super) fn init_macro(
-    g: &CsrGraph,
-    wadj: &[f64],
-    pop: usize,
-    cfg: &Cfg,
-    macro_cap: f64,
-) -> Vec<Mac> {
+/// The `pop` seed centre genomes of the macro population, before decoding.
+pub fn init_macro_genomes(g: &CsrGraph, pop: usize, macro_cap: f64) -> Vec<Genome> {
     let n = g.n;
     let mut by_deg: Vec<usize> = (0..n).collect();
     by_deg.sort_unstable_by(|&a, &b| g.deg[b].cmp(&g.deg[a]));
@@ -88,6 +82,31 @@ pub(super) fn init_macro(
             if genome.iter().all(|&b| b == 0) {
                 genome[by_deg[0]] = 1;
             }
+            genome
+        })
+        .collect()
+}
+
+pub(super) fn init_micro(g: &CsrGraph, pop: usize, cfg: &Cfg) -> Vec<Mic> {
+    init_micro_labels(g, pop)
+        .into_par_iter()
+        .map(|labels| {
+            let obj = cfg.eval_micro(g, &labels);
+            Mic { labels, obj }
+        })
+        .collect()
+}
+
+pub(super) fn init_macro(
+    g: &CsrGraph,
+    wadj: &[f64],
+    pop: usize,
+    cfg: &Cfg,
+    macro_cap: f64,
+) -> Vec<Mac> {
+    init_macro_genomes(g, pop, macro_cap)
+        .into_par_iter()
+        .map(|genome| {
             let labels = decode(g, wadj, &genome);
             let obj = cfg.eval_macro(g, &labels);
             Mac {

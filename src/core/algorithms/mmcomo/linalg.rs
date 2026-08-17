@@ -10,6 +10,30 @@
 
 use super::*;
 
+/// `diffusion_kernel` for a CSR graph, returned row-major so callers outside
+/// MMCoMO can index it as `sm[u * n + v]`.
+pub fn diffusion_kernel_csr(g: &crate::core::graph::CsrGraph, beta: f64) -> Vec<f64> {
+    let n = g.n;
+    if n == 0 {
+        return Vec::new();
+    }
+    let adj: Vec<Vec<usize>> = (0..n)
+        .map(|u| {
+            let (s, e) = (g.xadj[u] as usize, g.xadj[u + 1] as usize);
+            g.adj[s..e].iter().map(|&v| v as usize).collect()
+        })
+        .collect();
+    let deg: Vec<f64> = adj.iter().map(|a| a.len() as f64).collect();
+    let m2: f64 = deg.iter().sum();
+    let gg = Graph { n, adj, deg, m2 };
+    let sm = diffusion_kernel(&gg, beta);
+    let mut flat = Vec::with_capacity(n * n);
+    for row in sm {
+        flat.extend(row);
+    }
+    flat
+}
+
 /// Diffusion-kernel similarity matrix SM = exp(beta * (A - D)).
 pub fn diffusion_kernel(g: &Graph, beta: f64) -> Sm {
     let n = g.n;

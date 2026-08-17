@@ -14,6 +14,16 @@ pub fn select_best(g: &CsrGraph, front: Vec<Labels>) -> Labels {
     if front.is_empty() {
         return vec![0; g.n];
     }
+    let pick = select_index(g, &front);
+    front.into_iter().nth(pick).unwrap()
+}
+
+/// The index `select_best` picks, so callers can compare selection rules over
+/// an identical candidate set without re-running the search.
+pub fn select_index(g: &CsrGraph, front: &[Labels]) -> usize {
+    if front.is_empty() {
+        return 0;
+    }
     let obj: Vec<[f64; 4]> = front
         .par_iter()
         .map(|p| {
@@ -56,7 +66,7 @@ pub fn select_best(g: &CsrGraph, front: Vec<Labels>) -> Labels {
             pick = j;
         }
     }
-    front.into_iter().nth(pick).unwrap()
+    pick
 }
 
 #[cfg(test)]

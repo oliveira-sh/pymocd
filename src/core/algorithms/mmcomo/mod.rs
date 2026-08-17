@@ -10,7 +10,7 @@ use rand::{RngExt, rng};
 use std::collections::{HashMap, HashSet};
 
 mod defaults;
-mod linalg;
+pub mod linalg;
 mod nsga2;
 mod objectives;
 mod operators;

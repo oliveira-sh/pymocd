@@ -92,7 +92,10 @@ def main():
     kind, seed, threads = task["kind"], task["seed"], task["threads"]
 
     if kind == "lfr":
-        from _exp_synt_net.gen_graphs import ensure
+        if os.environ.get("HARD_GRAPHS", "networkx") == "reference":
+            from _exp_revision.lfr_reference import ensure
+        else:
+            from _exp_synt_net.gen_graphs import ensure
         n_cfg, mu = task["n_cfg"], task["mu"]
         data = np.load(ensure(n_cfg, mu, seed, log=lambda *a, **k: None))
         edges, gt = data["edges"], data["gt"].astype(np.int64)
@@ -133,11 +136,12 @@ def main():
     slug = re.sub(r"\W+", "-", "_".join(map(str, [
         task["alg"], kind, task.get("net", task.get("n_cfg")),
         task.get("mu", ""), seed])))
-    parts_dir = os.path.join(os.path.dirname(HERE), "data", "parts")
+    parts_dir = os.environ.get(
+        "HARD_PARTS", os.path.join(os.path.dirname(HERE), "data", "parts"))
     os.makedirs(parts_dir, exist_ok=True)
     np.savez_compressed(os.path.join(parts_dir, slug + ".npz"),
                         labels=lab.astype(np.int32))
-    out["part"] = f"data/parts/{slug}.npz"
+    out["part"] = os.path.join(parts_dir, slug + ".npz")
     print("RESULT " + json.dumps(out), flush=True)
 
 

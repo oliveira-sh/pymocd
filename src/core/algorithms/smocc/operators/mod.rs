@@ -7,5 +7,5 @@
 mod macro_genome;
 mod micro_labels;
 
-pub(super) use macro_genome::macro_offspring;
+pub(super) use macro_genome::macro_offspring_mode;
 pub(super) use micro_labels::{micro_offspring, micro_offspring_topo};
