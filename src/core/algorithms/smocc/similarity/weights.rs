@@ -20,13 +20,19 @@ pub fn update_weights(g: &CsrGraph, wadj: &mut [f64], elites: &[&Labels], rho: f
 
 /// Smallest weight the consensus update may leave on an edge.
 ///
-/// Without a floor the update has an absorbing state. An edge every elite cuts
-/// takes `c = 0`, so its weight decays geometrically; once it is near zero the
+/// The update has an absorbing state on paper: an edge every elite cuts takes
+/// `c = 0`, so its weight decays geometrically, and once it is near zero the
 /// decoder cannot propagate a label across it, no later elite can join its
-/// endpoints, and `c` stays zero forever. The split is then permanent whatever
-/// the objectives later prefer, which is one reason the delivered partition is
-/// finer than the graph warrants (\autoref{sec:camp_ablation}). A floor keeps
-/// every edge traversable, so a merge stays reachable.
+/// endpoints, and `c` stays zero forever. A floor would keep the merge
+/// reachable.
+///
+/// Measured, that state is never reached, so the floor is inert. On LFR graphs
+/// at `n = 10^4` the smallest learned weight is `0.096` at a mixing of `0.5`
+/// and `0.110` at `0.6`, and not one edge of `294_000` falls below `0.05`; the
+/// elite set spans granularity, so a coarse elite keeps almost every pair
+/// together and `c` is bounded away from zero. Floors at `0.01`, `0.05` and
+/// `0.10` reproduce the shipped run exactly. The parameter is kept because the
+/// paper reports that measurement, not because it changes anything.
 pub fn update_weights_floor(
     g: &CsrGraph,
     wadj: &mut [f64],

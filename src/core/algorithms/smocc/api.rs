@@ -47,6 +47,7 @@ pub fn smocc_probe(
     seeds: &[Labels],
     select_mode: u8,
     w_floor: f64,
+    rho_scale: f64,
 ) -> ProbeOut {
     let g = CsrGraph::from_edges(nodes, edges);
     if g.n == 0 {
@@ -60,7 +61,7 @@ pub fn smocc_probe(
     }
     let (front, mut diag) = run_probe(
         &g, pop, num_gens, cross_rate, mut_rate, gap, refine, topo_mode, obj_mode, macro_cap,
-        micro_mut, abl, sim_mode, beta, mac_mode, front_mode, seeds, w_floor,
+        micro_mut, abl, sim_mode, beta, mac_mode, front_mode, seeds, w_floor, rho_scale,
     );
     let selected = select_index_mode(&g, &front, select_mode);
     let w_values = std::mem::take(&mut diag.w_final);

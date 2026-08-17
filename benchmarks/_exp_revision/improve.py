@@ -17,6 +17,8 @@ missing candidates:
              95th percentiles of what remains rather than at the extremes
     floor    the consensus update never leaves an edge below a floor, so a cut
              every elite agrees on does not become permanent
+    rho      the consensus rate is scaled, interpolating between the frozen
+             similarity of the ablation and the shipped schedule
 
     python -m _exp_revision.improve
 """
@@ -35,9 +37,9 @@ from _exp_revision.common import OUT, Sink, _env_list  # noqa: E402
 
 ABL_NO_COARSEN = 1 << 4
 
-def arm(seed=None, sel=0, floor=0.0, coarsen=False):
+def arm(seed=None, sel=0, floor=0.0, coarsen=False, rho=1.0):
     return dict(abl=0 if coarsen else ABL_NO_COARSEN, seed=seed, sel=sel,
-                floor=floor)
+                floor=floor, rho=rho)
 
 
 ARMS = {
@@ -57,6 +59,13 @@ ARMS = {
     "floor-0.10":     arm(floor=0.10),
     "floor-0.20":     arm(floor=0.20),
     "robust+floor":   arm(sel=1, floor=0.05),
+    # Freezing the similarity halves the over-fragmentation and costs accuracy
+    # (\autoref{sec:camp_ablation}). The consensus rate interpolates between
+    # the two: rho=0 is the frozen arm, rho=1 the shipped schedule.
+    "rho-0.00":       arm(rho=0.0),
+    "rho-0.25":       arm(rho=0.25),
+    "rho-0.50":       arm(rho=0.5),
+    "rho-0.75":       arm(rho=0.75),
 }
 
 FIELDS = ["arm", "n_cfg", "mu", "seed", "status", "n", "m", "k", "gt_k",
@@ -123,8 +132,14 @@ def worker(task):
     n = task["n_cfg"]
     seeds, t_seed = make_seeds(cfg["seed"], n, edges, task["seed"], NSEED)
     t0 = time.perf_counter()
-    res = pymocd.smocc_probe(Shim(n, edges), abl=cfg["abl"], seeds=seeds,
-                             select_mode=cfg["sel"], w_floor=cfg["floor"])
+    # Pass only the knobs this arm actually moves, so a driver deployed ahead
+    # of an extension rebuild still runs the arms that do not need the new one.
+    kw = {"abl": cfg["abl"], "seeds": seeds, "select_mode": cfg["sel"]}
+    if cfg["floor"]:
+        kw["w_floor"] = cfg["floor"]
+    if cfg["rho"] != 1.0:
+        kw["rho_scale"] = cfg["rho"]
+    res = pymocd.smocc_probe(Shim(n, edges), **kw)
     dt = time.perf_counter() - t0
     lab = densify(res["front"][res["selected"]], n)
     from sklearn.metrics.cluster import homogeneity_completeness_v_measure

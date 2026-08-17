@@ -298,6 +298,7 @@ pub fn run_probe(
     front_mode: u8,
     seeds: &[Labels],
     w_floor: f64,
+    rho_scale: f64,
 ) -> (Vec<Labels>, Diag) {
     let t_start = Instant::now();
     let mut d = Diag::default();
@@ -501,7 +502,10 @@ pub fn run_probe(
                 .filter(|(i, _)| ranks[*i] == 1)
                 .map(|(_, m)| &m.labels)
                 .collect();
-            let rho = 0.5 * t as f64 / num_gens as f64;
+            // The consensus rate ramps from zero to half over the run.
+            // `rho_scale` scales that ramp: 0 freezes the similarity at its
+            // initial value, 1 is the shipped schedule.
+            let rho = rho_scale * 0.5 * t as f64 / num_gens as f64;
             if !no_w_update {
                 sim.update(g, &elites, rho);
             }
@@ -695,6 +699,7 @@ mod tests {
                 0,
                 &[],
                 0.0,
+                1.0,
             );
             assert_eq!(shipped, probed, "probe diverged from the shipped engine");
         }
@@ -728,6 +733,7 @@ mod tests {
                 0,
                 &[],
                 0.0,
+                1.0,
             );
             assert!(!front.is_empty());
             assert!(front.iter().all(|p| p.len() == g.n));
@@ -761,6 +767,7 @@ mod tests {
             0,
             std::slice::from_ref(&planted),
             0.0,
+            1.0,
         );
         assert_eq!(d.seeds_used, 1);
         let best = front
@@ -799,6 +806,7 @@ mod tests {
                 0,
                 &[],
                 0.0,
+                1.0,
             );
             assert!(!front.is_empty());
             assert!(d.decode_calls > 0);

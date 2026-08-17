@@ -557,12 +557,14 @@ pub fn smocc_fronts_fn(
 ///     w_floor: smallest weight the consensus update leaves on an edge. Zero
 ///         reproduces the shipped behaviour, in which an edge every elite cuts
 ///         decays to zero and can never be crossed again.
+///     rho_scale: scales the consensus rate's ramp. ``0`` freezes the
+///         similarity at its initial value, ``1`` is the shipped schedule.
 ///
 /// Returns a dict with ``front`` (list of partitions), ``selected`` (index of
 /// the member the deployed selector returns) and ``diag``.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(name = "smocc_probe", signature = (graph, pop_size = smocc::DEFAULT_POP_SIZE, num_gens = smocc::DEFAULT_NUM_GENS, cross_rate = smocc::DEFAULT_CROSS_RATE, mut_rate = smocc::DEFAULT_MUT_RATE, gap = smocc::DEFAULT_GAP, refine = true, topo_mode = smocc::DEFAULT_TOPO_MODE, obj_mode = smocc::DEFAULT_OBJ_MODE, macro_cap = smocc::DEFAULT_MACRO_CAP, micro_mut = smocc::DEFAULT_MICRO_MUT, abl = 0u32, sim_mode = 0u8, beta = 0.05, mac_mode = smocc::DEFAULT_MAC_MODE, front_mode = 0u8, seeds = Vec::new(), select_mode = smocc::DEFAULT_SELECT_MODE, w_floor = smocc::DEFAULT_W_FLOOR, want_w = false))]
+#[pyo3(name = "smocc_probe", signature = (graph, pop_size = smocc::DEFAULT_POP_SIZE, num_gens = smocc::DEFAULT_NUM_GENS, cross_rate = smocc::DEFAULT_CROSS_RATE, mut_rate = smocc::DEFAULT_MUT_RATE, gap = smocc::DEFAULT_GAP, refine = true, topo_mode = smocc::DEFAULT_TOPO_MODE, obj_mode = smocc::DEFAULT_OBJ_MODE, macro_cap = smocc::DEFAULT_MACRO_CAP, micro_mut = smocc::DEFAULT_MICRO_MUT, abl = 0u32, sim_mode = 0u8, beta = 0.05, mac_mode = smocc::DEFAULT_MAC_MODE, front_mode = 0u8, seeds = Vec::new(), select_mode = smocc::DEFAULT_SELECT_MODE, w_floor = smocc::DEFAULT_W_FLOOR, rho_scale = 1.0, want_w = false))]
 #[allow(clippy::too_many_arguments)]
 pub fn smocc_probe_fn(
     graph: &Bound<'_, PyAny>,
@@ -584,6 +586,7 @@ pub fn smocc_probe_fn(
     seeds: Vec<std::collections::HashMap<i32, i32>>,
     select_mode: u8,
     w_floor: f64,
+    rho_scale: f64,
     want_w: bool,
 ) -> PyResult<Py<PyAny>> {
     let py = graph.py();
@@ -624,6 +627,7 @@ pub fn smocc_probe_fn(
         &seed_vecs,
         select_mode,
         w_floor,
+        rho_scale,
     );
 
     let front = PyList::empty(py);
