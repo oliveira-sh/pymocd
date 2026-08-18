@@ -17,13 +17,8 @@ use super::ladder::ladder;
 use super::motion::advance;
 use super::particle::Scratch;
 
-/// Run the swarm and return its archive: the partitions and the objective
-/// point each occupies.
-///
-/// The archive is the deliverable, not a by-product. Because every resolution
-/// of CPM is a weighted sum of the same two objectives, the archive is this
-/// graph's resolution profile, and choosing a single answer out of it is the
-/// selector's job rather than the search's.
+/// Runs the swarm and returns its archive: the partitions and the objective point each
+/// occupies. The archive is the deliverable; choosing one member out of it is the selector's job.
 pub fn run(g: &CsrGraph, cfg: &Cfg) -> (Vec<Labels>, Vec<Obj>) {
     if g.n == 0 {
         return (Vec::new(), Vec::new());
@@ -38,10 +33,7 @@ pub fn run(g: &CsrGraph, cfg: &Cfg) -> (Vec<Labels>, Vec<Obj>) {
     archive.prune();
 
     for t in 1..=cfg.gens as u64 {
-        // The archive is read-only for the whole flight, so every particle
-        // sees the same front and none can chase a position another particle
-        // is in the middle of changing.
-        let view = &archive;
+        let view = &archive; // read-only for the whole flight, so every particle sees the same front.
         swarm.par_iter_mut().enumerate().for_each_init(
             || Scratch::new(g.n),
             |s, (i, p)| {
@@ -56,8 +48,7 @@ pub fn run(g: &CsrGraph, cfg: &Cfg) -> (Vec<Labels>, Vec<Obj>) {
             },
         );
 
-        // Offered in slot order, so the archive's contents never depend on
-        // which particle a worker finished first.
+        // Slot order, so the archive never depends on which particle a worker finished first.
         for p in &swarm {
             archive.offer(p.objective(g), &p.pos);
         }
@@ -244,7 +235,6 @@ mod zz_probe {
                 let mut live = Vec::new();
                 assert_eq!(&obj_of(&g, measure(&g, p, &mut size, &mut live)), o, "trial {trial}: objective drift");
             }
-            // selector must return an in-range index for every mode
             for mode in [0u8, 1, 2] {
                 let idx = crate::core::algorithms::mopso::front_test_select(&g, &front, &objs, mode);
                 assert!(idx < front.len(), "trial {trial} mode {mode}: index {idx} out of range");
@@ -254,7 +244,6 @@ mod zz_probe {
 
     #[test]
     fn zz_isolated_nodes_never_share_a_community_with_a_real_one() {
-        // deliberately many isolated nodes interleaved with structure
         let mut edges = Vec::new();
         for c in 0..6i32 {
             let lo = c * 10;

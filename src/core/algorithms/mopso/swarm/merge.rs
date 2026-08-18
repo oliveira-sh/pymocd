@@ -1,84 +1,92 @@
-//! The coarsening move: merge whole communities, which no sequence of
-//! single-node moves can do.
+//! The coarsening move: merging whole communities, which no run of node moves can do.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
-
-use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::core::graph::CsrGraph;
 
 use super::particle::{Particle, Scratch};
 
-/// Merge adjacent communities whose merge raises CPM at the particle's
-/// resolution, best gain first. Returns whether anything moved.
-///
-/// This operator exists because the node move cannot reach coarse partitions at
-/// all. Pulling one vertex out of a 5-clique to join a neighbouring clique
-/// loses four internal edges and gains one, so it is rejected at every
-/// resolution — yet merging the two cliques outright gains one edge for a
-/// penalty of `gamma * 25`, which pays whenever `gamma` is small. Without this,
-/// the coarse rungs of the ladder are unreachable and the archive holds only
-/// the fine half of the resolution profile.
-///
-/// Merging `a` and `b` changes CPM by `e_ab - gamma * s_a * s_b`, since the
-/// merged community's pair count grows by exactly `s_a * s_b`.
-///
-/// One sweep accepts a *matching*: no community takes part in two merges. That
-/// is what keeps every accepted gain exact — the pair counts and edge counts of
-/// disjoint merges do not interact, so the sweep's total gain is the sum of the
-/// gains it accepted, with nothing to re-derive. A run of sweeps still reaches
-/// full agglomeration, halving the community count at worst per sweep.
+/// The order a sweep considers merges in, packed into one integer: descending gain, then
+/// ascending `(a, b)`. `gain` is strictly positive here, so complementing its IEEE bits
+/// reverses the order and leaves the whole comparison a plain integer one.
+#[inline]
+fn rank(gain: f64, a: u32, b: u32) -> u128 {
+    (u128::from(!gain.to_bits()) << 64) | (u128::from(a) << 32) | u128::from(b)
+}
+
+/// Merges adjacent communities whose merge raises CPM by `e_ab - gamma * s_a * s_b`, best
+/// gain first, and returns whether anything moved. One sweep accepts a matching, so the
+/// accepted gains cannot interact; a run of sweeps still reaches full agglomeration.
 pub fn merge_sweep(g: &CsrGraph, p: &mut Particle, s: &mut Scratch) -> bool {
-    let mut between: FxHashMap<(i32, i32), u32> = FxHashMap::default();
-    for &(u, v) in &g.edges {
-        let (a, b) = (p.pos[u as usize], p.pos[v as usize]);
-        if a != b {
-            *between.entry(if a < b { (a, b) } else { (b, a) }).or_insert(0) += 1;
-        }
-    }
-    if between.is_empty() {
-        return false;
-    }
+    s.bucket_by_community(&p.pos);
 
-    let mut cand: Vec<((i32, i32), f64)> = between
-        .into_iter()
-        .filter_map(|((a, b), e)| {
-            let size = |c: i32| f64::from(s.size[c as usize]);
-            let gain = f64::from(e) - p.gamma * size(a) * size(b);
-            (gain > 0.0).then_some(((a, b), gain))
-        })
-        .collect();
-    if cand.is_empty() {
-        return false;
-    }
-    // Descending gain, ties by the pair, so the order never follows the hash.
-    cand.sort_unstable_by(|x, y| {
-        y.1.partial_cmp(&x.1)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| x.0.cmp(&y.0))
-    });
-
-    let mut taken: FxHashSet<i32> = FxHashSet::default();
-    let mut relabel: FxHashMap<i32, i32> = FxHashMap::default();
-    for ((a, b), _) in cand {
-        if taken.contains(&a) || taken.contains(&b) {
+    // One community at a time, so the edges it has into each neighbouring community can be
+    // counted in the same flat array a node move uses, and the pair never has to be hashed.
+    s.cand.clear();
+    for a in 0..g.n {
+        let sa = s.size[a];
+        if sa == 0 {
             continue;
         }
-        taken.insert(a);
-        taken.insert(b);
-        let (keep, gone) = if a < b { (a, b) } else { (b, a) };
-        relabel.insert(gone, keep);
+        let lo = s.start[a] as usize;
+        // Only the upper side of each pair is counted, which offers the pair exactly once
+        // and leaves half the edges costing nothing but the label they are read through.
+        for k in lo..lo + sa as usize {
+            for &v in g.neighbors(s.bucket[k] as usize) {
+                let b = p.pos[v as usize] as usize;
+                if b > a {
+                    if s.link[b] == 0 {
+                        s.touched.push(b as u32);
+                    }
+                    s.link[b] += 1;
+                }
+            }
+        }
+        let penalty = p.gamma * f64::from(sa);
+        for &bi in &s.touched {
+            let b = bi as usize;
+            let e = s.link[b];
+            s.link[b] = 0;
+            let gain = f64::from(e) - penalty * f64::from(s.size[b]);
+            if gain > 0.0 {
+                s.cand.push(rank(gain, a as u32, b as u32));
+            }
+        }
+        s.touched.clear();
     }
-    if relabel.is_empty() {
+    if s.cand.is_empty() {
         return false;
     }
+    // Descending gain, ties by the pair, so the order never follows the scan order.
+    s.cand.sort_unstable();
 
-    for c in p.pos.iter_mut() {
-        if let Some(&k) = relabel.get(c) {
-            *c = k;
+    // `link` is back to all zeros, so the matching reuses it as the set of communities
+    // already spoken for, cleared through `touched` exactly as the counting was.
+    for k in &s.cand {
+        let (a, b) = ((*k >> 32) as u32 as usize, *k as u32 as usize);
+        if s.link[a] != 0 || s.link[b] != 0 {
+            continue;
+        }
+        s.link[a] = 1;
+        s.link[b] = 1;
+        s.touched.push(a as u32);
+        s.touched.push(b as u32);
+        s.bucket[a] = a as u32; // the lower label is the one kept, so it maps to itself.
+        s.bucket[b] = a as u32;
+    }
+
+    for c in &mut p.pos {
+        let ci = *c as usize;
+        if s.link[ci] != 0 {
+            *c = s.bucket[ci] as i32;
         }
     }
+    for &c in &s.touched {
+        s.link[c as usize] = 0;
+    }
+    s.touched.clear();
+
     let (internal, pair_sum) = s.measure(g, &p.pos);
     p.internal = internal;
     p.pair_sum = pair_sum;

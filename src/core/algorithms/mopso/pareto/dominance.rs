@@ -24,5 +24,4 @@ mod tests {
         assert!(!dominates(&[0.0, 1.0], &[1.0, 0.0]));
         assert!(!dominates(&[1.0, 0.0], &[0.0, 1.0]));
     }
-
 }

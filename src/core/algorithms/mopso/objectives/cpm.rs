@@ -7,34 +7,32 @@ use crate::core::graph::CsrGraph;
 
 use super::Obj;
 
-/// The two extensive counts every CPM quantity is built from: the number of
-/// intra-community edges, and `sum_c C(n_c,2)`.
-///
-/// They are integers, which is why the swarm can maintain them through
-/// individual node moves instead of rescanning the graph: an integer count
-/// updated by integer deltas is still exact after any number of moves.
-pub type Counts = (i64, i64);
+pub type Counts = (i64, i64); // intra-community edges and `sum_c C(n_c,2)`, exact under integer deltas.
 
-/// Load `size` with the community sizes of `labels`, recording in `live` which
-/// entries were made nonzero. `live` is what a later caller clears, so the
-/// `O(n)`-sized `size` array is never memset.
+/// Loads `size` with the community sizes of `labels`, recording the nonzero entries in `live`.
 pub fn load_sizes(labels: &[i32], size: &mut [u32], live: &mut Vec<u32>) {
-    for &c in live.iter() {
-        size[c as usize] = 0;
+    // Clearing a scattered entry costs a whole cache line, so once the live set is a
+    // sixteenth of the slots there is nothing left to save by visiting only those.
+    if live.len().saturating_mul(16) >= size.len() {
+        size.fill(0);
+    } else {
+        for &c in live.iter() {
+            size[c as usize] = 0;
+        }
     }
     live.clear();
     for &c in labels {
         debug_assert!((c as usize) < size.len(), "label {c} outside the slot range");
         let c = c as usize;
-        if size[c] == 0 {
+        let k = size[c];
+        if k == 0 {
             live.push(c as u32);
         }
-        size[c] += 1;
+        size[c] = k + 1;
     }
 }
 
-/// Both counts of a partition, from scratch. Leaves `size`/`live` holding that
-/// partition's community sizes, which is what the swarm goes on to maintain.
+/// Both counts of a partition, from scratch, leaving `size`/`live` holding its community sizes.
 pub fn measure(g: &CsrGraph, labels: &[i32], size: &mut [u32], live: &mut Vec<u32>) -> Counts {
     load_sizes(labels, size, live);
     let mut pair_sum = 0i64;
@@ -49,31 +47,9 @@ pub fn measure(g: &CsrGraph, labels: &[i32], size: &mut [u32], live: &mut Vec<u3
     (internal, pair_sum)
 }
 
-/// The two minimised objectives:
-///
-/// ```text
-/// cut  = 1 - (sum_c e_c) / m           the fraction of edges leaving their community
-/// pair = (sum_c C(n_c,2)) / C(n,2)     the fraction of node pairs sharing a community
-/// ```
-///
-/// CPM at resolution `gamma` is `H(gamma) = sum_c [e_c - gamma C(n_c,2)]`, so
-///
-/// ```text
-/// H(gamma) / m = 1 - cut - (gamma / gamma_d) * pair,    gamma_d = m / C(n,2)
-/// ```
-///
-/// Every resolution is a weighted sum of the same two numbers. Minimising them
-/// jointly therefore optimises CPM at every `gamma` at once, and the Pareto
-/// front is the graph's complete resolution profile rather than one slice of
-/// it. `gamma_d` is the graph's density, the resolution at which the two
-/// objectives carry equal weight.
-///
-/// This is HP-MOCD's split of modularity with one term changed: `cut` is the
-/// same edge term, and CPM's constant pair penalty replaces modularity's
-/// degree null model `sum_c (d_c/2m)^2` — which is precisely the substitution
-/// that removes the resolution limit.
-///
-/// `cut` is also exactly the realised mixing parameter of the partition.
+/// The two minimised objectives: the fraction of edges leaving their community, and the
+/// fraction of node pairs sharing one. Every `gamma` of CPM is a weighted sum of the pair,
+/// so the Pareto front is the graph's whole resolution profile.
 pub fn obj_of(g: &CsrGraph, (internal, pair_sum): Counts) -> Obj {
     let m = g.m as f64;
     let n = g.n as f64;
@@ -86,8 +62,7 @@ pub fn obj_of(g: &CsrGraph, (internal, pair_sum): Counts) -> Obj {
     [cut, pair]
 }
 
-/// Number of distinct communities in `labels`. `seen` must arrive all-false and
-/// is left that way.
+/// Number of distinct communities in `labels`; `seen` must arrive all-false and is left that way.
 pub fn community_count(labels: &[i32], seen: &mut [bool]) -> usize {
     let mut k = 0;
     for &c in labels {
@@ -158,7 +133,6 @@ mod tests {
 
     #[test]
     fn cut_is_the_realised_mixing_parameter() {
-        // Six of the seven edges are internal to the two triangles; (2,3) leaves.
         let g = two_triangles();
         let [cut, _] = eval(&g, &[0, 0, 0, 1, 1, 1]);
         assert!((cut - 1.0 / 7.0).abs() < 1e-12, "cut = {cut}");

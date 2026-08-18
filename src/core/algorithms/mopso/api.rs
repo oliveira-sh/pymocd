@@ -1,5 +1,4 @@
-//! Public entry points for MOPSO: the archive search and the
-//! single-partition wrapper re-exported from the crate root.
+//! Public entry points for MOPSO, re-exported from the crate root.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -11,8 +10,7 @@ use super::front::{select_best, select_index_mode};
 use super::swarm::run;
 use super::utils::to_output;
 
-/// Run the swarm and return the selected partition as `(node, community)`
-/// pairs. Isolated nodes get community `-1`.
+/// Runs the swarm and returns the selected partition; isolated nodes get community `-1`.
 #[allow(clippy::too_many_arguments)]
 pub fn mopso(
     nodes: &[i32],
@@ -45,12 +43,9 @@ pub fn mopso(
     to_output(&g, &best)
 }
 
-/// The whole archive: one partition per member, the objective point each
-/// occupies, and the index the selector picks out of them.
-pub type Profile = (Vec<Vec<(i32, i32)>>, Vec<[f64; 2]>, usize);
+pub type Profile = (Vec<Vec<(i32, i32)>>, Vec<[f64; 2]>, usize); // partitions, their objective points, and the selected index.
 
-/// The whole archive — the graph's resolution profile — as one partition per
-/// member, plus the index the selector picks out of it.
+/// Runs the swarm and returns the whole archive, the graph's resolution profile.
 #[allow(clippy::too_many_arguments)]
 pub fn mopso_fronts(
     nodes: &[i32],
@@ -152,8 +147,6 @@ mod tests {
 
     #[test]
     fn beats_the_resolution_limit_on_a_ring_of_cliques() {
-        // Modularity merges adjacent cliques here once the ring is long enough.
-        // CPM has no such limit, and the selector should land on all thirty.
         let (nodes, edges) = ring_of_cliques(30, 5);
         let c = small(&nodes, &edges);
         for r in 0..30i32 {
@@ -197,12 +190,10 @@ mod tests {
         assert_eq!(front.len(), objs.len());
         assert!(pick < front.len());
         assert!(front.iter().all(|f| f.len() == nodes.len()));
-        // Sorted by neither objective by construction, but a genuine front must
-        // trade one against the other.
         let cuts: Vec<f64> = objs.iter().map(|o| o[0]).collect();
         assert!(
-            cuts.iter().cloned().fold(f64::MIN, f64::max)
-                > cuts.iter().cloned().fold(f64::MAX, f64::min),
+            cuts.iter().copied().fold(f64::MIN, f64::max)
+                > cuts.iter().copied().fold(f64::MAX, f64::min),
             "the archive collapsed to one point"
         );
     }

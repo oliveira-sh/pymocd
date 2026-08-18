@@ -13,10 +13,7 @@ use crate::core::graph::CsrGraph;
 use super::modularity::max_modularity;
 use super::plateau::widest_plateau;
 
-/// A community count at or above this fraction of `n` marks a degenerate
-/// member: all singletons, or nearly so. It sets no scale and is never chosen.
-const DEGENERATE_FRACTION: f64 = 0.5;
-
+const DEGENERATE_FRACTION: f64 = 0.5; // a member with at least this fraction of n communities is all singletons; never chosen.
 
 /// The community count of every archive member.
 pub fn counts(g: &CsrGraph, front: &[Labels]) -> Vec<usize> {
@@ -29,22 +26,19 @@ pub fn counts(g: &CsrGraph, front: &[Labels]) -> Vec<usize> {
         .collect()
 }
 
-/// The range of `lambda = gamma / density` that can still change the answer,
-/// which is the resolution ladder's range expressed in the selector's units.
-/// `gamma` runs over `[1/n^2, 1]`, so `lambda` runs over that divided by the
-/// graph's density.
+/// The resolution ladder's range in the selector's units: `gamma` over `[1/n^2, 1]`
+/// divided by the graph's density.
 fn lambda_span(g: &CsrGraph) -> (f64, f64) {
     let n = g.n as f64;
     let density = 2.0 * g.m as f64 / (n * (n - 1.0));
-    if !(density > 0.0) {
+    if density <= 0.0 || density.is_nan() {
         return (0.0, f64::INFINITY);
     }
     (1.0 / (n * n * density), 1.0 / density)
 }
 
-/// The scalarised rule: the CPM optimum at `gamma` = the graph's own density,
-/// which is where the two objectives carry equal weight. It is the same
-/// operating point as the Leiden-CPM baseline.
+/// The scalarised rule: the CPM optimum at `gamma` = the graph's own density, where the
+/// two objectives carry equal weight.
 fn cheapest(objs: &[Obj], keep: &[usize]) -> usize {
     let mut pick = keep[0];
     let mut best = objs[pick][0] + objs[pick][1];
@@ -62,24 +56,8 @@ pub fn select_index(g: &CsrGraph, front: &[Labels], objs: &[Obj]) -> usize {
     select_index_mode(g, front, objs, DEFAULT_SELECT_MODE)
 }
 
-/// `mode` picks the rule.
-///
-/// `0` is the equal-weight sum: CPM at `gamma` = density. Its failure is
-/// systematic rather than noisy — at high mixing it prefers coarser than the
-/// planted partition, and at large `n` the pair term underflows against the cut
-/// term entirely, so it degenerates toward one community.
-///
-/// `1` reads the archive as the resolution profile it is and keeps the
-/// granularity holding the widest span of `gamma` (see `plateau`). It is
-/// scale-free, which is what mode `0` is not. Modularity is the fallback for
-/// the one case the plateau cannot speak to — a hull too thin to have an
-/// interior, which happens only on graphs of a few dozen vertices.
-///
-/// `2` is modularity alone, the rule the other detectors here select by, kept
-/// as the ablation arm that isolates what the plateau contributes. Over 24 LFR
-/// archives (n from 1000 to 50000, mixing 0.3 to 0.6) mode 1 scores 0.825 mean
-/// AMI against a front ceiling of 0.833, where mode 2 scores 0.697 and mode 0
-/// 0.685.
+/// Picks a member by `mode`: `1` the resolution plateau, falling back to modularity when
+/// the hull is too thin to read; `2` modularity alone; anything else the equal-weight sum.
 pub fn select_index_mode(g: &CsrGraph, front: &[Labels], objs: &[Obj], mode: u8) -> usize {
     if front.is_empty() {
         return 0;
@@ -138,8 +116,6 @@ mod tests {
 
     #[test]
     fn plateau_recovers_the_planted_ring_where_the_sum_does_not() {
-        // Twelve 5-cliques. The archive holds the planted partition, a coarse
-        // partition merging them in pairs, and a fine one splitting each clique.
         let (k, s) = (12i32, 5i32);
         let g = ring_of_cliques(k, s);
         let planted: Labels = (0..g.n).map(|i| (i as i32 / s) * s).collect();
@@ -169,9 +145,8 @@ mod tests {
 
     #[test]
     fn a_narrow_plateau_hands_over_to_modularity() {
-        // A ring of 5-cliques where the archive holds nothing between the
-        // planted partition and one community: the plateau the coarse member
-        // reads is inherited, not earned, and the gate must refuse it.
+        // The archive holds nothing between the planted partition and one community, so
+        // the plateau the coarse member reads is inherited rather than earned.
         let g = ring_of_cliques(20, 5);
         let planted: Labels = (0..g.n).map(|i| (i as i32 / 5) * 5).collect();
         let coarse: Labels = (0..g.n).map(|i| (i as i32 / 50) * 50).collect();

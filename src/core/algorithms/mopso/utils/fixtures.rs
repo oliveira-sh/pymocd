@@ -26,9 +26,8 @@ pub fn two_cliques() -> CsrGraph {
     CsrGraph::from_edges(&(0..10).collect::<Vec<i32>>(), &e)
 }
 
-/// `k` cliques of `s` vertices each, chained into a ring by one edge apiece.
-/// The planted answer is `k` communities, and modularity's resolution limit
-/// merges them once `k` grows — which is what CPM is here to avoid.
+/// `k` cliques of `s` vertices each, chained into a ring by one edge apiece; the planted
+/// answer is `k` communities, which modularity's resolution limit merges once `k` grows.
 pub fn ring_of_cliques(k: i32, s: i32) -> CsrGraph {
     let nodes: Vec<i32> = (0..k * s).collect();
     let mut e = Vec::new();

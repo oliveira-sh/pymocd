@@ -12,29 +12,11 @@ use crate::core::graph::CsrGraph;
 use super::local::best_move;
 use super::particle::{Particle, Scratch};
 
-/// Advance one particle by one iteration.
-///
-/// The continuous update `v <- w v + c1 r1 (pbest - x) + c2 r2 (leader - x)`
-/// carries over term by term once "distance" is read per node: a node whose
-/// label differs from an attractor's contributes that attractor's pull, a node
-/// that already agrees contributes nothing. Velocity is then the probability
-/// that the node is unstable this iteration, clamped to `[0,1]` so it stays a
-/// probability, and `x <- x + v` becomes: an unstable node adopts one of the
-/// two attractors' labels, chosen in proportion to their pulls.
-///
-/// A node that agrees with both attractors but still carries momentum has no
-/// direction to follow, so it drifts to a neighbour's label — the discrete
-/// remnant of coasting.
-///
-/// The stable nodes are where the resolution-directed local move runs. The two
-/// branches are drawn from the same uniform and are therefore mutually
-/// exclusive, which is deliberate: a node that has just taken an attractor's
-/// label should not be overwritten in the same iteration. It also anneals the
-/// swarm for free — velocity is high early, so the swarm explores, and decays
-/// as the attractors are reached, so late iterations are almost all local
-/// refinement.
-///
-/// Costs one uniform per node, plus two per particle.
+/// Advances one particle by one iteration. Per node, velocity is the probability that the
+/// node is unstable: an unstable node adopts an attractor's label in proportion to the two
+/// pulls, or drifts to a neighbour's when neither pulls, and a stable node gets the
+/// resolution-directed local move. The two branches share one uniform, so they are
+/// mutually exclusive.
 pub fn advance(
     g: &CsrGraph,
     p: &mut Particle,
@@ -50,10 +32,10 @@ pub fn advance(
 
     #[allow(clippy::needless_range_loop)]
     for j in 0..g.n {
-        // An isolated vertex belongs to no community. Following an attractor
-        // into one would cost `pair` and return no edge, and the local move can
-        // never undo it because it has no neighbour to reason from.
-        if g.neighbors(j).is_empty() {
+        // An isolated vertex belongs to no community, and no local move could undo it
+        // joining one. The adjacency is read once here and handed to whichever branch runs.
+        let nbrs = g.neighbors(j);
+        if nbrs.is_empty() {
             continue;
         }
         let here = p.pos[j];
@@ -65,9 +47,7 @@ pub fn advance(
 
         let u = unit(r);
         if u < v {
-            // `u / v` is uniform on [0,1) given the node is unstable, so the
-            // attractor split and the drift target cost no further draws.
-            let t = u / v;
+            let t = u / v; // uniform on [0,1) given instability, so the split costs no further draw.
             let total = pull_p + pull_l;
             let target = if total > 0.0 {
                 if t * total < pull_p {
@@ -76,20 +56,19 @@ pub fn advance(
                     leader[j]
                 }
             } else {
-                let nbrs = g.neighbors(j);
                 let pick = (t * nbrs.len() as f64) as usize;
                 p.pos[nbrs[pick.min(nbrs.len() - 1)] as usize]
             };
             if target != here {
-                let (from_links, to_links) = p.link_pair(g, j, target);
+                let (from_links, to_links) = p.link_pair(nbrs, here, target);
                 p.relocate(j, target, from_links, to_links, s);
             }
         } else if u > local_floor {
-            best_move(g, p, j, s);
+            best_move(nbrs, p, j, s);
         }
     }
-    // Both attractors are read as labels next iteration, so the flight has to
-    // end in the shared naming or the reading is meaningless.
+    // Both attractors are read as labels next iteration, so the flight ends in the
+    // shared naming.
     p.canonicalize(s);
 }
 
@@ -166,9 +145,8 @@ mod tests {
     fn the_social_term_alone_pulls_toward_the_leader() {
         let (g, pos, _) = setup();
         let leader: Labels = (0..g.n).map(|i| (i as i32 / 5) * 5).collect();
-        // No cognition, no local search, no inertia: only the leader acts.
         let cfg = Cfg::new(10, 10, 0.0, 0.0, 1.0, 0.0, 10, 0);
-        let mut p = particle(&g, pos.clone(), pos.clone(), 0.3);
+        let mut p = particle(&g, pos.clone(), pos, 0.3);
         let mut s = Scratch::new(g.n);
         let before = p.pos.iter().zip(&leader).filter(|(a, b)| a == b).count();
         for t in 1..=8u64 {

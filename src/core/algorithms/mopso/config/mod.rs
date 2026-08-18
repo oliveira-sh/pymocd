@@ -1,5 +1,4 @@
-//! Tunable configuration for MOPSO: shipped defaults and the parameter bundle
-//! the swarm reads.
+//! Tunable configuration for MOPSO: the parameter bundle the swarm reads.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -11,8 +10,7 @@ use defaults::{
     DEFAULT_SEED_ROUNDS, DEFAULT_SOCIAL,
 };
 
-/// Everything the swarm needs that is not the graph. Out-of-range values are
-/// clamped rather than rejected, because these arrive from Python.
+/// Everything the swarm needs that is not the graph.
 #[derive(Clone, Copy, Debug)]
 pub struct Cfg {
     pub pop: usize,
@@ -34,15 +32,14 @@ impl Default for Cfg {
             cognitive: DEFAULT_COGNITIVE,
             social: DEFAULT_SOCIAL,
             local_rate: DEFAULT_LOCAL_RATE,
-            // One archive slot per particle: the archive has to hold the whole
-            // resolution profile, not just its best corner.
-            archive: DEFAULT_POP_SIZE,
+            archive: DEFAULT_POP_SIZE, // one slot per particle: the archive holds the whole profile.
             seed_rounds: DEFAULT_SEED_ROUNDS,
         }
     }
 }
 
 impl Cfg {
+    /// Out-of-range values are clamped rather than rejected, because these arrive from Python.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         pop: usize,

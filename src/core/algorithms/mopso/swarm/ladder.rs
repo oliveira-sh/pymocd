@@ -5,30 +5,9 @@
 
 use crate::core::graph::CsrGraph;
 
-/// The resolution assigned to each of `pop` particles, geometrically spaced
-/// over the whole range where `gamma` can still change the answer.
-///
-/// `gamma` is a density threshold: a CPM community must be internally denser
-/// than `gamma`, or splitting it pays. That pins both ends without reference to
-/// the graph.
-///
-/// * At `gamma = 1` only cliques survive, since no set of vertices exceeds
-///   density one. Nothing above it is a different question.
-/// * Two halves of the graph merge when the edges between them beat
-///   `gamma * (n/2)^2`, and a connected graph always has at least one such
-///   edge, so below `1/n^2` everything reachable has already merged.
-///
-/// Geometric spacing, because that range spans `2 ln n` e-folds and the
-/// community-size axis of a resolution profile is logarithmic.
-///
-/// Spreading the swarm this way is what fills the archive with a whole profile
-/// instead of a hundred particles piled onto one granularity — and a truncated
-/// profile is not a harmless loss, because the coarsest member the archive
-/// happens to hold inherits the entire resolution range below it and wins the
-/// plateau it has not earned.
-///
-/// It also makes each particle a decomposition subproblem in the MOEA/D sense,
-/// which is what gives its personal best a total order to be ranked by.
+/// The resolution assigned to each of `pop` particles, spaced geometrically over
+/// `[1/n^2, 1]` — the whole range where `gamma` can still change the answer, since a CPM
+/// community must be internally denser than `gamma` to survive.
 pub fn ladder(g: &CsrGraph, pop: usize) -> Vec<f64> {
     let n = g.n;
     if n < 2 || g.m == 0 {
@@ -65,8 +44,6 @@ mod tests {
 
     #[test]
     fn the_ends_are_set_by_cpm_and_not_by_the_graph() {
-        // The same two endpoints whatever the density, because both come from
-        // what gamma means rather than from what the graph looks like.
         for (k, s) in [(4, 5), (40, 5), (10, 30)] {
             let g = ring_of_cliques(k, s);
             let l = ladder(&g, 8);
@@ -78,9 +55,8 @@ mod tests {
 
     #[test]
     fn the_ladder_brackets_the_planted_granularity() {
-        // A ring of 5-cliques: merging two adjacent cliques gains the single
-        // ring edge for a penalty of 25 gamma, so the planted partition is the
-        // CPM optimum exactly on 0.04 < gamma < 1. Some rung must fall inside.
+        // Merging two adjacent 5-cliques gains one ring edge for a penalty of 25 gamma,
+        // so the planted partition is the CPM optimum exactly on 0.04 < gamma < 1.
         let g = ring_of_cliques(30, 5);
         let l = ladder(&g, 100);
         assert!(

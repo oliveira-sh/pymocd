@@ -15,11 +15,7 @@ struct Mass {
     live: Vec<u32>,
 }
 
-/// Marks a community `deg` has not accumulated yet. A zero cannot serve as
-/// that mark: a community whose first member is an isolated vertex still has
-/// degree mass zero, so testing against zero would enter it twice and count its
-/// share of the null model twice.
-const UNSEEN: f64 = -1.0;
+const UNSEEN: f64 = -1.0; // marks a community `deg` has not accumulated yet; zero cannot, an isolated vertex has it.
 
 impl Mass {
     fn new(n: usize) -> Self {
@@ -29,11 +25,8 @@ impl Mass {
         }
     }
 
-    /// `Q = (1 - cut) - sum_c (d_c / 2m)^2`.
-    ///
-    /// The first term is already in the archive — `1 - cut` is the fraction of
-    /// edges that stay inside their community — so scoring a member costs one
-    /// pass over the labels and no pass over the edges.
+    /// `Q = (1 - cut) - sum_c (d_c / 2m)^2`. The first term is already in the archive, so
+    /// scoring a member costs one pass over the labels and none over the edges.
     fn modularity(&mut self, g: &CsrGraph, labels: &[i32], cut: f64) -> f64 {
         for &c in &self.live {
             self.deg[c as usize] = UNSEEN;
@@ -58,11 +51,6 @@ impl Mass {
 }
 
 /// The candidate of greatest modularity, ties by the lower index.
-///
-/// This is the rule every other detector in this repository selects by, and it
-/// is here as the fallback for when the resolution profile has no plateau to
-/// read — which is exactly when a classical, resolution-limited answer is the
-/// safer one.
 pub fn max_modularity(g: &CsrGraph, front: &[Labels], objs: &[Obj], keep: &[usize]) -> usize {
     if g.m == 0 {
         return keep[0];
@@ -98,8 +86,7 @@ mod tests {
             .collect()
     }
 
-    /// Q straight from the definition, over the hashmap graph the crate's
-    /// reference implementation uses.
+    /// Q straight from the definition.
     fn reference(g: &CsrGraph, labels: &[i32]) -> f64 {
         let m = g.m as f64;
         let mut q = 0.0;
@@ -166,8 +153,8 @@ mod tests {
 
     #[test]
     fn an_isolated_first_member_does_not_double_count() {
-        // Vertex 0 is isolated and shares a community with a triangle, so the
-        // community's degree mass is still zero when its second member arrives.
+        // Vertex 0 is isolated and shares a community with a triangle, so the community's
+        // degree mass is still zero when its second member arrives.
         let g = CsrGraph::from_edges(&[0, 1, 2, 3, 4], &[(1, 2), (2, 3), (1, 3)]);
         let part: Labels = vec![1, 1, 1, 1, 4];
         let objs = evaluated(&g, std::slice::from_ref(&part));

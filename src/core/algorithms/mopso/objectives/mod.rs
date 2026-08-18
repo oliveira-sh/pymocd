@@ -5,9 +5,6 @@
 
 mod cpm;
 
-/// A point in objective space. Fixed at two entries: the CPM split has exactly
-/// two terms, and a fixed-size array keeps every particle's objective off the
-/// heap.
-pub type Obj = [f64; 2];
+pub type Obj = [f64; 2]; // a point in objective space; the CPM split has exactly two terms.
 
 pub(super) use cpm::{Counts, community_count, load_sizes, measure, obj_of};

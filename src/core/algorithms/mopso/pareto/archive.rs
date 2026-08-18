@@ -1,5 +1,4 @@
-//! The external Pareto archive: the swarm's shared memory of the best
-//! trade-offs it has seen, and the pool leaders are drawn from.
+//! The external Pareto archive: the swarm's shared memory of the front, and its leader pool.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -12,13 +11,8 @@ use crate::core::algorithms::mopso::objectives::Obj;
 use super::crowding::crowding;
 use super::dominance::dominates;
 
-/// A bounded archive of mutually non-dominated partitions.
-///
-/// Every member is a point on the graph's resolution profile: because CPM at
-/// any `gamma` is a weighted sum of the two objectives, the archive is the
-/// swarm's running approximation of the whole `gamma` sweep. Truncation is by
-/// crowding distance, which spreads the survivors along that profile instead of
-/// letting the swarm pile up at one granularity.
+/// A bounded archive of mutually non-dominated partitions, one per point of the
+/// graph's resolution profile.
 pub struct Archive {
     obj: Vec<Obj>,
     pos: Vec<Labels>,
@@ -38,7 +32,7 @@ impl Archive {
     }
 
     #[cfg(test)]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.obj.len()
     }
 
@@ -51,10 +45,9 @@ impl Archive {
         (self.pos, self.obj)
     }
 
-    /// Offer a candidate. Rejected when an incumbent dominates it or already
-    /// occupies its exact objective point; otherwise it evicts everything it
-    /// dominates and joins. `pos` is only cloned on acceptance, which is what
-    /// keeps a swarm-wide offer pass off the allocator at large `n`.
+    /// Offers a candidate: rejected when an incumbent dominates it or already occupies its
+    /// point, otherwise it evicts everything it dominates and joins. `pos` is cloned on
+    /// acceptance only.
     pub fn offer(&mut self, obj: Obj, pos: &[i32]) -> bool {
         for existing in &self.obj {
             if dominates(existing, &obj) || *existing == obj {
@@ -78,15 +71,12 @@ impl Archive {
         true
     }
 
-    /// Drop the most crowded members down to the capacity, then refresh the
-    /// crowding distances leader selection reads. Called once per iteration,
-    /// after the whole swarm has been offered.
+    /// Drops the most crowded members down to the capacity, then refreshes the crowding
+    /// distances leader selection reads.
     pub fn prune(&mut self) {
         if self.obj.len() > self.cap {
             let d = crowding(&self.obj);
             let mut order: Vec<u32> = (0..self.obj.len() as u32).collect();
-            // Least crowded first; index breaks ties so the survivors never
-            // depend on the sort's stability.
             order.sort_unstable_by(|&a, &b| {
                 d[b as usize]
                     .partial_cmp(&d[a as usize])
@@ -105,9 +95,8 @@ impl Archive {
         self.crowd = crowding(&self.obj);
     }
 
-    /// Binary tournament on crowding distance: the leader is drawn from the
-    /// sparse end of the front, which is where the swarm still has profile left
-    /// to explore.
+    /// Binary tournament on crowding distance, so the leader comes from the sparse end
+    /// of the front.
     pub fn leader(&self, r: &mut impl Rng) -> usize {
         let n = self.obj.len();
         debug_assert!(n > 0, "leader() on an empty archive");

@@ -13,15 +13,12 @@ use crate::core::graph::CsrGraph;
 
 use super::local::best_move;
 use super::merge::merge_sweep;
-use super::particle::{Particle, Scratch};
+use super::particle::{Particle, ScratchPool};
 
-/// Salt reserved for seeding, so no iteration can collide with it.
-const SEED_SALT: u64 = u64::MAX;
+const SEED_SALT: u64 = u64::MAX; // reserved for seeding, so no iteration can collide with it.
 
-/// Every node takes a random neighbour's label. The result is far from a
-/// partition but it is locally coherent, which is a much better start than
-/// random labels: the local move has structure to sharpen rather than to
-/// invent.
+/// Every node takes a random neighbour's label: locally coherent, so the local move has
+/// structure to sharpen rather than to invent.
 fn scatter(g: &CsrGraph, slot: usize) -> Labels {
     let mut r = slot_rng(SEED_SALT, slot);
     (0..g.n)
@@ -36,17 +33,16 @@ fn scatter(g: &CsrGraph, slot: usize) -> Labels {
         .collect()
 }
 
-/// The seeded swarm, one particle per rung of `gammas`.
-///
-/// Each particle is driven to its own rung before the first iteration, so the
-/// archive starts out holding a spread of granularities rather than a hundred
-/// copies of the same coarse partition.
+/// The seeded swarm, one particle per rung of `gammas`, each driven to its own rung before
+/// the first iteration so the archive starts out spanning granularities.
 pub fn seed(g: &CsrGraph, cfg: &Cfg, gammas: &[f64]) -> Vec<Particle> {
+    let pool = ScratchPool::new(g.n);
     gammas
         .par_iter()
         .enumerate()
         .map(|(k, &gamma)| {
-            let mut s = Scratch::new(g.n);
+            let mut held = pool.get();
+            let s = &mut *held;
             let pos = scatter(g, k);
             let (internal, pair_sum) = s.measure(g, &pos);
             let mut p = Particle {
@@ -58,20 +54,19 @@ pub fn seed(g: &CsrGraph, cfg: &Cfg, gammas: &[f64]) -> Vec<Particle> {
                 gamma,
                 best_score: f64::NEG_INFINITY,
             };
-            // Node moves sharpen boundaries, merges coarsen; neither reaches
-            // the other's granularity alone, so a rung is only reached by
-            // alternating them until the particle stops moving.
+            // Node moves sharpen boundaries and merges coarsen; neither reaches the
+            // other's granularity alone.
             for _ in 0..cfg.seed_rounds {
                 let mut moved = false;
                 for u in 0..g.n {
-                    moved |= best_move(g, &mut p, u, &mut s);
+                    moved |= best_move(g.neighbors(u), &mut p, u, s);
                 }
-                moved |= merge_sweep(g, &mut p, &mut s);
+                moved |= merge_sweep(g, &mut p, s);
                 if !moved {
                     break;
                 }
             }
-            p.canonicalize(&mut s);
+            p.canonicalize(s);
             p.best.copy_from_slice(&p.pos);
             p.best_score = p.score();
             p
@@ -83,6 +78,7 @@ pub fn seed(g: &CsrGraph, cfg: &Cfg, gammas: &[f64]) -> Vec<Particle> {
 mod tests {
     use super::*;
     use crate::core::algorithms::mopso::swarm::ladder::ladder;
+    use crate::core::algorithms::mopso::swarm::particle::Scratch;
     use crate::core::algorithms::mopso::utils::fixtures::ring_of_cliques;
 
     fn counts(p: &Particle) -> usize {

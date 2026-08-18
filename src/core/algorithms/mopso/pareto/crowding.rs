@@ -1,16 +1,12 @@
-//! Crowding distance over a mutually non-dominated set: the density estimate
-//! that both truncates the archive and biases leader selection toward the
-//! sparse parts of the front.
+//! Crowding distance over a mutually non-dominated set, the archive's density estimate.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use crate::core::algorithms::mopso::objectives::Obj;
 
-/// Deb's crowding distance, specialised to a single front of two objectives.
-/// The extremes take infinity so the ends of the resolution profile are never
-/// truncated away — losing them would collapse the range of granularities the
-/// selector gets to choose from.
+/// Deb's crowding distance over one front of two objectives; the extremes take infinity
+/// so the ends of the resolution profile are never truncated away.
 pub fn crowding(objs: &[Obj]) -> Vec<f64> {
     let n = objs.len();
     let mut dist = vec![0.0f64; n];
@@ -21,7 +17,6 @@ pub fn crowding(objs: &[Obj]) -> Vec<f64> {
     let mut order: Vec<u32> = (0..n as u32).collect();
     #[allow(clippy::needless_range_loop)]
     for obj in 0..2 {
-        // Ties broken by index so the sweep never depends on sort stability.
         order.sort_unstable_by(|&a, &b| {
             objs[a as usize][obj]
                 .partial_cmp(&objs[b as usize][obj])
