@@ -451,7 +451,15 @@ pub fn mopso_fn(
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
     let part = mopso::mopso(
-        &nodes, &edges, pop_size, num_gens, inertia, cognitive, social, local_rate, archive,
+        &nodes,
+        &edges,
+        pop_size,
+        num_gens,
+        inertia,
+        cognitive,
+        social,
+        local_rate,
+        archive,
         seed_rounds,
     );
     let d = PyDict::new(py);
@@ -470,13 +478,9 @@ pub fn mopso_fn(
 /// ``pair`` the fraction of node pairs sharing one.
 ///
 /// Args:
-///     select_mode: ``1`` keeps the granularity holding the widest span of
-///         `gamma` (the resolution plateau); ``0`` takes the equal-weight sum,
-///         which is CPM at `gamma` = the graph's density and the same operating
-///         point as the Leiden-CPM baseline.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(name = "mopso_fronts", signature = (graph, pop_size = mopso::DEFAULT_POP_SIZE, num_gens = mopso::DEFAULT_NUM_GENS, inertia = mopso::DEFAULT_INERTIA, cognitive = mopso::DEFAULT_COGNITIVE, social = mopso::DEFAULT_SOCIAL, local_rate = mopso::DEFAULT_LOCAL_RATE, archive = mopso::DEFAULT_POP_SIZE, seed_rounds = mopso::DEFAULT_SEED_ROUNDS, select_mode = mopso::DEFAULT_SELECT_MODE))]
+#[pyo3(name = "mopso_fronts", signature = (graph, pop_size = mopso::DEFAULT_POP_SIZE, num_gens = mopso::DEFAULT_NUM_GENS, inertia = mopso::DEFAULT_INERTIA, cognitive = mopso::DEFAULT_COGNITIVE, social = mopso::DEFAULT_SOCIAL, local_rate = mopso::DEFAULT_LOCAL_RATE, archive = mopso::DEFAULT_POP_SIZE, seed_rounds = mopso::DEFAULT_SEED_ROUNDS))]
 #[allow(clippy::too_many_arguments)]
 pub fn mopso_fronts_fn(
     graph: &Bound<'_, PyAny>,
@@ -488,14 +492,21 @@ pub fn mopso_fronts_fn(
     local_rate: f64,
     archive: usize,
     seed_rounds: usize,
-    select_mode: u8,
 ) -> PyResult<Py<PyAny>> {
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
     let (fronts, objs, selected) = mopso::mopso_fronts(
-        &nodes, &edges, pop_size, num_gens, inertia, cognitive, social, local_rate, archive,
-        seed_rounds, select_mode,
+        &nodes,
+        &edges,
+        pop_size,
+        num_gens,
+        inertia,
+        cognitive,
+        social,
+        local_rate,
+        archive,
+        seed_rounds,
     );
     let parts = PyList::empty(py);
     for part in fronts {
@@ -509,7 +520,10 @@ pub fn mopso_fronts_fn(
     for o in objs {
         points.append((o[0], o[1]))?;
     }
-    Ok((parts, points, selected).into_pyobject(py)?.into_any().unbind())
+    Ok((parts, points, selected)
+        .into_pyobject(py)?
+        .into_any()
+        .unbind())
 }
 
 /// `smocc` — optimized MMCoMO variant (sparse-CSR similarity, Rayon-parallel,

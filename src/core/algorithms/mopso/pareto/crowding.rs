@@ -81,8 +81,10 @@ mod tests {
     fn small_sets_are_all_boundary() {
         assert_eq!(crowding(&[]).len(), 0);
         assert!(crowding(&[[0.0, 0.0]])[0].is_infinite());
-        assert!(crowding(&[[0.0, 1.0], [1.0, 0.0]])
-            .iter()
-            .all(|d| d.is_infinite()));
+        assert!(
+            crowding(&[[0.0, 1.0], [1.0, 0.0]])
+                .iter()
+                .all(|d| d.is_infinite())
+        );
     }
 }

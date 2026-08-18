@@ -156,14 +156,20 @@ mod tests {
     }
 }
 
+/// Randomised checks that the archive's invariants survive parameter values and graph
+/// shapes the shipped defaults never produce.
 #[cfg(test)]
-mod zz_probe {
+mod fuzz {
     use super::*;
+    use crate::core::algorithms::mopso::front::select_index;
     use crate::core::algorithms::mopso::objectives::{measure, obj_of};
 
     fn rnd_graph(n: i32, e: usize, seed: u64) -> CsrGraph {
         let mut st = seed;
-        let mut next = |m: u64| { st = st.wrapping_mul(6364136223846793005).wrapping_add(1); (st >> 33) % m };
+        let mut next = |m: u64| {
+            st = st.wrapping_mul(6364136223846793005).wrapping_add(1);
+            (st >> 33) % m
+        };
         let mut edges = Vec::new();
         for _ in 0..e {
             let a = next(n as u64) as i32;
@@ -174,7 +180,7 @@ mod zz_probe {
     }
 
     #[test]
-    fn zz_invariants_hold_under_extreme_params() {
+    fn invariants_hold_under_extreme_parameters() {
         let cfgs = vec![
             Cfg::new(8, 12, 1.0, 1.0, 1.0, 1.0, 8, 8),
             Cfg::new(8, 12, 0.0, 0.0, 0.0, 1.0, 8, 0),
@@ -183,13 +189,24 @@ mod zz_probe {
             Cfg::new(16, 5, 0.5, 1.0, 1.0, 0.5, 3, 20),
         ];
         for seed in [1u64, 7, 99, 12345] {
-            for (n, e) in [(1i32, 0usize), (2, 1), (3, 0), (5, 3), (20, 10), (40, 200), (60, 60)] {
+            for (n, e) in [
+                (1i32, 0usize),
+                (2, 1),
+                (3, 0),
+                (5, 3),
+                (20, 10),
+                (40, 200),
+                (60, 60),
+            ] {
                 let g = rnd_graph(n.max(1), e, seed);
                 for cfg in &cfgs {
                     let (front, objs) = run(&g, cfg);
                     for (p, o) in front.iter().zip(&objs) {
                         assert_eq!(p.len(), g.n);
-                        assert!(p.iter().all(|&c| c >= 0 && (c as usize) < g.n), "label out of range");
+                        assert!(
+                            p.iter().all(|&c| c >= 0 && (c as usize) < g.n),
+                            "label out of range"
+                        );
                         let mut size = vec![0u32; g.n];
                         let mut live = Vec::new();
                         let direct = obj_of(&g, measure(&g, p, &mut size, &mut live));
@@ -201,9 +218,12 @@ mod zz_probe {
     }
 
     #[test]
-    fn zz_big_fuzz() {
+    fn the_archive_stays_valid_over_three_hundred_random_graphs() {
         let mut st = 0xDEAD_BEEF_1234_5678u64;
-        let mut next = |m: u64| { st = st.wrapping_mul(6364136223846793005).wrapping_add(1); (st >> 33) % m.max(1) };
+        let mut next = |m: u64| {
+            st = st.wrapping_mul(6364136223846793005).wrapping_add(1);
+            (st >> 33) % m.max(1)
+        };
         for trial in 0..300u32 {
             let n = 1 + next(60) as i32;
             let e = next(150) as usize;
@@ -230,20 +250,29 @@ mod zz_probe {
             assert!(!front.is_empty(), "trial {trial}: empty archive");
             for (p, o) in front.iter().zip(&objs) {
                 assert_eq!(p.len(), g.n);
-                assert!(p.iter().all(|&c| c >= 0 && (c as usize) < g.n), "trial {trial}: label out of range");
+                assert!(
+                    p.iter().all(|&c| c >= 0 && (c as usize) < g.n),
+                    "trial {trial}: label out of range"
+                );
                 let mut size = vec![0u32; g.n];
                 let mut live = Vec::new();
-                assert_eq!(&obj_of(&g, measure(&g, p, &mut size, &mut live)), o, "trial {trial}: objective drift");
+                assert_eq!(
+                    &obj_of(&g, measure(&g, p, &mut size, &mut live)),
+                    o,
+                    "trial {trial}: objective drift"
+                );
             }
-            for mode in [0u8, 1, 2] {
-                let idx = crate::core::algorithms::mopso::front_test_select(&g, &front, &objs, mode);
-                assert!(idx < front.len(), "trial {trial} mode {mode}: index {idx} out of range");
-            }
+            let idx = select_index(&g, &front, &objs);
+            assert!(
+                idx < front.len(),
+                "trial {trial}: selected {idx} of {}",
+                front.len()
+            );
         }
     }
 
     #[test]
-    fn zz_isolated_nodes_never_share_a_community_with_a_real_one() {
+    fn an_isolated_vertex_never_joins_a_community() {
         let mut edges = Vec::new();
         for c in 0..6i32 {
             let lo = c * 10;
@@ -261,7 +290,11 @@ mod zz_probe {
             for u in 0..g.n {
                 if g.deg[u] == 0 {
                     let shared = (0..g.n).filter(|&v| p[v] == p[u]).count();
-                    assert_eq!(shared, 1, "isolated node {u} joined a community: label {}", p[u]);
+                    assert_eq!(
+                        shared, 1,
+                        "isolated node {u} joined a community: label {}",
+                        p[u]
+                    );
                 }
             }
         }

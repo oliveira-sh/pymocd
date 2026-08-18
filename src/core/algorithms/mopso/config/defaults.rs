@@ -16,5 +16,3 @@ pub const DEFAULT_SOCIAL: f64 = 0.7; // pull toward the archive leader.
 pub const DEFAULT_LOCAL_RATE: f64 = 0.35; // per-node rate of the resolution-directed CPM local move.
 
 pub const DEFAULT_SEED_ROUNDS: usize = 8; // alternating node-move and merge rounds driving a particle to its rung.
-
-pub const DEFAULT_SELECT_MODE: u8 = 1; // 1 = resolution plateau, 0 = equal-weight sum, 2 = modularity.

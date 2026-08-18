@@ -67,8 +67,8 @@ fn best_move_at(
 mod tests {
     use super::*;
     use crate::core::algorithms::mopso::swarm::particle::seeded as particle;
-    use crate::core::graph::CsrGraph;
     use crate::core::algorithms::mopso::utils::fixtures::{ring_of_cliques, two_triangles};
+    use crate::core::graph::CsrGraph;
 
     #[test]
     fn a_free_node_joins_the_community_it_has_most_edges_into() {

@@ -175,8 +175,16 @@ mod tests {
         assert_eq!(octave(2), 1);
         assert_eq!(octave(3), 1);
         assert_eq!(octave(4), 2);
-        assert_eq!(octave(1092), octave(1313), "one plateau split across octaves");
-        assert_ne!(octave(1092), octave(2500), "a doubling stayed in one octave");
+        assert_eq!(
+            octave(1092),
+            octave(1313),
+            "one plateau split across octaves"
+        );
+        assert_ne!(
+            octave(1092),
+            octave(2500),
+            "a doubling stayed in one octave"
+        );
         assert_eq!(octave(0), 0, "a zero count must not panic");
     }
 
@@ -216,10 +224,7 @@ mod tests {
         ];
         let counts = vec![400, 90, 20, 5, 4, 1]; // octave-separated, so the pooling cannot decide this one.
         let keep: Vec<usize> = (0..objs.len()).collect();
-        assert_eq!(
-            widest_plateau(&objs, &counts, &keep, WIDE),
-            Some(3)
-        );
+        assert_eq!(widest_plateau(&objs, &counts, &keep, WIDE), Some(3));
     }
 
     #[test]

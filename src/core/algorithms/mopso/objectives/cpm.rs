@@ -22,7 +22,10 @@ pub fn load_sizes(labels: &[i32], size: &mut [u32], live: &mut Vec<u32>) {
     }
     live.clear();
     for &c in labels {
-        debug_assert!((c as usize) < size.len(), "label {c} outside the slot range");
+        debug_assert!(
+            (c as usize) < size.len(),
+            "label {c} outside the slot range"
+        );
         let c = c as usize;
         let k = size[c];
         if k == 0 {
@@ -53,7 +56,11 @@ pub fn measure(g: &CsrGraph, labels: &[i32], size: &mut [u32], live: &mut Vec<u3
 pub fn obj_of(g: &CsrGraph, (internal, pair_sum): Counts) -> Obj {
     let m = g.m as f64;
     let n = g.n as f64;
-    let cut = if m > 0.0 { 1.0 - internal as f64 / m } else { 0.0 };
+    let cut = if m > 0.0 {
+        1.0 - internal as f64 / m
+    } else {
+        0.0
+    };
     let pair = if n > 1.0 {
         2.0 * pair_sum as f64 / (n * (n - 1.0))
     } else {

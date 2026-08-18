@@ -138,7 +138,10 @@ mod tests {
         let mut s = Scratch::new(g.n);
         let mut r = slot_rng(1, 0);
         advance(&g, &mut p, &leader, &cfg, &mut s, &mut r);
-        assert_eq!(p.pos, pos, "the particle moved with every force switched off");
+        assert_eq!(
+            p.pos, pos,
+            "the particle moved with every force switched off"
+        );
     }
 
     #[test]

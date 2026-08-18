@@ -66,7 +66,7 @@ One partition is chosen from the archive with no ground truth by reading it as
 the resolution profile it is and keeping the granularity that survives the
 widest span of $\gamma$ — the profile's **plateau**. The profile itself is
 exposed via [`mopso_fronts`](api/fronts.md#pymocd.mopso_fronts), which also
-returns each member's (`cut`, `pair`) point.
+returns each member's (`cut`, `pair`) point, so you can apply your own rule.
 
 MOPSO is **deterministic**: one independent random stream per (iteration,
 particle) and no shared state inside an iteration, so the same graph and

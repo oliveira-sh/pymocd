@@ -13,8 +13,8 @@ pub struct Particle {
     pub pos: Labels,
     pub vel: Vec<f32>,
     pub best: Labels,
-    pub internal: i64, // intra-community edges of `pos`, each counted once.
-    pub pair_sum: i64, // `sum_c C(n_c, 2)` over `pos`.
+    pub internal: i64,   // intra-community edges of `pos`, each counted once.
+    pub pair_sum: i64,   // `sum_c C(n_c, 2)` over `pos`.
     pub gamma: f64, // the particle's niche on the resolution profile; only its local move reads it.
     pub best_score: f64, // CPM at `gamma` of `best`, what the cognitive memory is ranked by.
 }
@@ -56,14 +56,14 @@ impl ScratchPool {
 
 /// Per-worker buffers, reused across every particle a rayon task handles.
 pub struct Scratch {
-    pub size: Vec<u32>, // community sizes of the particle being advanced.
-    pub live: Vec<u32>, // the communities `size` holds a nonzero count for.
-    pub link: Vec<u32>, // edges from the node being moved into each community.
+    pub size: Vec<u32>,    // community sizes of the particle being advanced.
+    pub live: Vec<u32>,    // the communities `size` holds a nonzero count for.
+    pub link: Vec<u32>,    // edges from the node being moved into each community.
     pub touched: Vec<u32>, // the communities `link` holds a nonzero count for.
-    pub rep: Vec<i32>, // lowest-numbered member of each community, for `canonicalize`.
-    pub bucket: Vec<u32>, // vertices ordered by community, then the merge relabelling.
-    pub start: Vec<u32>, // where each community's run of `bucket` begins.
-    pub cand: Vec<u128>, // the merges one sweep is choosing between, in sweep order.
+    pub rep: Vec<i32>,     // lowest-numbered member of each community, for `canonicalize`.
+    pub bucket: Vec<u32>,  // vertices ordered by community, then the merge relabelling.
+    pub start: Vec<u32>,   // where each community's run of `bucket` begins.
+    pub cand: Vec<u128>,   // the merges one sweep is choosing between, in sweep order.
 }
 
 impl Scratch {
@@ -100,7 +100,10 @@ impl Scratch {
             acc += self.size[c];
             self.start[c] = acc; // one past the end of the community, for now.
         }
-        debug_assert_eq!(acc as usize, n, "the community sizes do not cover the vertices");
+        debug_assert_eq!(
+            acc as usize, n,
+            "the community sizes do not cover the vertices"
+        );
         // Filling from the back turns each end into the start it will be read as.
         for (u, &c) in pos.iter().enumerate().rev() {
             let c = c as usize;
@@ -267,21 +270,40 @@ mod tests {
     #[test]
     fn canonical_labels_name_a_community_by_its_lowest_member() {
         let g = ring_of_cliques(4, 5);
-        let (mut p, mut s) = seeded(&g, vec![7, 7, 7, 7, 7, 3, 3, 3, 3, 3, 19, 19, 19, 19, 19, 11, 11, 11, 11, 11], 0.1);
+        let (mut p, mut s) = seeded(
+            &g,
+            vec![
+                7, 7, 7, 7, 7, 3, 3, 3, 3, 3, 19, 19, 19, 19, 19, 11, 11, 11, 11, 11,
+            ],
+            0.1,
+        );
         let before = (p.internal, p.pair_sum);
         p.canonicalize(&mut s);
         assert_eq!(&p.pos[..5], &[0; 5]);
         assert_eq!(&p.pos[5..10], &[5; 5]);
         assert_eq!(&p.pos[10..15], &[10; 5]);
         assert_eq!(&p.pos[15..], &[15; 5]);
-        assert_eq!((p.internal, p.pair_sum), before, "relabelling changed a count");
+        assert_eq!(
+            (p.internal, p.pair_sum),
+            before,
+            "relabelling changed a count"
+        );
         let mut q = p.pos.clone();
         p.canonicalize(&mut s);
         assert_eq!(p.pos, q);
         q.rotate_left(0);
-        let (mut r, mut s2) = seeded(&g, vec![2, 2, 2, 2, 2, 8, 8, 8, 8, 8, 13, 13, 13, 13, 13, 17, 17, 17, 17, 17], 0.1);
+        let (mut r, mut s2) = seeded(
+            &g,
+            vec![
+                2, 2, 2, 2, 2, 8, 8, 8, 8, 8, 13, 13, 13, 13, 13, 17, 17, 17, 17, 17,
+            ],
+            0.1,
+        );
         r.canonicalize(&mut s2);
-        assert_eq!(r.pos, p.pos, "two particles disagreed on the same partition");
+        assert_eq!(
+            r.pos, p.pos,
+            "two particles disagreed on the same partition"
+        );
     }
 
     #[test]

@@ -6,7 +6,6 @@
 use rayon::prelude::*;
 
 use crate::core::algorithms::mopso::Labels;
-use crate::core::algorithms::mopso::config::defaults::DEFAULT_SELECT_MODE;
 use crate::core::algorithms::mopso::objectives::{Obj, community_count};
 use crate::core::graph::CsrGraph;
 
@@ -19,10 +18,7 @@ const DEGENERATE_FRACTION: f64 = 0.5; // a member with at least this fraction of
 pub fn counts(g: &CsrGraph, front: &[Labels]) -> Vec<usize> {
     front
         .par_iter()
-        .map_init(
-            || vec![false; g.n],
-            |seen, p| community_count(p, seen),
-        )
+        .map_init(|| vec![false; g.n], |seen, p| community_count(p, seen))
         .collect()
 }
 
@@ -37,28 +33,15 @@ fn lambda_span(g: &CsrGraph) -> (f64, f64) {
     (1.0 / (n * n * density), 1.0 / density)
 }
 
-/// The scalarised rule: the CPM optimum at `gamma` = the graph's own density, where the
-/// two objectives carry equal weight.
-fn cheapest(objs: &[Obj], keep: &[usize]) -> usize {
-    let mut pick = keep[0];
-    let mut best = objs[pick][0] + objs[pick][1];
-    for &i in &keep[1..] {
-        let s = objs[i][0] + objs[i][1];
-        if s < best {
-            best = s;
-            pick = i;
-        }
-    }
-    pick
-}
-
+/// The member to return: the granularity holding the widest span of `gamma`, and
+/// modularity for the one case a plateau cannot speak to — a hull too thin to have an
+/// interior, which happens only on graphs of a few dozen vertices.
+///
+/// Measured over 24 LFR archives (n from 1000 to 50000, mixing 0.3 to 0.6) this scores
+/// 0.825 mean AMI against a front ceiling of 0.833, where modularity alone scores 0.697
+/// and the equal-weight sum — CPM at `gamma` = density, which is the Leiden-CPM
+/// baseline's operating point — scores 0.685.
 pub fn select_index(g: &CsrGraph, front: &[Labels], objs: &[Obj]) -> usize {
-    select_index_mode(g, front, objs, DEFAULT_SELECT_MODE)
-}
-
-/// Picks a member by `mode`: `1` the resolution plateau, falling back to modularity when
-/// the hull is too thin to read; `2` modularity alone; anything else the equal-weight sum.
-pub fn select_index_mode(g: &CsrGraph, front: &[Labels], objs: &[Obj], mode: u8) -> usize {
     if front.is_empty() {
         return 0;
     }
@@ -71,12 +54,8 @@ pub fn select_index_mode(g: &CsrGraph, front: &[Labels], objs: &[Obj], mode: u8)
         keep = (0..front.len()).collect();
     }
 
-    match mode {
-        1 => widest_plateau(objs, &k, &keep, lambda_span(g))
-            .unwrap_or_else(|| max_modularity(g, front, objs, &keep)),
-        2 => max_modularity(g, front, objs, &keep),
-        _ => cheapest(objs, &keep),
-    }
+    widest_plateau(objs, &k, &keep, lambda_span(g))
+        .unwrap_or_else(|| max_modularity(g, front, objs, &keep))
 }
 
 pub fn select_best(g: &CsrGraph, front: Vec<Labels>, objs: &[Obj]) -> Labels {
@@ -103,15 +82,12 @@ mod tests {
     }
 
     #[test]
-    fn every_mode_rejects_the_degenerate_members() {
+    fn the_degenerate_members_are_rejected() {
         let g = two_cliques();
         let split: Labels = (0..g.n).map(|i| i32::from(i >= 5) * 5).collect();
         let front = vec![vec![0; g.n], (0..g.n as i32).collect(), split.clone()];
         let objs = evaluated(&g, &front);
-        for mode in [0u8, 1, 2] {
-            let pick = select_index_mode(&g, &front, &objs, mode);
-            assert_eq!(front[pick], split, "mode {mode} took a degenerate member");
-        }
+        assert_eq!(front[select_index(&g, &front, &objs)], split);
     }
 
     #[test]
@@ -125,7 +101,7 @@ mod tests {
         let front = vec![one, coarse, planted.clone(), fine];
         let objs = evaluated(&g, &front);
 
-        let pick = select_index_mode(&g, &front, &objs, 1);
+        let pick = select_index(&g, &front, &objs);
         assert_eq!(front[pick], planted, "the plateau missed the planted ring");
     }
 
@@ -153,7 +129,7 @@ mod tests {
         let front = vec![planted.clone(), coarse, vec![0; g.n]];
         let objs = evaluated(&g, &front);
         assert_eq!(
-            front[select_index_mode(&g, &front, &objs, 1)],
+            front[select_index(&g, &front, &objs)],
             planted,
             "the gate let a two-member hull decide"
         );

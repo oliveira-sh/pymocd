@@ -7,4 +7,4 @@ mod modularity;
 mod plateau;
 mod select;
 
-pub(super) use select::{select_best, select_index_mode};
+pub(super) use select::{select_best, select_index};

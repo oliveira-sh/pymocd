@@ -36,7 +36,10 @@ mod tests {
         let g = ring_of_cliques(20, 5);
         let l = ladder(&g, 32);
         assert_eq!(l.len(), 32);
-        assert!(l.windows(2).all(|w| w[1] > w[0]), "the ladder is not sorted");
+        assert!(
+            l.windows(2).all(|w| w[1] > w[0]),
+            "the ladder is not sorted"
+        );
         let n = g.n as f64;
         assert!((l[0] - 1.0 / (n * n)).abs() < 1e-15, "coarse end {}", l[0]);
         assert!((l[31] - 1.0).abs() < 1e-12, "fine end {}", l[31]);
@@ -48,7 +51,11 @@ mod tests {
             let g = ring_of_cliques(k, s);
             let l = ladder(&g, 8);
             let n = g.n as f64;
-            assert!((l[0] * n * n - 1.0).abs() < 1e-9, "n={n}: coarse end {}", l[0]);
+            assert!(
+                (l[0] * n * n - 1.0).abs() < 1e-9,
+                "n={n}: coarse end {}",
+                l[0]
+            );
             assert!((l[7] - 1.0).abs() < 1e-12, "n={n}: fine end {}", l[7]);
         }
     }

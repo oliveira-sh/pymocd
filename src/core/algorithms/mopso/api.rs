@@ -6,7 +6,7 @@
 use crate::core::graph::CsrGraph;
 
 use super::config::Cfg;
-use super::front::{select_best, select_index_mode};
+use super::front::{select_best, select_index};
 use super::swarm::run;
 use super::utils::to_output;
 
@@ -58,7 +58,6 @@ pub fn mopso_fronts(
     local_rate: f64,
     archive: usize,
     seed_rounds: usize,
-    select_mode: u8,
 ) -> Profile {
     let g = CsrGraph::from_edges(nodes, edges);
     if g.n == 0 {
@@ -75,8 +74,12 @@ pub fn mopso_fronts(
         seed_rounds,
     );
     let (front, objs) = run(&g, &cfg);
-    let selected = select_index_mode(&g, &front, &objs, select_mode);
-    (front.iter().map(|l| to_output(&g, l)).collect(), objs, selected)
+    let selected = select_index(&g, &front, &objs);
+    (
+        front.iter().map(|l| to_output(&g, l)).collect(),
+        objs,
+        selected,
+    )
 }
 
 #[cfg(test)]
@@ -184,8 +187,7 @@ mod tests {
     fn the_front_is_a_profile_and_the_selection_indexes_into_it() {
         let (nodes, edges) = ring_of_cliques(12, 5);
         let (_, _, w, c1, c2, lr, _, sr) = defaults();
-        let (front, objs, pick) =
-            mopso_fronts(&nodes, &edges, 32, 25, w, c1, c2, lr, 32, sr, 1);
+        let (front, objs, pick) = mopso_fronts(&nodes, &edges, 32, 25, w, c1, c2, lr, 32, sr);
         assert!(!front.is_empty());
         assert_eq!(front.len(), objs.len());
         assert!(pick < front.len());

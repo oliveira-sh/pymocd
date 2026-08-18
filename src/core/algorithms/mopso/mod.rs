@@ -8,20 +8,10 @@ mod config;
 mod front;
 mod objectives;
 mod pareto;
-pub mod swarm;
+mod swarm;
 mod utils;
 
 pub type Labels = Vec<i32>; // one community label per dense vertex id, always in [0, n).
 
 pub use api::{Profile, mopso, mopso_fronts};
 pub use config::defaults::*;
-
-#[cfg(test)]
-pub(crate) fn front_test_select(
-    g: &crate::core::graph::CsrGraph,
-    front: &[Labels],
-    objs: &[objectives::Obj],
-    mode: u8,
-) -> usize {
-    front::select_index_mode(g, front, objs, mode)
-}
