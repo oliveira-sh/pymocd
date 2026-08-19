@@ -49,13 +49,19 @@ fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // utils
     m.add_function(wrap_pyfunction!(max_cores, m)?)?;
 
+    // generic NSGA-II with pluggable Python objectives, for objective research
+    m.add_class::<crate::core::algorithms::hpmocd::HpMocd>()?;
+
     // detectors -> partition
     m.add_function(wrap_pyfunction!(hpmocd_fn, m)?)?;
     m.add_function(wrap_pyfunction!(hpmocd_fronts_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(mopots_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mocd_q_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mocd_d_fn, m)?)?;
     m.add_function(wrap_pyfunction!(moga_net_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(gdpso_fn, m)?)?;
     m.add_function(wrap_pyfunction!(ccm_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(cdrme_fn, m)?)?;
     m.add_function(wrap_pyfunction!(krm_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mmcomo_fn, m)?)?;
     m.add_function(wrap_pyfunction!(smocc_fn, m)?)?;
@@ -66,6 +72,8 @@ fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(moga_net_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mmcomo_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(smocc_fronts_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(mopots_fronts_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(mopots_ladder_fn, m)?)?;
 
     // deprecated aliases (pre-rename API)
     m.add("scale", m.getattr("smocc")?)?;

@@ -4,6 +4,8 @@
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use crate::core::algorithms::ccm;
+use crate::core::algorithms::cdrme;
+use crate::core::algorithms::gdpso;
 use crate::core::algorithms::hpmocd::HpMocd;
 use crate::core::algorithms::hpmocd::{
     DEFAULT_CROSS_RATE as HPMOCD_DEFAULT_CROSS_RATE,
@@ -14,6 +16,7 @@ use crate::core::algorithms::krm;
 use crate::core::algorithms::mmcomo;
 use crate::core::algorithms::mocd;
 use crate::core::algorithms::moganet;
+use crate::core::algorithms::mopots;
 use crate::core::algorithms::smocc;
 use crate::core::graph::{Graph, Partition, get_edges, get_nodes};
 use pyo3::prelude::*;
@@ -81,6 +84,127 @@ pub fn hpmocd_fronts_fn(py: Python<'_>, graph: &Bound<'_, PyAny>) -> PyResult<Py
         out.append(d)?;
     }
     Ok(out.into_any().unbind())
+}
+
+/// Run MO-POTS — NSGA-II over the exact affine decomposition of the Constant
+/// Potts Model into ``cut = 1 − Σ_c |E(c)|/m`` and ``pair = Σ_c C(n_c,2)/C(n,2)``,
+/// both minimized. Returns the **max-modularity** member of the rank-1 Pareto
+/// front.
+///
+/// ``gamma`` is not a search parameter: it is the exchange rate between the two
+/// objectives (``H_gamma(C)/m = 1 − cut − (gamma/gamma_d)·pair``, with
+/// ``gamma_d = 2m/(n(n−1))``), so one run sweeps a whole ladder of resolutions
+/// along the front. Both ``n`` and ``n_c`` count only non-isolated nodes.
+///
+/// Note the ``MoPots`` class is NOT registered with PyO3, as with ``HpMocd``, so
+/// this function is the supported route to MO-POTS.
+///
+/// Args:
+///     graph: networkx.Graph (undirected, integer node ids).
+///
+/// Returns:
+///     ``dict[node, community]``. Isolated nodes get community ``-1``.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "mopots", signature = (graph, pop_size = mopots::DEFAULT_POP_SIZE, num_gens = mopots::DEFAULT_NUM_GENS, cross_rate = mopots::DEFAULT_CROSS_RATE, mut_rate = mopots::DEFAULT_MUT_RATE))]
+pub fn mopots_fn(
+    graph: &Bound<'_, PyAny>,
+    pop_size: usize,
+    num_gens: usize,
+    cross_rate: f64,
+    mut_rate: f64,
+) -> PyResult<Partition> {
+    mopots::MoPots::new(
+        graph,
+        mopots::DEFAULT_DEBUG_LEVEL,
+        pop_size,
+        num_gens,
+        cross_rate,
+        mut_rate,
+    )?
+    .run()
+}
+
+/// MO-POTS's full rank-1 Pareto front, the candidate set ``mopots`` selects from.
+///
+/// ``mopots`` applies max-modularity selection to this front and returns one
+/// partition; this returns every member, so MO-POTS can be compared against
+/// other detectors on the SAME footing (best-in-front, i.e. selector-free).
+/// Members trade ``cut`` against ``pair``, so the front is a ladder of
+/// resolutions rather than a set of equally-scaled alternatives.
+///
+/// Note the ``MoPots`` class is NOT registered with PyO3, as with ``HpMocd``, so
+/// ``MoPots.generate_pareto_front`` is unreachable from Python. This function is
+/// the supported route to the front.
+///
+/// Args:
+///     graph: networkx.Graph (undirected, integer node ids).
+///
+/// Returns:
+///     ``list[dict[node, community]]``. Isolated nodes get community ``-1``.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "mopots_fronts", signature = (graph, pop_size = mopots::DEFAULT_POP_SIZE, num_gens = mopots::DEFAULT_NUM_GENS, cross_rate = mopots::DEFAULT_CROSS_RATE, mut_rate = mopots::DEFAULT_MUT_RATE))]
+pub fn mopots_fronts_fn(
+    graph: &Bound<'_, PyAny>,
+    pop_size: usize,
+    num_gens: usize,
+    cross_rate: f64,
+    mut_rate: f64,
+) -> PyResult<Vec<Partition>> {
+    let front = mopots::MoPots::new(
+        graph,
+        mopots::DEFAULT_DEBUG_LEVEL,
+        pop_size,
+        num_gens,
+        cross_rate,
+        mut_rate,
+    )?
+    .generate_pareto_front()?;
+    Ok(front.into_iter().map(|(part, _objs)| part).collect())
+}
+
+/// The graph's multi-scale community profile from a single MO-POTS run: the
+/// front's lower convex hull as ``(partition, cut, pair, gamma)``, in increasing
+/// ``gamma``.
+///
+/// Each entry maximizes ``H_gamma`` among the members of the front THIS run
+/// produced, from its own ``gamma`` up to the next entry's; the first entry is
+/// always labelled ``gamma = 0.0``, whether or not the front holds a
+/// single-community member. Front members no ``gamma`` ever selects (concave
+/// dents) are omitted, so the list is a subset of ``mopots_fronts``.
+///
+/// Note the ``MoPots`` class is NOT registered with PyO3, as with ``HpMocd``, so
+/// ``MoPots.ladder`` is unreachable from Python. This function is the supported
+/// route to the ladder.
+///
+/// Args:
+///     graph: networkx.Graph (undirected, integer node ids). A DiGraph's
+///         reciprocal arcs are kept as two edges, which inflates ``m`` and
+///         therefore every reported ``gamma``.
+///
+/// Returns:
+///     ``list[tuple[dict[node, community], float, float, float]]``. Isolated
+///     nodes get community ``-1``.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "mopots_ladder", signature = (graph, pop_size = mopots::DEFAULT_POP_SIZE, num_gens = mopots::DEFAULT_NUM_GENS, cross_rate = mopots::DEFAULT_CROSS_RATE, mut_rate = mopots::DEFAULT_MUT_RATE))]
+pub fn mopots_ladder_fn(
+    graph: &Bound<'_, PyAny>,
+    pop_size: usize,
+    num_gens: usize,
+    cross_rate: f64,
+    mut_rate: f64,
+) -> PyResult<Vec<(Partition, f64, f64, f64)>> {
+    mopots::MoPots::new(
+        graph,
+        mopots::DEFAULT_DEBUG_LEVEL,
+        pop_size,
+        num_gens,
+        cross_rate,
+        mut_rate,
+    )?
+    .ladder()
 }
 
 /// Run Shi-MOCD (Shi, Yan, Cai, Wu 2012) — PESA-II over Shi's
@@ -159,6 +283,59 @@ pub fn mocd_d_fn(
     .run()
 }
 
+/// Run GDPSO (Cai, Gong, Ma, Ruan, Yuan, Jiao, "Greedy discrete particle swarm
+/// optimization for large-scale social network clustering", Information
+/// Sciences 316:503–516, 2015) — a swarm of label vectors, each seeded by a
+/// short asynchronous label-propagation run, that once per generation turns a
+/// sigmoid of the velocity into a binary per-node move mask and offers every
+/// masked node an exact single-node modularity move. Returns the best position
+/// the swarm ever held; GDPSO is single-objective (Newman–Girvan modularity),
+/// so there is no Pareto front and no ``gdpso_fronts``.
+///
+/// Written from a specification of the authors' public reference
+/// implementation; no reference source was copied.
+///
+/// Note ``pbest`` and ``gbest`` carry no label information — they enter only as
+/// two indicator bits shifting a node's move probability — so in practice this
+/// behaves as the best of ``pop_size`` LPA seeds, each polished by Louvain
+/// local-moving. ``lpa_sweeps``, not ``num_gens``, is the lever on seed
+/// diversity. GDPSO also inherits modularity's resolution limit whole.
+///
+/// Args:
+///     graph: networkx.Graph or igraph.Graph (integer node ids).
+///     w: inertia weight on the previous velocity (Clerc constant, inherited
+///         from real-valued PSO; the velocity is re-binarized every generation).
+///     c1: cognitive weight, applied to the ``pbest`` agreement indicator.
+///     c2: social weight, applied to the ``gbest`` agreement indicator.
+///     mut_rate: per-node label-broadcast probability inside a mutated particle.
+///     mut_frac: fraction of the swarm that is mutated each generation. The
+///         reference overloads a single 0.1 for this and for ``mut_rate``.
+///     lpa_sweeps: asynchronous label-propagation sweeps seeding each particle.
+///
+/// Returns:
+///     ``dict[node, community]``. Isolated nodes get community ``-1``.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "gdpso", signature = (graph, pop_size = gdpso::DEFAULT_POP_SIZE, num_gens = gdpso::DEFAULT_NUM_GENS, w = gdpso::DEFAULT_W, c1 = gdpso::DEFAULT_C1, c2 = gdpso::DEFAULT_C2, mut_rate = gdpso::DEFAULT_MUT_RATE, mut_frac = gdpso::DEFAULT_MUT_FRAC, lpa_sweeps = gdpso::DEFAULT_LPA_SWEEPS))]
+#[allow(clippy::too_many_arguments)]
+pub fn gdpso_fn(
+    graph: &Bound<'_, PyAny>,
+    pop_size: usize,
+    num_gens: usize,
+    w: f64,
+    c1: f64,
+    c2: f64,
+    mut_rate: f64,
+    mut_frac: f64,
+    lpa_sweeps: usize,
+) -> PyResult<Partition> {
+    let nodes = get_nodes(graph)?;
+    let edges = get_edges(graph)?;
+    Ok(gdpso::gdpso(
+        &nodes, &edges, pop_size, num_gens, w, c1, c2, mut_rate, mut_frac, lpa_sweeps,
+    ))
+}
+
 /// Run MOGA-Net (Pizzuti, IEEE TEC 16(3):418–430, 2012) — NSGA-II over the
 /// (Community Score, Community Fitness) bi-objective. Returns the
 /// **max-modularity** member of the rank-1 Pareto front (Pizzuti Sec. V-E).
@@ -166,10 +343,14 @@ pub fn mocd_d_fn(
 /// Args:
 ///     graph: networkx.Graph or igraph.Graph (integer node ids).
 ///     r: Community Score power-mean exponent (resolution knob; higher helps at
-///         high mixing). The paper never fixes it; 1.5 reproduces its
-///         real-world tables.
-///     alpha: Community Fitness exponent (larger → smaller communities).
-///         Pizzuti default 1.
+///         high mixing). TEVC 2012 Sec. VI-C fixes it at 2, which is the
+///         default here.
+///     alpha: Community Fitness exponent. It does **not** set a community size:
+///         in the per-node form used here CF ≤ Σ_i deg(i)^(1−alpha) for every
+///         alpha, with equality only for the single-community partition. It
+///         reweights who counts — alpha > 1 discounts high-degree nodes, so
+///         low-degree nodes' internal edges matter relatively more. Pizzuti
+///         default 1.
 ///
 /// Returns:
 ///     ``dict[node, community]``. Isolated nodes get community ``-1``.
@@ -191,6 +372,69 @@ pub fn moga_net_fn(
     ))
 }
 
+/// Run CDRME (Dabaghi-Zarandi, Afkhami & Ashoori, "Community Detection method
+/// based on Random walk and Multi objective Evolutionary algorithm in complex
+/// networks", Journal of Network and Computer Applications 234:104070, 2025) —
+/// softmax-weighted random walks seeded at degree-weighted centres compose a
+/// primary community set, a population of stochastic agglomerative merge chains
+/// diversifies it under the paper's linkage objective (Eq. 12), and a
+/// similarity-driven mutation repairs the weakly attached nodes.
+///
+/// Eq. (12) adds ``innerLinkage`` (Eq. 9) and ``outerLinkage`` (Eq. 10) into one
+/// maximised scalar, so there is no Pareto front and no ``cdrme_fronts``. The
+/// paper's own selector (Sec. 4.4.4) names three "evaluation measures"; NMI
+/// needs ground truth and Density is maximised by the single community, so the
+/// shipped rule is max-modularity, which is what the authors' own code selects
+/// on.
+///
+/// Written from the paper. The authors' reference implementation is a private
+/// notebook, not a published repository.
+///
+/// Args:
+///     graph: networkx.Graph or igraph.Graph (integer node ids).
+///     alpha_walk: Eq. (7) walk-length coefficient, the paper's 1 to 2. Since
+///         ``|V|/ENC`` is identically ``AvgDegree(G)`` (Eqs. 5-6), the length is
+///         ``Degree(v) + alpha_walk * AvgDegree(G)``. Clamped to ``[0, 2]``.
+///     n_walk: walks per centre (Algorithm 1); the paper gives no value.
+///     pop_size: ``N_p``, the number of merge chains. Every chromosome starts
+///         identical, so this is how many points along the merge chain are
+///         sampled, not a breeding pool. Cost is linear in it.
+///     elite_size: ``N_sp <= N_p``, the chromosomes that reach mutation
+///         (Sec. 4.4.1). Ranking by Eq. (12) drops the coarse chromosomes, so
+///         the default keeps them all.
+///     alpha_mut: Sec. 4.4.2 mutation threshold on the ``[0,1]`` similarity
+///         scale; a gene below it is offered a new community.
+///     mut_sweeps: cap on the 4.4.2 <-> 4.4.3 loop, which the paper leaves
+///         unbounded. The loop also stops on the first sweep that moves no gene.
+///
+/// Returns:
+///     ``dict[node, community]``. Isolated nodes get community ``-1``.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "cdrme", signature = (graph, alpha_walk = cdrme::DEFAULT_ALPHA_WALK, n_walk = cdrme::DEFAULT_N_WALK, pop_size = cdrme::DEFAULT_POP_SIZE, elite_size = cdrme::DEFAULT_ELITE_SIZE, alpha_mut = cdrme::DEFAULT_ALPHA_MUT, mut_sweeps = cdrme::DEFAULT_MUT_SWEEPS))]
+#[allow(clippy::too_many_arguments)]
+pub fn cdrme_fn(
+    graph: &Bound<'_, PyAny>,
+    alpha_walk: f64,
+    n_walk: usize,
+    pop_size: usize,
+    elite_size: usize,
+    alpha_mut: f64,
+    mut_sweeps: usize,
+) -> PyResult<Partition> {
+    let nodes = get_nodes(graph)?;
+    let edges = get_edges(graph)?;
+    Ok(cdrme::cdrme(
+        &nodes,
+        &edges,
+        alpha_walk,
+        n_walk,
+        pop_size,
+        elite_size,
+        alpha_mut,
+        mut_sweeps,
+    ))
+}
 /// Run NSGA-III-CCM (Shaik, Ravi & Deb, SN Computer Science 2:13, 2021) —
 /// NSGA-III over the three maximized objectives (Community Score, Community
 /// Fitness, Modularity). Returns the **max-modularity** member of the rank-1
@@ -327,9 +571,11 @@ pub fn krm_fronts_fn(
 ///
 /// Args:
 ///     graph: networkx.Graph or igraph.Graph (integer node ids).
-///     r: Community Score power-mean exponent. The paper never fixes it; 1.5
-///         reproduces its real-world tables.
-///     alpha: Community Fitness exponent (Pizzuti default 1).
+///     r: Community Score power-mean exponent. TEVC 2012 Sec. VI-C fixes it at
+///         2, which is the default here.
+///     alpha: Community Fitness exponent. It does **not** set a community size:
+///         CF ≤ Σ_i deg(i)^(1−alpha) for every alpha, with equality only for
+///         the single-community partition. Pizzuti default 1.
 ///
 /// Returns:
 ///     ``list[dict[node, community]]``. Isolated nodes get community ``-1``.
@@ -479,12 +725,23 @@ pub fn smocc_fn(
 ///         reused, so old benchmark rows recording them cannot be confused with
 ///         a new operator.
 ///
-///     obj_mode: objective placement. Two objective sets remain, at their
-///         original ids: ``0`` = ``(KKM, RC)`` and ``6`` = ``(intra, inter)``.
-///         Values under ``100`` are homogeneous; ``100 <= v < 1000`` is
+///     obj_mode: objective placement. Three objective sets remain, at their
+///         original ids: ``0`` = ``(KKM, RC)``, ``6`` = ``(intra, inter)`` and
+///         ``20`` = the Constant Potts pair ``(cut, pair)``, both minimised over
+///         the non-isolated nodes, whose Pareto front is the CPM resolution
+///         ladder. Values under ``100`` are homogeneous; ``100 <= v < 1000`` is
 ///         heterogeneous with one decimal digit per side (``micro =
-///         (v-100)//10``, ``macro = (v-100)%10``), so the shipped default
-///         ``160`` is micro ``(intra, inter)`` / macro ``(KKM, RC)``. Ids
+///         (v-100)//10``, ``macro = (v-100)%10``), so ``160`` is micro
+///         ``(intra, inter)`` / macro ``(KKM, RC)``. That branch cannot name a
+///         two-digit id, so ``v >= 1000`` gives each side two digits (``micro =
+///         (v-1000)//100``, ``macro = (v-1000)%100``): the shipped default
+///         ``1020`` is micro ``(KKM, RC)`` / macro CPM, which at matched front
+///         size beat every other placement on LFR at mixing ``mu >= 0.5``
+///         (+0.029 AMI over ``160``) at the cost of ``-0.026`` on the annotated
+///         real networks; ``3000`` is its mirror (micro CPM / macro
+///         ``(KKM, RC)``) and was the WORST of the placements tried,
+///         ``3006`` micro CPM / macro ``(intra, inter)``, ``1620`` the mirror,
+///         and ``3020`` is homogeneous CPM (the same arm as ``20``). Ids
 ///         ``1..=5`` and ``7..=12`` were losing objective sets and now decode to
 ///         the default, exactly as any out-of-range id always did.
 ///
