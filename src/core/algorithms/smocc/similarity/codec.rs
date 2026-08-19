@@ -36,6 +36,10 @@ fn propagate(g: &CsrGraph, wadj: &[f64], is_center: &[bool], lab: &mut [i32], n_
     const CLEAN: u8 = 0;
     const DIRTY: u8 = 1;
     const CENTER: u8 = 2;
+    // CENTER maps to itself, so a center is never re-queued; CLEAN and DIRTY both map to DIRTY
+    const fn mark_dirty_unless_center(state: u8) -> u8 {
+        (state >> 1) + 1
+    }
     let mut state: Vec<u8> = is_center
         .iter()
         .map(|&c| if c { CENTER } else { DIRTY })
@@ -83,7 +87,7 @@ fn propagate(g: &CsrGraph, wadj: &[f64], is_center: &[bool], lab: &mut [i32], n_
                 changed = true;
                 for &v in &g.adj[start..end] {
                     let v = v as usize;
-                    state[v] = (state[v] >> 1) + 1;
+                    state[v] = mark_dirty_unless_center(state[v]);
                 }
             }
         }

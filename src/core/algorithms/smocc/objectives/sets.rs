@@ -7,6 +7,7 @@
 use crate::core::algorithms::smocc::Labels;
 use crate::core::graph::CsrGraph;
 
+use super::cpm::cpm;
 use super::intra_inter::intra_inter;
 use super::kkm_rc::kkm_rc;
 
@@ -15,12 +16,15 @@ pub enum ObjSet {
     KkmRc = 0,
 
     HpIntraInter = 6,
+
+    Cpm = 20,
 }
 
 impl ObjSet {
     pub const fn from_u8(v: u8) -> Self {
         match v {
             6 => Self::HpIntraInter,
+            20 => Self::Cpm,
             _ => Self::KkmRc,
         }
     }
@@ -54,6 +58,10 @@ pub fn evaluate(g: &CsrGraph, labels: &Labels, set: ObjSet) -> Vec<f64> {
         ObjSet::KkmRc => {
             let (kkm, rc) = kkm_rc(g, labels);
             vec![kkm, rc]
+        }
+        ObjSet::Cpm => {
+            let (cut, pair) = cpm(g, labels);
+            vec![cut, pair]
         }
     }
 }

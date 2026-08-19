@@ -206,7 +206,7 @@ mod tests {
     fn heterogeneous_objective_modes_are_deterministic_and_nonempty() {
         let nodes: Vec<i32> = (0..10).collect();
         let edges = two_clique_edges();
-        for obj_mode in [106u16, 160, 166, 100] {
+        for obj_mode in [106u16, 160, 166, 100, 3000, 1020, 3006, 1620] {
             let run = || {
                 smocc_fronts(
                     &nodes,
@@ -255,10 +255,12 @@ mod tests {
         }
         assert_eq!(run(160), run(1600));
         assert_eq!(run(106), run(1006));
+        // only the two-digit branch can name id 20: 320 would decode as het(22,0)
+        assert_eq!(run(20), run(3020), "mode 20 != het(20,20)");
     }
 
     #[test]
-    fn both_objective_sets_search_and_differ() {
+    fn every_objective_set_searches_and_differs() {
         let (nodes, edges) = grid(10, 10);
         let n = nodes.len();
         let run = |obj_mode: u16| {
@@ -279,16 +281,20 @@ mod tests {
         };
         let kkm_rc = run(0);
         let intra_inter = run(6);
-        for (label, a) in [("0", &kkm_rc), ("6", &intra_inter)] {
+        let cpm = run(20);
+        for (label, a) in [("0", &kkm_rc), ("6", &intra_inter), ("20", &cpm)] {
             assert!(!a.is_empty(), "obj_mode {label}: empty front");
             assert!(a.iter().all(|f| f.len() == n), "obj_mode {label}: partial");
         }
         assert_eq!(kkm_rc, run(0), "obj_mode 0 is not deterministic");
         assert_eq!(intra_inter, run(6), "obj_mode 6 is not deterministic");
+        assert_eq!(cpm, run(20), "obj_mode 20 is not deterministic");
         assert_ne!(
             kkm_rc, intra_inter,
             "the two objective sets are the same arm"
         );
+        assert_ne!(cpm, kkm_rc, "cpm decoded to the default arm");
+        assert_ne!(cpm, intra_inter, "cpm decoded to the intra/inter arm");
         assert_ne!(run(160), kkm_rc);
         assert_ne!(run(160), intra_inter);
     }

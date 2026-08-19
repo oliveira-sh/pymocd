@@ -13,7 +13,8 @@ pub const DEFAULT_MUT_RATE: f64 = 0.5;
 
 pub const DEFAULT_MICRO_MUT: f64 = 0.5;
 
-pub const DEFAULT_OBJ_MODE: u16 = 160;
+// 1020 decodes as micro (KKM, RC) / macro CPM; see README.md
+pub const DEFAULT_OBJ_MODE: u16 = 1020;
 
 pub const DEFAULT_TOPO_MODE: u8 = 130;
 
