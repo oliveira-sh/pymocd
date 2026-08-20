@@ -1,19 +1,15 @@
-//! NSGA-II survivor selection + generational loop (Deb et al. 2002) over the
-//! shared `helpers::individual` core; only crowding distance and the
-//! crowding-based truncation are NSGA-II-specific and live here.
-//! SCALE keeps its own dense-CSR NSGA-II — that representation is the source
-//! of its speed and is intentionally NOT shared here.
+//! Crowding distance and the truncation of the 2N pool back to `pop_size`.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use super::individual::{Individual, create_offspring, fast_non_dominated_sort};
-use super::operators;
-use crate::core::graph::Graph;
 use rustc_hash::FxHashMap as HashMap;
 use std::cmp::Ordering;
 
-pub fn calculate_crowding_distance(population: &mut [Individual]) {
+use super::individual::Individual;
+use super::sorting::fast_non_dominated_sort;
+
+fn calculate_crowding_distance(population: &mut [Individual]) {
     if population.is_empty() {
         return;
     }
@@ -63,8 +59,6 @@ pub fn calculate_crowding_distance(population: &mut [Individual]) {
     }
 }
 
-/// NSGA-II survivor selection: non-dominated sort + crowding, then keep the best
-/// `pop_size` by (rank ascending, crowding descending).
 pub fn select_survivors(population: &mut Vec<Individual>, pop_size: usize) {
     fast_non_dominated_sort(population);
     calculate_crowding_distance(population);
@@ -76,43 +70,4 @@ pub fn select_survivors(population: &mut Vec<Individual>, pop_size: usize) {
         })
     });
     population.truncate(pop_size);
-}
-
-/// Generic NSGA-II generational loop (Deb et al. 2002). `evaluate` sets each
-/// individual's `objectives`. `on_generation(gen, num_gens, &pop)` runs after each
-/// generation's offspring are merged. Returns the final combined population
-/// **unfiltered** — the caller applies its own rank-1 filter and selection.
-/// Generic over error type `E` so pyo3 callers can propagate `PyErr`.
-#[allow(clippy::too_many_arguments)]
-pub fn evolve<E>(
-    graph: &Graph,
-    pop_size: usize,
-    num_gens: usize,
-    cross_rate: f64,
-    mut_rate: f64,
-    tournament_size: usize,
-    mut evaluate: impl FnMut(&mut [Individual]) -> Result<(), E>,
-    mut on_generation: impl FnMut(usize, usize, &[Individual]) -> Result<(), E>,
-) -> Result<Vec<Individual>, E> {
-    use rayon::prelude::*;
-
-    let mut individuals: Vec<Individual> = operators::generate_population(graph, pop_size)
-        .into_par_iter()
-        .map(Individual::new)
-        .collect();
-    evaluate(&mut individuals)?;
-
-    for generation in 0..num_gens {
-        select_survivors(&mut individuals, pop_size);
-
-        let mut offspring =
-            create_offspring(&individuals, graph, cross_rate, mut_rate, tournament_size);
-        evaluate(&mut offspring)?;
-
-        individuals.extend(offspring);
-
-        on_generation(generation, num_gens, &individuals)?;
-    }
-
-    Ok(individuals)
 }
