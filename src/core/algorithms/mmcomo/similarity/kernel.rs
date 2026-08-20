@@ -1,24 +1,65 @@
-//! linalg — diffusion-kernel similarity matrix SM for MMCoMO.
-//!
-//! Kondor-Lafferty diffusion kernel [68]: SM = exp(beta * H), H = A - D.
-//! Computed via symmetric Jacobi eigendecomposition (self-contained, no deps).
-//! beta is NEVER specified in the paper; the caller supplies it.
+//! Diffusion-kernel similarity matrix SM and the eigensolver it needs.
+//! This Source Code Form is subject to the terms of The GNU General Public License v3.0
+//! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-// Dense matrix kernels: indexed loops over multiple matrices read clearer
-// than iterator chains here.
+// dense matrix kernels: indexed loops over several matrices read clearer here
 #![allow(clippy::needless_range_loop)]
 
-use super::*;
+use crate::core::algorithms::mmcomo::{Graph, Sm};
 
-/// Diffusion-kernel similarity matrix SM = exp(beta * (A - D)).
+/// Cyclic Jacobi sweep budget; convergence normally breaks out far earlier.
+const MAX_JACOBI_SWEEPS: usize = 100;
+/// Sum of squared off-diagonals below which the matrix counts as diagonal.
+const OFF_DIAG_TOL: f64 = 1e-30;
+/// A pivot this small rotates nothing and would only risk overflowing `theta`.
+const MIN_PIVOT: f64 = 1e-300;
+
+/// Kondor-Lafferty diffusion kernel [68]: `SM = exp(beta * (A - D))`, computed
+/// via symmetric Jacobi eigendecomposition (self-contained, no deps).
+///
+/// `beta` is NEVER specified in the paper; the caller supplies it.
 pub fn diffusion_kernel(g: &Graph, beta: f64) -> Sm {
     let n = g.n;
     if n == 0 {
         return Vec::new();
     }
 
-    // H = A - D (negative graph Laplacian). Degree derived from adj so H stays
-    // consistent with `adj` regardless of how `g.deg` was populated.
+    let h = negative_laplacian(g);
+    let (eigenvalues, eigenvectors) = jacobi_eigen(&h);
+
+    // exp(beta*H) = Q diag(exp(beta*lambda)) Q^T.
+    let scaled: Vec<f64> = eigenvalues.iter().map(|&lam| (beta * lam).exp()).collect();
+
+    let mut q_scaled = vec![vec![0.0f64; n]; n];
+    for i in 0..n {
+        for k in 0..n {
+            q_scaled[i][k] = eigenvectors[i][k] * scaled[k];
+        }
+    }
+
+    let mut sm = vec![vec![0.0f64; n]; n];
+    for i in 0..n {
+        for j in i..n {
+            let mut acc = 0.0f64;
+            let qi = &q_scaled[i];
+            let qj = &eigenvectors[j];
+            for k in 0..n {
+                acc += qi[k] * qj[k];
+            }
+            sm[i][j] = acc;
+            sm[j][i] = acc;
+        }
+    }
+
+    sm
+}
+
+/// `H = A - D`, exactly symmetric so Jacobi accepts it. Degrees are derived from
+/// `adj` rather than read from `g.deg`, so H stays consistent with `adj`
+/// regardless of how `g.deg` was populated.
+fn negative_laplacian(g: &Graph) -> Vec<Vec<f64>> {
+    let n = g.n;
     let mut h = vec![vec![0.0f64; n]; n];
     for i in 0..n {
         let mut d = 0.0f64;
@@ -30,7 +71,6 @@ pub fn diffusion_kernel(g: &Graph, beta: f64) -> Sm {
         h[i][i] -= d;
     }
 
-    // Symmetrise defensively: Jacobi requires an exactly symmetric input.
     for i in 0..n {
         for j in (i + 1)..n {
             let s = 0.5 * (h[i][j] + h[j][i]);
@@ -38,72 +78,41 @@ pub fn diffusion_kernel(g: &Graph, beta: f64) -> Sm {
             h[j][i] = s;
         }
     }
-
-    let (eig, q) = jacobi_eigen(&h);
-
-    // exp(beta*H) = Q diag(exp(beta*lambda)) Q^T.
-    let scaled: Vec<f64> = eig.iter().map(|&lam| (beta * lam).exp()).collect();
-
-    let mut qs = vec![vec![0.0f64; n]; n];
-    for i in 0..n {
-        for k in 0..n {
-            qs[i][k] = q[i][k] * scaled[k];
-        }
-    }
-
-    let mut sm = vec![vec![0.0f64; n]; n];
-    for i in 0..n {
-        for j in i..n {
-            let mut acc = 0.0f64;
-            let qi = &qs[i];
-            let qj = &q[j];
-            for k in 0..n {
-                acc += qi[k] * qj[k];
-            }
-            sm[i][j] = acc;
-            sm[j][i] = acc;
-        }
-    }
-
-    sm
+    h
 }
-/// Symmetric eigendecomposition via cyclic Jacobi rotations.
-///
-/// `a` symmetric n x n (row-major) -> `(eigenvalues, eigenvectors)` with
-/// columns of V the eigenvectors, so `A = V * diag(eig) * V^T`.
+
+/// Cyclic Jacobi eigendecomposition of a symmetric row-major `a`, returning
+/// `(eigenvalues, V)` with the eigenvectors as columns of `V`: `a = V diag(eig) V^T`.
 fn jacobi_eigen(a: &[Vec<f64>]) -> (Vec<f64>, Vec<Vec<f64>>) {
     let n = a.len();
-    let mut m = a.to_vec();
-    // Accumulated rotations -> eigenvectors (start as identity).
+    let mut work = a.to_vec();
     let mut v = vec![vec![0.0f64; n]; n];
     for i in 0..n {
         v[i][i] = 1.0;
     }
     if n == 1 {
-        return (vec![m[0][0]], v);
+        return (vec![work[0][0]], v);
     }
 
-    let max_sweeps = 100;
-    for _ in 0..max_sweeps {
-        // Sum of squares of off-diagonal entries (upper triangle).
-        let mut off = 0.0f64;
+    for _ in 0..MAX_JACOBI_SWEEPS {
+        let mut off_diag_sq = 0.0f64;
         for p in 0..n {
             for q in (p + 1)..n {
-                off += m[p][q] * m[p][q];
+                off_diag_sq += work[p][q] * work[p][q];
             }
         }
-        if off <= 1e-30 {
+        if off_diag_sq <= OFF_DIAG_TOL {
             break;
         }
 
         for p in 0..n {
             for q in (p + 1)..n {
-                let apq = m[p][q];
-                if apq.abs() <= 1e-300 {
+                let apq = work[p][q];
+                if apq.abs() <= MIN_PIVOT {
                     continue;
                 }
-                let app = m[p][p];
-                let aqq = m[q][q];
+                let app = work[p][p];
+                let aqq = work[q][q];
                 let theta = (aqq - app) / (2.0 * apq);
                 let t = if theta >= 0.0 {
                     1.0 / (theta + (theta * theta + 1.0).sqrt())
@@ -113,19 +122,19 @@ fn jacobi_eigen(a: &[Vec<f64>]) -> (Vec<f64>, Vec<Vec<f64>>) {
                 let c = 1.0 / (t * t + 1.0).sqrt();
                 let s = t * c;
 
-                m[p][p] = app - t * apq;
-                m[q][q] = aqq + t * apq;
-                m[p][q] = 0.0;
-                m[q][p] = 0.0;
+                work[p][p] = app - t * apq;
+                work[q][q] = aqq + t * apq;
+                work[p][q] = 0.0;
+                work[q][p] = 0.0;
 
                 for i in 0..n {
                     if i != p && i != q {
-                        let aip = m[i][p];
-                        let aiq = m[i][q];
-                        m[i][p] = c * aip - s * aiq;
-                        m[p][i] = m[i][p];
-                        m[i][q] = s * aip + c * aiq;
-                        m[q][i] = m[i][q];
+                        let aip = work[i][p];
+                        let aiq = work[i][q];
+                        work[i][p] = c * aip - s * aiq;
+                        work[p][i] = work[i][p];
+                        work[i][q] = s * aip + c * aiq;
+                        work[q][i] = work[i][q];
                     }
                 }
 
@@ -139,7 +148,7 @@ fn jacobi_eigen(a: &[Vec<f64>]) -> (Vec<f64>, Vec<Vec<f64>>) {
         }
     }
 
-    let eig: Vec<f64> = (0..n).map(|i| m[i][i]).collect();
+    let eig: Vec<f64> = (0..n).map(|i| work[i][i]).collect();
     (eig, v)
 }
 
@@ -147,8 +156,8 @@ fn jacobi_eigen(a: &[Vec<f64>]) -> (Vec<f64>, Vec<Vec<f64>>) {
 mod tests {
     use super::*;
 
-    fn toy_graph() -> Graph {
-        // edges: 0-1, 1-2, 2-3
+    /// The path 0-1-2-3.
+    fn path_of_four() -> Graph {
         let adj = vec![vec![1usize], vec![0usize, 2], vec![1usize, 3], vec![2usize]];
         let deg: Vec<f64> = adj.iter().map(|a| a.len() as f64).collect();
         let m2: f64 = deg.iter().sum();
@@ -157,7 +166,7 @@ mod tests {
 
     #[test]
     fn sm_is_symmetric() {
-        let g = toy_graph();
+        let g = path_of_four();
         let sm = diffusion_kernel(&g, 0.05);
         let n = g.n;
         for i in 0..n {
@@ -174,7 +183,7 @@ mod tests {
 
     #[test]
     fn sm_positive_diagonal() {
-        let g = toy_graph();
+        let g = path_of_four();
         let sm = diffusion_kernel(&g, 0.05);
         for i in 0..g.n {
             assert!(
@@ -187,7 +196,7 @@ mod tests {
 
     #[test]
     fn sm_entrywise_positive() {
-        let g = toy_graph();
+        let g = path_of_four();
         let sm = diffusion_kernel(&g, 0.1);
         for i in 0..g.n {
             for j in 0..g.n {
@@ -198,7 +207,7 @@ mod tests {
 
     #[test]
     fn beta_zero_gives_identity() {
-        let g = toy_graph();
+        let g = path_of_four();
         let sm = diffusion_kernel(&g, 0.0);
         for i in 0..g.n {
             for j in 0..g.n {

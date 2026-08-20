@@ -1,6 +1,9 @@
-//! Macro/micro representation conversions for MMCoMO (paper Section III-C).
+//! Macro/micro representation conversions (paper Section III-C).
+//! This Source Code Form is subject to the terms of The GNU General Public License v3.0
+//! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use super::*;
+use crate::core::algorithms::mmcomo::{Genome, Graph, Labels, Sm};
 
 /// Decode a medoid genome to a label vector (Eqs. 3-5).
 ///
@@ -66,7 +69,7 @@ pub fn encode(g: &Graph, sm: &Sm, labels: &Labels) -> Genome {
         return genome;
     }
 
-    // Group node indices by community label, preserving first-seen order.
+    // first-seen grouping: the genome must not depend on the label magnitudes
     let mut groups: Vec<Vec<usize>> = Vec::new();
     let mut pos: std::collections::HashMap<i32, usize> = std::collections::HashMap::new();
     for (i, &lab) in labels.iter().enumerate() {
@@ -107,30 +110,9 @@ pub fn encode(g: &Graph, sm: &Sm, labels: &Labels) -> Genome {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::algorithms::mmcomo::fixtures::two_triangles;
 
-    // Two triangles {0,1,2} and {3,4,5} joined by a single bridge edge (2,3).
-    fn two_triangles() -> Graph {
-        let edges = [
-            (0usize, 1usize),
-            (1, 2),
-            (0, 2),
-            (3, 4),
-            (4, 5),
-            (3, 5),
-            (2, 3),
-        ];
-        let n = 6;
-        let mut adj: Vec<Vec<usize>> = vec![Vec::new(); n];
-        for &(a, b) in &edges {
-            adj[a].push(b);
-            adj[b].push(a);
-        }
-        let deg: Vec<f64> = adj.iter().map(|a| a.len() as f64).collect();
-        let m2: f64 = deg.iter().sum();
-        Graph { n, adj, deg, m2 }
-    }
-
-    // Block similarity: high within each triangle, low across.
+    /// High similarity inside each triangle, low across.
     fn block_sm() -> Sm {
         let tri = |x: usize| i32::from(x >= 3);
         (0..6)
