@@ -1,18 +1,17 @@
-//! Individual + Pareto dominance + fast non-dominated sort for NSGA-III-KRM.
-//! Objectives are stored all-minimized as `[KKM, RC, -Q]` so a single
-//! `dominates` rule works across the bi-min/uni-max objective mix.
+//! A population member and the Pareto dominance order over the population.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use super::locus::Genome;
+use crate::core::algorithms::krm::locus::Genome;
 
 #[derive(Clone, Debug)]
 pub struct Individual {
     pub genome: Genome,
-    /// Per-position community labels (union-find roots from `Locus::decode`).
+    /// Per-position labels: the raw union-find roots of `Locus::decode`.
     pub labels: Vec<i32>,
-    /// `[KKM, RC, -Q]`, all minimized.
+    /// `[KKM, RC, −Q]`, all minimized: `Q` is negated so one `dominates` rule
+    /// covers the mixed minimize/maximize set.
     pub objectives: Vec<f64>,
     pub rank: usize,
 }
@@ -33,8 +32,7 @@ impl Individual {
     }
 }
 
-/// Fast non-dominated sort (Deb et al. 2002); deliberately sequential so this
-/// engine's cost reflects the paper's method.
+/// Fast non-dominated sort (Deb et al. 2002).
 pub fn fast_non_dominated_sort(pop: &mut [Individual]) {
     let n = pop.len();
     if n == 0 {
