@@ -8,15 +8,25 @@ use pyo3::prelude::*;
 use pyo3::types::PyAny;
 use rustc_hash::{FxHashMap, FxHashSet};
 
+/// Undirected simple graph keyed by the caller's own node ids.
 #[derive(Debug)]
 pub struct Graph {
+    /// Each undirected edge EXACTLY ONCE, in insertion order and in the
+    /// orientation it arrived in (not normalised to `u < v`). So `edges.len()`
+    /// is `m`, and `total_degree == 2 * m`. `adjacency_list` stores the same
+    /// edges twice, once per endpoint — mixing the two is the classic
+    /// factor-of-2 error in the objectives.
     pub edges: Vec<(NodeId, NodeId)>,
     pub nodes: FxHashSet<NodeId>,
+    /// Both directions of every edge; sorted per node by [`Graph::finalize`].
     pub adjacency_list: FxHashMap<NodeId, Vec<NodeId>>,
     pub degrees: FxHashMap<NodeId, usize>,
+    /// `nodes` as a sorted vector; filled by [`Graph::finalize`].
     pub node_vec: Vec<NodeId>,
     pub max_degree: usize,
+    /// Sum of all degrees, i.e. `2 * m`.
     pub total_degree: usize,
+    /// Every edge normalised to `(min, max)`, for O(1) duplicate rejection.
     pub edge_lookup: FxHashSet<(NodeId, NodeId)>,
 }
 
@@ -26,6 +36,7 @@ impl Default for Graph {
     }
 }
 
+/// Node ids of a NetworkX or igraph graph. Only integer ids are supported.
 pub fn get_nodes(graph: &Bound<'_, PyAny>) -> PyResult<Vec<NodeId>> {
     if let Ok(nx_nodes) = graph.call_method0("nodes") {
         let mut nodes: Vec<NodeId> = Vec::new();
@@ -61,6 +72,7 @@ pub fn get_nodes(graph: &Bound<'_, PyAny>) -> PyResult<Vec<NodeId>> {
     ))
 }
 
+/// Edge list of a NetworkX or igraph graph, each undirected edge once.
 pub fn get_edges(graph: &Bound<'_, PyAny>) -> PyResult<Vec<(NodeId, NodeId)>> {
     let edges_iter = match graph.call_method0("edges") {
         Ok(nx_edges) => nx_edges.call_method0("__iter__")?,
@@ -103,6 +115,9 @@ impl Graph {
         }
     }
 
+    /// Ingest a NetworkX or igraph graph. Self-loops are dropped; parallel
+    /// edges are kept as they arrive, unlike [`Graph::add_edge`], which
+    /// rejects duplicates.
     pub fn from_python(pygraph: &Bound<'_, PyAny>) -> Self {
         let mut graph = Self::new();
         let nodes = get_nodes(pygraph).unwrap();
@@ -154,6 +169,8 @@ impl Graph {
         );
     }
 
+    /// Add one undirected edge. Self-loops and repeats (in either
+    /// orientation) are ignored, so `edges` keeps one entry per edge.
     pub fn add_edge(&mut self, from: NodeId, to: NodeId) {
         if from == to {
             return;
@@ -182,6 +199,8 @@ impl Graph {
         self.total_degree += 2;
     }
 
+    /// Sort `node_vec` and every adjacency list, then shrink. Detectors that
+    /// iterate neighbours assume this has run.
     pub fn finalize(&mut self) {
         self.node_vec = self.nodes.iter().copied().collect();
         self.node_vec.sort_unstable();

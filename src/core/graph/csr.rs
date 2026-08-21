@@ -1,6 +1,7 @@
 //! Dense CSR (Compressed Sparse Row) graph.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
-//! Copyright 2025 - Guilherme Santos.
+//! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use rustc_hash::FxHashMap;
 
@@ -10,22 +11,26 @@ pub struct CsrGraph {
     pub m: usize,
     /// Row offsets, length `n + 1`. Neighbors of `u` are `adj[xadj[u]..xadj[u+1]]`.
     pub xadj: Vec<u32>,
-    /// Concatenated neighbor lists, length `2m`.
+    /// Concatenated neighbor lists, length `2m`: every undirected edge appears
+    /// TWICE, once from each endpoint. Contrast `edges` below — reading a
+    /// per-edge quantity off `adj` double-counts it.
     pub adj: Vec<u32>,
     /// Per-node degree, length `n`.
     pub deg: Vec<u32>,
-    /// Each undirected edge once with `u < v`, length `m`. Drives the O(m)
-    /// intra-edge count in the objective.
+    /// Each undirected edge ONCE, oriented `u < v`, length `m`. This is what
+    /// the O(m) intra-edge sweeps in the objectives iterate.
     pub edges: Vec<(u32, u32)>,
     /// Dense id -> original file id, for output / NMI scoring.
     pub labels: Vec<i32>,
 }
 
 impl CsrGraph {
-    /// Build a dense CSR graph from a node list and edge list (in-memory / Python
-    /// ingestion). Ids are interned in `nodes` order first so isolated nodes get
-    /// dense ids; edges then add the neighbor lists. Originals kept in `labels`.
-    /// Each undirected edge should appear once (both directions are added here).
+    /// Build a dense CSR graph from a node list and an edge list.
+    ///
+    /// Ids are interned in `nodes` order first, so isolated nodes still get a
+    /// dense id; edges may then introduce ids `nodes` omitted. Callers pass
+    /// each undirected edge once — both directions are added here. Self-loops
+    /// are dropped.
     pub fn from_edges(nodes: &[i32], edges: &[(i32, i32)]) -> Self {
         let mut id_map: FxHashMap<i32, u32> = FxHashMap::default();
         let mut labels: Vec<i32> = Vec::new();
@@ -55,9 +60,10 @@ impl CsrGraph {
         Self::build_csr(labels, rows)
     }
 
-    /// Lay out CSR (`xadj`/`adj`/`deg`) + unique-edge arrays from interned
-    /// `labels` and per-node neighbor lists `rows`. Each undirected edge is
-    /// present in `rows` from both endpoints; the `u < v` filter keeps one copy.
+    /// Lay out `xadj`/`adj`/`deg` plus the unique-edge array from interned
+    /// `labels` and per-node neighbor lists `rows`. Each undirected edge is in
+    /// `rows` from both endpoints; the `u < v` filter is what keeps one copy
+    /// of it in `edges`.
     fn build_csr(labels: Vec<i32>, mut rows: Vec<Vec<u32>>) -> Self {
         let n = labels.len();
         rows.resize(n, Vec::new());
