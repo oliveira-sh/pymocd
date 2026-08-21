@@ -1,18 +1,17 @@
-//! Individual + Pareto dominance + fast non-dominated sort for MOGA-Net.
-//! Objectives are stored as `[-CS, -CF]` (both minimized) since Pizzuti's CS
-//! and CF are both maximized.
+//! Population member, Pareto dominance, non-dominated sort and crowding distance.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use super::locus::Genome;
+use crate::core::algorithms::moganet::locus::Genome;
 
 #[derive(Clone, Debug)]
 pub struct Individual {
     pub genome: Genome,
-    /// Decoded compact community labels, indexed by node position.
+    /// Compact community labels, indexed by node position.
     pub labels: Vec<i32>,
-    /// `[-CS, -CF]`, both minimized.
+    /// `[-CS, -CF]`: negated because Pizzuti maximizes both and `dominates`
+    /// minimizes.
     pub objectives: Vec<f64>,
     pub rank: usize,
     pub crowding_distance: f64,
@@ -34,8 +33,8 @@ impl Individual {
     }
 }
 
-/// Fast non-dominated sort (Deb et al. 2002, NSGA-II); deliberately
-/// sequential.
+/// Fast non-dominated sort (Deb et al. 2002, NSGA-II). Sequential on purpose:
+/// this baseline's cost must track the published single-threaded method.
 pub fn fast_non_dominated_sort(pop: &mut [Individual]) {
     let n = pop.len();
     if n == 0 {
@@ -80,10 +79,8 @@ pub fn fast_non_dominated_sort(pop: &mut [Individual]) {
     }
 }
 
-/// NSGA-II crowding distance (Deb et al. 2002) within each rank front: per
-/// objective, sort the front and accumulate normalized neighbour gaps;
-/// boundary individuals get `+inf`. Assumes `fast_non_dominated_sort` has
-/// already assigned `rank`.
+/// NSGA-II crowding distance (Deb et al. 2002) within each rank front;
+/// requires ranks already assigned.
 pub fn calculate_crowding_distance(pop: &mut [Individual]) {
     if pop.is_empty() {
         return;
