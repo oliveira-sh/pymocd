@@ -10,7 +10,10 @@ use pyo3_stub_gen::derive::gen_stub_pyfunction;
 use crate::core::graph::to_partition;
 use crate::core::metrics::{ami, ari, contingency, entropy, f1, mutual_info, nmi};
 
-/// Align two {node:community} dicts into label vectors over their shared nodes.
+/// Align two `{node: community}` dicts into label vectors.
+///
+/// Only nodes present in BOTH dicts are scored, silently: a partition that
+/// omits nodes is compared on the intersection, not penalised for them.
 fn aligned_labels(
     partition: &Bound<'_, PyDict>,
     gt: &Bound<'_, PyDict>,
