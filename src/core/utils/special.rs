@@ -1,8 +1,12 @@
 //! Numeric special functions shared across subsystems.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
-//! Copyright 2025 - Guilherme Santos.
+//! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-/// Log Gamma (Lanczos approximation, the Numerical Recipes `gammln`).
+/// Log Gamma. Lanczos approximation with g = 5, n = 6; coefficients and the
+/// `2.5066282746310005` prefactor are verbatim from Numerical Recipes in C
+/// (2nd ed.) section 6.1 `gammln`, accurate to about 2e-10 for `xx > 0`.
+/// Do not "tidy" the constants — AMI's exact expected-MI sum reads them.
 pub fn gammln(xx: f64) -> f64 {
     const COF: [f64; 6] = [
         76.18009172947146,
