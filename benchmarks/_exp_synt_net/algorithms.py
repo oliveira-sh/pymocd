@@ -38,6 +38,14 @@ def hpmocd_algorithm(G):
     return _restore_labels(pymocd.hpmocd(H), inverse)
 
 
+@algorithm("MO-POTS", needs_conversion=False, parallel=False)
+@_safe
+@_with_seed
+def mopots_algorithm(G):
+    H, inverse = _ensure_int_nodes(G)
+    return _restore_labels(pymocd.mopots(H), inverse)
+
+
 # Dense n x n diffusion kernel + eigendecomposition, roughly O(n^3):
 # 517 s at n=1458, so it cannot take part in the larger sweeps.
 @algorithm("MMCoMO", needs_conversion=False, parallel=False, max_nodes=2000)

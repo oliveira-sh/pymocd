@@ -38,6 +38,7 @@ def run_algorithm(alg, n, edges, seed, threads):
     lib = {
         "SMOCC": lambda: pymocd.smocc(shim),
         "HP-MOCD": lambda: pymocd.hpmocd(shim),
+        "MO-POTS": lambda: pymocd.mopots(shim),
         "MMCoMO": lambda: pymocd.mmcomo(shim),
         "NSGA-III CCM": lambda: pymocd.ccm(shim),
         "NSGA-III KRM": lambda: pymocd.krm(shim),
@@ -87,6 +88,50 @@ def run_algorithm(alg, n, edges, seed, threads):
     raise ValueError(f"unknown algorithm {alg}")
 
 
+# detectors whose whole Pareto front is scored, keeping the ground-truth-best member
+ORACLE_LIB = {
+    "MO-POTS (oracle)": lambda pymocd, shim: pymocd.mopots_fronts(shim),
+}
+
+
+def _to_labels(part, n):
+    """Same node->label transform the single-partition path uses."""
+    lab = np.full(n, -1, dtype=np.int64)
+    for node, c in part.items():
+        lab[node] = c
+    unassigned = lab == -1
+    lab[unassigned] = np.arange(n, dtype=np.int64)[unassigned] + n
+    return lab
+
+
+def run_front(alg, n, edges, threads):
+    """Return every rank-1 front member as a label vector, plus the search time."""
+    import pymocd
+    pymocd.max_cores(threads)
+    shim = Shim(n, edges)
+    t0 = time.perf_counter()
+    front = ORACLE_LIB[alg](pymocd, shim)
+    dt = time.perf_counter() - t0
+    return [_to_labels(p, n) for p in front], dt
+
+
+def select_oracle(cands, gt, eval_nodes, n, edges):
+    """The member a perfect selector would have returned: max AMI, or max Q with no gt."""
+    if not cands:
+        raise ValueError("front is empty")
+    if gt is not None:
+        from sklearn.metrics.cluster import adjusted_mutual_info_score
+        return max(cands,
+                   key=lambda lab: adjusted_mutual_info_score(gt, lab[eval_nodes]))
+    import igraph as ig
+    g = ig.Graph(n=n, edges=edges)
+
+    def q(lab):
+        _, dense = np.unique(lab, return_inverse=True)
+        return float(g.modularity(dense.tolist()))
+    return max(cands, key=q)
+
+
 def main():
     task = json.loads(sys.argv[1])
     kind, seed, threads = task["kind"], task["seed"], task["threads"]
@@ -102,7 +147,11 @@ def main():
         from _exp_real_net.networks import LOADERS
         edges, n, gt, eval_nodes = LOADERS[task["net"]]()
 
-    lab, dt = run_algorithm(task["alg"], n, edges, seed, threads)
+    if task["alg"] in ORACLE_LIB:
+        cands, dt = run_front(task["alg"], n, edges, threads)
+        lab = select_oracle(cands, gt, eval_nodes, n, edges)
+    else:
+        lab, dt = run_algorithm(task["alg"], n, edges, seed, threads)
 
     import igraph as ig
     from sklearn.metrics.cluster import (adjusted_mutual_info_score,
