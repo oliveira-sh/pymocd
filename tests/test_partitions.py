@@ -33,6 +33,9 @@ class TestPartitions(unittest.TestCase):
     def test_hpmocd(self):
         self.assert_valid_partition(pymocd.hpmocd(self.graph))
 
+    def test_mopots(self):
+        self.assert_valid_partition(pymocd.mopots(self.graph))
+
     def test_mocd_q(self):
         self.assert_valid_partition(pymocd.mocd_q(self.graph))
 
@@ -65,6 +68,32 @@ class TestPartitions(unittest.TestCase):
         for partition in front:
             self.assert_valid_partition(partition)
 
+    def test_mopots_fronts(self):
+        front = pymocd.mopots_fronts(self.graph)
+        self.assertIsInstance(front, list)
+        self.assertTrue(front)
+        for partition in front:
+            self.assert_valid_partition(partition)
+
+    def test_mopots_ladder(self):
+        ladder = pymocd.mopots_ladder(self.graph)
+        self.assertIsInstance(ladder, list)
+        self.assertTrue(ladder)
+        previous = None
+        for partition, cut, pair, gamma in ladder:
+            self.assert_valid_partition(partition)
+            self.assertGreaterEqual(gamma, 0.0)
+            self.assertGreaterEqual(cut, 0.0)
+            self.assertLessEqual(cut, 1.0)
+            self.assertGreaterEqual(pair, 0.0)
+            self.assertLessEqual(pair, 1.0)
+            if previous is not None:
+                previous_cut, previous_pair, previous_gamma = previous
+                self.assertGreater(gamma, previous_gamma)
+                self.assertGreaterEqual(cut, previous_cut)
+                self.assertLessEqual(pair, previous_pair)
+            previous = (cut, pair, gamma)
+
 
 class TestTwoCliquePartition(unittest.TestCase):
     def setUp(self):
@@ -83,6 +112,9 @@ class TestTwoCliquePartition(unittest.TestCase):
 
     def test_smocc_recovers_exact_partition(self):
         self.assert_exact_two_clique_split(pymocd.smocc(self.graph))
+
+    def test_mopots_recovers_exact_partition(self):
+        self.assert_exact_two_clique_split(pymocd.mopots(self.graph))
 
 
 if __name__ == "__main__":
