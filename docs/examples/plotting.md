@@ -44,7 +44,7 @@ labels = pymocd.smocc(G)
 plot_communities(G, labels)
 ```
 
-All module-level detectors (`smocc`, `hpmocd`, `mmcomo`, ...) return the same `dict[node, community]` shape.
+Every module-level detector — `smocc`, `mopots`, `hpmocd`, `cdrme`, `mmcomo`, `ccm`, `krm`, `gdpso`, `mocd_q`, `mocd_d` and `moga_net` — returns the same `dict[node, community]` shape, so the helper works with any of them.
 
 ## Plotting the Pareto front
 
