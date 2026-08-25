@@ -42,7 +42,7 @@ use api::metrics::*;
 /// Python Multi-objective Community Detection (pymocd) is a Python library, powered by
 /// a Rust backend, for performing efficient community detection in complex networks.
 /// Get your graph, call a method, and we'll offer you a community.
-/// Recommended Methods: `smocc` or `hpmocd`.
+/// Recommended Methods: `mr_mocd` or `hpmocd`.
 #[pymodule]
 #[pyo3(name = "pymocd")]
 fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -55,7 +55,6 @@ fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // detectors -> partition
     m.add_function(wrap_pyfunction!(hpmocd_fn, m)?)?;
     m.add_function(wrap_pyfunction!(hpmocd_fronts_fn, m)?)?;
-    m.add_function(wrap_pyfunction!(mopots_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mocd_q_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mocd_d_fn, m)?)?;
     m.add_function(wrap_pyfunction!(moga_net_fn, m)?)?;
@@ -64,20 +63,19 @@ fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(cdrme_fn, m)?)?;
     m.add_function(wrap_pyfunction!(krm_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mmcomo_fn, m)?)?;
-    m.add_function(wrap_pyfunction!(smocc_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(mr_mocd_fn, m)?)?;
 
     // detectors -> pareto frontier
     m.add_function(wrap_pyfunction!(ccm_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(krm_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(moga_net_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mmcomo_fronts_fn, m)?)?;
-    m.add_function(wrap_pyfunction!(smocc_fronts_fn, m)?)?;
-    m.add_function(wrap_pyfunction!(mopots_fronts_fn, m)?)?;
-    m.add_function(wrap_pyfunction!(mopots_ladder_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(mr_mocd_fronts_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(mr_mocd_select_fn, m)?)?;
 
     // deprecated aliases (pre-rename API)
-    m.add("scale", m.getattr("smocc")?)?;
-    m.add("scale_fronts", m.getattr("smocc_fronts")?)?;
+    m.add("scale", m.getattr("mr_mocd")?)?;
+    m.add("scale_fronts", m.getattr("mr_mocd_fronts")?)?;
 
     // evaluation metrics
     m.add_function(wrap_pyfunction!(gt_metrics_fn, m)?)?;

@@ -16,8 +16,7 @@ use crate::core::algorithms::krm;
 use crate::core::algorithms::mmcomo;
 use crate::core::algorithms::mocd;
 use crate::core::algorithms::moganet;
-use crate::core::algorithms::mopots;
-use crate::core::algorithms::smocc;
+use crate::core::algorithms::mr_mocd;
 use crate::core::graph::{Graph, Partition, get_edges, get_nodes};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
@@ -84,127 +83,6 @@ pub fn hpmocd_fronts_fn(py: Python<'_>, graph: &Bound<'_, PyAny>) -> PyResult<Py
         out.append(d)?;
     }
     Ok(out.into_any().unbind())
-}
-
-/// Run MO-POTS — NSGA-II over the exact affine decomposition of the Constant
-/// Potts Model into ``cut = 1 − Σ_c |E(c)|/m`` and ``pair = Σ_c C(n_c,2)/C(n,2)``,
-/// both minimized. Returns the **max-modularity** member of the rank-1 Pareto
-/// front.
-///
-/// ``gamma`` is not a search parameter: it is the exchange rate between the two
-/// objectives (``H_gamma(C)/m = 1 − cut − (gamma/gamma_d)·pair``, with
-/// ``gamma_d = 2m/(n(n−1))``), so one run sweeps a whole ladder of resolutions
-/// along the front. Both ``n`` and ``n_c`` count only non-isolated nodes.
-///
-/// Note the ``MoPots`` class is NOT registered with PyO3, as with ``HpMocd``, so
-/// this function is the supported route to MO-POTS.
-///
-/// Args:
-///     graph: networkx.Graph (undirected, integer node ids).
-///
-/// Returns:
-///     ``dict[node, community]``. Isolated nodes get community ``-1``.
-#[gen_stub_pyfunction]
-#[pyfunction]
-#[pyo3(name = "mopots", signature = (graph, pop_size = mopots::DEFAULT_POP_SIZE, num_gens = mopots::DEFAULT_NUM_GENS, cross_rate = mopots::DEFAULT_CROSS_RATE, mut_rate = mopots::DEFAULT_MUT_RATE))]
-pub fn mopots_fn(
-    graph: &Bound<'_, PyAny>,
-    pop_size: usize,
-    num_gens: usize,
-    cross_rate: f64,
-    mut_rate: f64,
-) -> PyResult<Partition> {
-    mopots::MoPots::new(
-        graph,
-        mopots::DEFAULT_DEBUG_LEVEL,
-        pop_size,
-        num_gens,
-        cross_rate,
-        mut_rate,
-    )?
-    .run()
-}
-
-/// MO-POTS's full rank-1 Pareto front, the candidate set ``mopots`` selects from.
-///
-/// ``mopots`` applies max-modularity selection to this front and returns one
-/// partition; this returns every member, so MO-POTS can be compared against
-/// other detectors on the SAME footing (best-in-front, i.e. selector-free).
-/// Members trade ``cut`` against ``pair``, so the front is a ladder of
-/// resolutions rather than a set of equally-scaled alternatives.
-///
-/// Note the ``MoPots`` class is NOT registered with PyO3, as with ``HpMocd``, so
-/// ``MoPots.generate_pareto_front`` is unreachable from Python. This function is
-/// the supported route to the front.
-///
-/// Args:
-///     graph: networkx.Graph (undirected, integer node ids).
-///
-/// Returns:
-///     ``list[dict[node, community]]``. Isolated nodes get community ``-1``.
-#[gen_stub_pyfunction]
-#[pyfunction]
-#[pyo3(name = "mopots_fronts", signature = (graph, pop_size = mopots::DEFAULT_POP_SIZE, num_gens = mopots::DEFAULT_NUM_GENS, cross_rate = mopots::DEFAULT_CROSS_RATE, mut_rate = mopots::DEFAULT_MUT_RATE))]
-pub fn mopots_fronts_fn(
-    graph: &Bound<'_, PyAny>,
-    pop_size: usize,
-    num_gens: usize,
-    cross_rate: f64,
-    mut_rate: f64,
-) -> PyResult<Vec<Partition>> {
-    let front = mopots::MoPots::new(
-        graph,
-        mopots::DEFAULT_DEBUG_LEVEL,
-        pop_size,
-        num_gens,
-        cross_rate,
-        mut_rate,
-    )?
-    .generate_pareto_front()?;
-    Ok(front.into_iter().map(|(part, _objs)| part).collect())
-}
-
-/// The graph's multi-scale community profile from a single MO-POTS run: the
-/// front's lower convex hull as ``(partition, cut, pair, gamma)``, in increasing
-/// ``gamma``.
-///
-/// Each entry maximizes ``H_gamma`` among the members of the front THIS run
-/// produced, from its own ``gamma`` up to the next entry's; the first entry is
-/// always labelled ``gamma = 0.0``, whether or not the front holds a
-/// single-community member. Front members no ``gamma`` ever selects (concave
-/// dents) are omitted, so the list is a subset of ``mopots_fronts``.
-///
-/// Note the ``MoPots`` class is NOT registered with PyO3, as with ``HpMocd``, so
-/// ``MoPots.ladder`` is unreachable from Python. This function is the supported
-/// route to the ladder.
-///
-/// Args:
-///     graph: networkx.Graph (undirected, integer node ids). A DiGraph's
-///         reciprocal arcs are kept as two edges, which inflates ``m`` and
-///         therefore every reported ``gamma``.
-///
-/// Returns:
-///     ``list[tuple[dict[node, community], float, float, float]]``. Isolated
-///     nodes get community ``-1``.
-#[gen_stub_pyfunction]
-#[pyfunction]
-#[pyo3(name = "mopots_ladder", signature = (graph, pop_size = mopots::DEFAULT_POP_SIZE, num_gens = mopots::DEFAULT_NUM_GENS, cross_rate = mopots::DEFAULT_CROSS_RATE, mut_rate = mopots::DEFAULT_MUT_RATE))]
-pub fn mopots_ladder_fn(
-    graph: &Bound<'_, PyAny>,
-    pop_size: usize,
-    num_gens: usize,
-    cross_rate: f64,
-    mut_rate: f64,
-) -> PyResult<Vec<(Partition, f64, f64, f64)>> {
-    mopots::MoPots::new(
-        graph,
-        mopots::DEFAULT_DEBUG_LEVEL,
-        pop_size,
-        num_gens,
-        cross_rate,
-        mut_rate,
-    )?
-    .ladder()
 }
 
 /// Run Shi-MOCD (Shi, Yan, Cai, Wu 2012) — PESA-II over Shi's
@@ -655,42 +533,69 @@ pub fn mmcomo_fronts_fn(
     Ok(out.into_any().unbind())
 }
 
-/// `smocc` — optimized MMCoMO variant (sparse-CSR similarity, Rayon-parallel,
-/// union-refined Pareto front). Returns the label-free-selected member of the
-/// merged rank-1 front. Isolated nodes get -1.
+/// `mr_mocd` — multi-objective particle swarm optimisation over the Constant
+/// Potts Model. Returns the selected partition as ``dict[node, community]``;
+/// isolated nodes get ``-1``.
+///
+/// CPM, `H(gamma) = sum_c [e_c - gamma * C(n_c,2)]`, is split the way HP-MOCD
+/// splits modularity, into a cut fraction and a pair coverage. Every resolution
+/// `gamma` is a weighted sum of that same pair, so the Pareto front the swarm
+/// builds is the graph's whole resolution profile and `gamma` stops being a
+/// parameter the caller has to guess.
+///
+/// Deterministic: the same graph and parameters give the same partition on any
+/// number of threads.
 ///
 /// Args:
-///     macro_cap: multiplier on the macro population's centre ceiling, which is
-///         ``ceil(macro_cap * sqrt(n))`` communities (still hard-capped at
-///         ``n``). ``1.0`` is the historical ``ceil(sqrt(n))`` and is exactly
-///         behaviour-preserving. Raise it when the true community count exceeds
-///         ``sqrt(n)``: the heterogeneous-objective gain measured on LFR holds
-///         while ``cap/k_true >= 1`` (+0.016 ARI at n <= 1000, +0.019 at
-///         n = 2000) and disappears once the ceiling can no longer express
-///         ``k_true`` (n = 5000/10000, ``cap/k_true`` 0.64/0.45).
+///     inertia: fraction of a node's instability carried to the next iteration.
+///     cognitive: pull toward the particle's own best partition.
+///     social: pull toward a leader drawn from the archive by binary
+///         tournament on crowding distance.
+///     local_rate: per-node rate of the resolution-directed CPM local move. Read only
+///         when ``repair`` is false; the repair supersedes it.
+///     repair: after perturbing a particle toward its attractors, drive it back to a local
+///         optimum of CPM at its own resolution, and prune the archive by keeping the best
+///         member at each rung of the resolution ladder rather than the least crowded.
+///         This is what makes the flight a search: with it off, 100 generations of 100
+///         particles improve a particle's own objective between 0 and 9 times in total and
+///         the net effect on the LFR grid is negative. Set false to reproduce the original
+///         flight exactly.
+///     archive: capacity of the external Pareto archive.
 ///
-/// Note: the published algorithm's local-search step (a Louvain-first-phase
-/// modularity ascent on the rank-1 micro members) is intentionally NOT
-/// implemented. It was removed outright, so there is no parameter to enable it.
+/// There is no seeding local search and no ``seed_rounds``: every particle starts at a
+/// raw scatter and the flight does all of the optimisation. Driving each particle to a
+/// CPM local optimum first was measured to be worth only a handful of iterations, and
+/// asymptotically to cost quality, because a particle already at a local optimum must be
+/// dragged out of it before it can move.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(name = "smocc", signature = (graph, pop_size = smocc::DEFAULT_POP_SIZE, num_gens = smocc::DEFAULT_NUM_GENS, cross_rate = smocc::DEFAULT_CROSS_RATE, mut_rate = smocc::DEFAULT_MUT_RATE, gap = smocc::DEFAULT_GAP, macro_cap = smocc::DEFAULT_MACRO_CAP, micro_mut = smocc::DEFAULT_MICRO_MUT))]
+#[pyo3(name = "mr_mocd", signature = (graph, pop_size = mr_mocd::DEFAULT_POP_SIZE, num_gens = mr_mocd::DEFAULT_NUM_GENS, inertia = mr_mocd::DEFAULT_INERTIA, cognitive = mr_mocd::DEFAULT_COGNITIVE, social = mr_mocd::DEFAULT_SOCIAL, local_rate = mr_mocd::DEFAULT_LOCAL_RATE, archive = mr_mocd::DEFAULT_POP_SIZE, ls_period = mr_mocd::DEFAULT_LS_PERIOD))]
 #[allow(clippy::too_many_arguments)]
-pub fn smocc_fn(
+pub fn mr_mocd_fn(
     graph: &Bound<'_, PyAny>,
     pop_size: usize,
     num_gens: usize,
-    cross_rate: f64,
-    mut_rate: f64,
-    gap: usize,
-    macro_cap: f64,
-    micro_mut: f64,
+    inertia: f64,
+    cognitive: f64,
+    social: f64,
+    local_rate: f64,
+    archive: usize,
+    ls_period: usize,
 ) -> PyResult<Py<PyAny>> {
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
-    let part = smocc::smocc(
-        &nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, macro_cap, micro_mut,
+    let part = mr_mocd::mr_mocd(
+        &nodes,
+        &edges,
+        pop_size,
+        num_gens,
+        inertia,
+        cognitive,
+        social,
+        local_rate,
+        archive,
+        ls_period,
     );
     let d = PyDict::new(py);
     for (node, comm) in part {
@@ -699,86 +604,90 @@ pub fn smocc_fn(
     Ok(d.into_any().unbind())
 }
 
-/// `smocc`'s merged rank-1 front (after union-refinement), the candidate set
-/// `smocc` selects from. Isolated nodes get -1.
+/// `mr_mocd`'s archive: the graph's resolution profile.
+///
+/// Returns ``(fronts, objectives, selected)`` where ``fronts`` is a list of
+/// ``dict[node, community]``, ``objectives`` the matching ``(cut, pair)`` pairs,
+/// and ``selected`` the index the selector picks. ``cut`` is the fraction of
+/// edges leaving their community — the partition's own mixing parameter — and
+/// ``pair`` the fraction of node pairs sharing one.
 ///
 /// Args:
-///     macro_cap: multiplier on the macro population's centre ceiling, which is
-///         ``ceil(macro_cap * sqrt(n))`` communities (still hard-capped at
-///         ``n``). ``1.0`` is the historical ``ceil(sqrt(n))`` and is exactly
-///         behaviour-preserving. Raise it when the true community count exceeds
-///         ``sqrt(n)``: the heterogeneous-objective gain measured on LFR holds
-///         while ``cap/k_true >= 1`` (+0.016 ARI at n <= 1000, +0.019 at
-///         n = 2000) and disappears once the ceiling can no longer express
-///         ``k_true`` (n = 5000/10000, ``cap/k_true`` 0.64/0.45).
-///     topo_mode: operator bitmask. Two bits remain: ``2`` neighbour-majority
-///         micro mutation and ``128`` faithful HP-MOCD ensemble crossover (4
-///         distinct parents). They combine freely, and the shipped default is
-///         ``130 = 128 | 2``. ``0`` is the historical operator set.
-///
-///         Every other bit is DELETED and silently inert. Bits ``1``, ``4``,
-///         ``8``, ``16``, ``32`` and ``64`` used to select a 3-parent ensemble
-///         crossover, a k-aware macro mutation, a community-split mutation, a
-///         multi-community graft, the ``wadj``-weighted local search and a
-///         2-hop-exclusion macro centre init respectively. None of them beat the
-///         shipped mask, so the code is gone; the bits are deliberately not
-///         reused, so old benchmark rows recording them cannot be confused with
-///         a new operator.
-///
-///     obj_mode: objective placement. Three objective sets remain, at their
-///         original ids: ``0`` = ``(KKM, RC)``, ``6`` = ``(intra, inter)`` and
-///         ``20`` = the Constant Potts pair ``(cut, pair)``, both minimised over
-///         the non-isolated nodes, whose Pareto front is the CPM resolution
-///         ladder. Values under ``100`` are homogeneous; ``100 <= v < 1000`` is
-///         heterogeneous with one decimal digit per side (``micro =
-///         (v-100)//10``, ``macro = (v-100)%10``), so ``160`` is micro
-///         ``(intra, inter)`` / macro ``(KKM, RC)``. That branch cannot name a
-///         two-digit id, so ``v >= 1000`` gives each side two digits (``micro =
-///         (v-1000)//100``, ``macro = (v-1000)%100``): the shipped default
-///         ``1020`` is micro ``(KKM, RC)`` / macro CPM, which at matched front
-///         size beat every other placement on LFR at mixing ``mu >= 0.5``
-///         (+0.029 AMI over ``160``) at the cost of ``-0.026`` on the annotated
-///         real networks; ``3000`` is its mirror (micro CPM / macro
-///         ``(KKM, RC)``) and was the WORST of the placements tried,
-///         ``3006`` micro CPM / macro ``(intra, inter)``, ``1620`` the mirror,
-///         and ``3020`` is homogeneous CPM (the same arm as ``20``). Ids
-///         ``1..=5`` and ``7..=12`` were losing objective sets and now decode to
-///         the default, exactly as any out-of-range id always did.
-///
-/// Note: the published algorithm's local-search step (a Louvain-first-phase
-/// modularity ascent on the rank-1 micro members) is intentionally NOT
-/// implemented. It was removed outright, so there is no parameter to enable it.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(name = "smocc_fronts", signature = (graph, pop_size = smocc::DEFAULT_POP_SIZE, num_gens = smocc::DEFAULT_NUM_GENS, cross_rate = smocc::DEFAULT_CROSS_RATE, mut_rate = smocc::DEFAULT_MUT_RATE, gap = smocc::DEFAULT_GAP, refine = true, topo_mode = smocc::DEFAULT_TOPO_MODE, obj_mode = smocc::DEFAULT_OBJ_MODE, macro_cap = smocc::DEFAULT_MACRO_CAP, micro_mut = smocc::DEFAULT_MICRO_MUT))]
+#[pyo3(name = "mr_mocd_fronts", signature = (graph, pop_size = mr_mocd::DEFAULT_POP_SIZE, num_gens = mr_mocd::DEFAULT_NUM_GENS, inertia = mr_mocd::DEFAULT_INERTIA, cognitive = mr_mocd::DEFAULT_COGNITIVE, social = mr_mocd::DEFAULT_SOCIAL, local_rate = mr_mocd::DEFAULT_LOCAL_RATE, archive = mr_mocd::DEFAULT_POP_SIZE, ls_period = mr_mocd::DEFAULT_LS_PERIOD))]
 #[allow(clippy::too_many_arguments)]
-pub fn smocc_fronts_fn(
+pub fn mr_mocd_fronts_fn(
     graph: &Bound<'_, PyAny>,
     pop_size: usize,
     num_gens: usize,
-    cross_rate: f64,
-    mut_rate: f64,
-    gap: usize,
-    refine: bool,
-    topo_mode: u8,
-    obj_mode: u16,
-    macro_cap: f64,
-    micro_mut: f64,
+    inertia: f64,
+    cognitive: f64,
+    social: f64,
+    local_rate: f64,
+    archive: usize,
+    ls_period: usize,
 ) -> PyResult<Py<PyAny>> {
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
-    let fronts = smocc::smocc_fronts(
-        &nodes, &edges, pop_size, num_gens, cross_rate, mut_rate, gap, refine, topo_mode, obj_mode,
-        macro_cap, micro_mut,
+    let (fronts, objs, selected) = mr_mocd::mr_mocd_fronts(
+        &nodes,
+        &edges,
+        pop_size,
+        num_gens,
+        inertia,
+        cognitive,
+        social,
+        local_rate,
+        archive,
+        ls_period,
     );
-    let out = PyList::empty(py);
+    let parts = PyList::empty(py);
     for part in fronts {
         let d = PyDict::new(py);
         for (node, comm) in part {
             d.set_item(node, comm)?;
         }
-        out.append(d)?;
+        parts.append(d)?;
     }
+    let points = PyList::empty(py);
+    for o in objs {
+        points.append((o[0], o[1]))?;
+    }
+    Ok((parts, points, selected)
+        .into_pyobject(py)?
+        .into_any()
+        .unbind())
+}
+
+/// Run `mr_mocd`'s label-free selection chain over partitions produced elsewhere.
+///
+/// `candidates` is a list of ``dict[node, community]``. Returns
+/// ``(selected_index, objectives)`` where ``objectives`` holds the ``(cut, pair)``
+/// point of each candidate. This exists so the selector can be evaluated
+/// independently of the search that normally feeds it.
+#[gen_stub_pyfunction]
+#[pyfunction]
+#[pyo3(name = "mr_mocd_select", signature = (graph, candidates))]
+pub fn mr_mocd_select_fn(
+    graph: &Bound<'_, PyAny>,
+    candidates: Vec<std::collections::HashMap<i32, i32>>,
+) -> PyResult<Py<PyAny>> {
+    let py = graph.py();
+    let nodes = get_nodes(graph)?;
+    let edges = get_edges(graph)?;
+    let cands: Vec<Vec<(i32, i32)>> = candidates
+        .iter()
+        .map(|m| m.iter().map(|(&k, &v)| (k, v)).collect())
+        .collect();
+    let (pick, objs) = mr_mocd::mr_mocd_select(&nodes, &edges, &cands);
+    let points = PyList::empty(py);
+    for o in objs {
+        points.append(vec![o[0], o[1]])?;
+    }
+    let out = PyList::empty(py);
+    out.append(pick)?;
+    out.append(points)?;
     Ok(out.into_any().unbind())
 }

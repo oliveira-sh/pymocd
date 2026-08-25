@@ -9,5 +9,4 @@ pub mod krm;
 pub mod mmcomo;
 pub mod mocd;
 pub mod moganet;
-pub mod mopots;
-pub mod smocc;
+pub mod mr_mocd;
