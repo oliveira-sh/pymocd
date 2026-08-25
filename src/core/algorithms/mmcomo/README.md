@@ -37,15 +37,15 @@ None published. Neither the authors' site nor GitHub carries code for it, so
 this module is a self-contained reimplementation from the paper alone; no
 reference binary or trace exists to diff against.
 
-[`smocc/`](../smocc/README.md) is **this project's own optimised variant of
+[`mr_mocd/`](../mr_mocd/README.md) is **this project's own optimised variant of
 MMCoMO**. It keeps the two-population macro-micro structure and replaces
 essentially everything under it: sparse per-edge similarity instead of the dense
 `O(n²)` kernel (so no `beta`), the local search deleted outright, HP-MOCD micro
 operators, optionally different objective pairs per swarm, union refinement of
 the final front, and a label-free scalarisation selector instead of max-`Q`.
 It is a separate detector with its own paper, not a tuning of this one; this
-module exists to be the faithful baseline that `smocc/` is measured against.
-Its own divergence list is in [`smocc/README.md`](../smocc/README.md).
+module exists to be the faithful baseline that `mr_mocd/` is measured against.
+Its own divergence list is in [`mr_mocd/README.md`](../mr_mocd/README.md).
 
 **Objectives**
 
@@ -237,7 +237,7 @@ silent or deferring on each.
   binding, to keep the crate dependency-free; `H = A − D` is rebuilt from `adj`
   and explicitly re-symmetrised so the solver's input is exactly symmetric.
 - **Isolated nodes are a repo convention.** They take part in the search — they
-  are never excluded from Eq. 1's sums, unlike `mopots`, which scopes its
+  are never excluded from Eq. 1's sums, unlike `mr_mocd`, which scopes its
   objectives to non-isolated nodes — but are reported as community `-1`, as
   every detector in this project does. Their in-search treatment is *not*
   uniform across the two swarms (see **Objectives**), which is a quirk of the

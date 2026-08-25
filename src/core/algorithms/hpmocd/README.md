@@ -120,7 +120,7 @@ parameter anywhere in the module:
    `par_iter().fold(..).reduce(..)`; membership of `next_front` is deterministic
    but its *order* is not, and nothing sorts it. That order survives into
    `sort_unstable_by` in `select_survivors`, which cannot separate individuals
-   equal on (rank, crowding). (MO-POTS sorts each peeled front for exactly this
+   equal on (rank, crowding). (MR-MOCD sorts each peeled front for exactly this
    reason; HP-MOCD does not.)
 4. **Hash iteration order.** `partition.keys()` fixes the order of the mutation
    draws and of `ensemble_crossover`'s node scan, and `community_counts.iter()`
@@ -173,7 +173,7 @@ inferred from the paper text.
   `src/lib.rs`, and the front is reachable through `hpmocd_fronts` either way.
 - Historical note, for anyone diffing against an older checkout: the individual
   and NSGA-II files used to describe themselves as a core shared with an `nsga3`
-  engine, and to point at SMOCC's separate dense-CSR NSGA-II. No engine outside
+  engine, and to point at MR-MOCD's separate swarm engine. No engine outside
   this directory reads these files today; the sharing never existed in this
   module's tree.
 

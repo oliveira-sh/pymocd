@@ -7,7 +7,7 @@ use rand::RngExt;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 
-// shared with smocc, mopots and gdpso so every module documents one contract
+// shared with mr_mocd and gdpso so every module documents one contract
 const RNG_BASE: u64 = 0x5CA1_E5EED;
 
 pub const SALT_CENTER: u64 = 0x0CD_0001;

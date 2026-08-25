@@ -14,8 +14,7 @@ documented by its own `README.md` alongside the code.
 | [`mmcomo/`](mmcomo/README.md) | MMCoMO | Zhang, Yang, Yang & Zhang, *IEEE Computational Intelligence Magazine* | 2023 |
 | [`mocd/`](mocd/README.md) | Shi-MOCD (MOCD-Q, MOCD-D) | Shi, Yan, Cai & Wu, *Applied Soft Computing* 12(2):850–859 | 2012 |
 | [`moganet/`](moganet/README.md) | MOGA-Net | Pizzuti, *IEEE ICTAI* / *IEEE TEC* 16(3):418–430 | 2009 |
-| [`mopots/`](mopots/README.md) | MO-POTS | Santos, in preparation | 2026 |
-| [`smocc/`](smocc/README.md) | SMOCC | Santos, in preparation | 2026 |
+| [`mr_mocd/`](mr_mocd/README.md) | MR-MOCD | Santos, in preparation | 2026 |
 
 Each module README carries the full citation, the objective equations, the
 representation, the search loop, the parameter table, whether the detector is
