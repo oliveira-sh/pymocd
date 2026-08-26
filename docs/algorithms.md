@@ -1,10 +1,10 @@
 # Algorithms
 
-`pymocd` exposes **ten community-detection algorithms** through **eleven
+`pymocd` exposes **nine community-detection algorithms** through **ten
 detector entry points** — Shi-MOCD ships under two selection rules, `mocd_q`
 and `mocd_d`.
 
-Three of them are this library's own work: **SMOCC**, **MO-POTS** and
+Two of them are this library's own work: **MR-MOCD** and
 **HP-MOCD**. *Every other detector is a re-implementation of someone else's
 published method*, written from the paper in this repository. The last column
 records whether the original authors released code — three of the seven did,
@@ -14,8 +14,7 @@ four did not.
 
 | API | Algorithm | Objectives & engine | Selection rule | Original implementation |
 |---|---|---|---|---|
-| [`smocc`](api/detectors.md#pymocd.smocc) | **SMOCC** — Santos, *in prep.* (2026) | sparse macro–micro co-evolutionary NSGA-II: micro kernel *k*-means/ratio-cut, macro Constant Potts; similarity carried on the graph's edges, so memory is *O(n+m)* | label-free min–max-normalised scalarisation over the merged rank-1 front | **this library** |
-| [`mopots`](api/detectors.md#pymocd.mopots) | **MO-POTS** — Santos, *in prep.* (2026) | exact Constant Potts split into cut fraction + pair fraction, parallel NSGA-II — the front *is* the resolution ladder | max modularity *Q* (front via [`mopots_fronts`](api/fronts.md#pymocd.mopots_fronts)) | **this library** |
+| [`mr_mocd`](api/detectors.md#pymocd.mr_mocd) | **MR-MOCD** — Santos, *in prep.* (2026) | exact Constant Potts split into cut fraction + pair coverage — the front *is* the resolution profile; memetic particle swarm niched along a geometric resolution ladder, with decomposition-based archive truncation | shortest two-level map-equation code length, then the widest resolution plateau, then max *Q* (front via [`mr_mocd_fronts`](api/fronts.md#pymocd.mr_mocd_fronts)) | **this library** |
 | [`hpmocd`](api/detectors.md#pymocd.hpmocd) | **HP-MOCD** — [Santos et al., *SNAM* 2025](https://doi.org/10.1007/s13278-025-01519-7) | decomposed modularity (intra, inter), parallel NSGA-II | max modularity *Q* (front via [`hpmocd_fronts`](api/fronts.md#pymocd.hpmocd_fronts)) | **this library** |
 | [`cdrme`](api/detectors.md#pymocd.cdrme) | **CDRME** — [Dabaghi-Zarandi et al., *JNCA* 2025](https://doi.org/10.1016/j.jnca.2024.104070) | softmax-weighted random walks build a primary community set; stochastic agglomerative merge chains optimise the paper's Eq. (12) linkage scalar — a single objective, so there is no front | max modularity *Q* | a private Python notebook supplied by the authors — **no public repository exists**, so there is no URL to cite |
 | [`mmcomo`](api/detectors.md#pymocd.mmcomo) | **MMCoMO** — [Zhang et al., *IEEE CIM* 2023](https://ieeexplore.ieee.org/document/10188453) | kernel *k*-means + ratio cut, macro/micro co-evolutionary NSGA-II over a dense diffusion kernel | max *Q* (front via [`mmcomo_fronts`](api/fronts.md#pymocd.mmcomo_fronts)) | — |
@@ -31,8 +30,7 @@ isolated nodes are assigned community `-1`.
 
 Each one has a module README carrying its full derivation, its parameter table
 and every deliberate divergence from its paper:
-[`smocc`](https://github.com/oliveira-sh/pymocd/blob/master/src/core/algorithms/smocc/README.md) ·
-[`mopots`](https://github.com/oliveira-sh/pymocd/blob/master/src/core/algorithms/mopots/README.md) ·
+[`mr_mocd`](https://github.com/oliveira-sh/pymocd/blob/master/src/core/algorithms/mr_mocd/README.md) ·
 [`hpmocd`](https://github.com/oliveira-sh/pymocd/blob/master/src/core/algorithms/hpmocd/README.md) ·
 [`cdrme`](https://github.com/oliveira-sh/pymocd/blob/master/src/core/algorithms/cdrme/README.md) ·
 [`mmcomo`](https://github.com/oliveira-sh/pymocd/blob/master/src/core/algorithms/mmcomo/README.md) ·
@@ -45,11 +43,10 @@ and every deliberate divergence from its paper:
 
 ## Which one should I use?
 
-- **[`smocc`](api/detectors.md#pymocd.smocc)** — the recommended default:
-  label-free automatic selection, near-linear time and memory.
-- **[`mopots`](api/detectors.md#pymocd.mopots)** — one run, every resolution:
-  its Pareto front *is* the Constant Potts resolution ladder, read off with
-  [`mopots_ladder`](api/fronts.md#pymocd.mopots_ladder).
+- **[`mr_mocd`](api/detectors.md#pymocd.mr_mocd)** — the recommended default:
+  one run covers every resolution, and the partition is chosen for you with no
+  ground truth and no resolution parameter to set. The whole profile is
+  available from [`mr_mocd_fronts`](api/fronts.md#pymocd.mr_mocd_fronts).
 - **[`hpmocd`](api/detectors.md#pymocd.hpmocd)** — the published HP-MOCD
   behaviour with max-modularity selection.
 - **The other seven** — re-implemented baselines, for papers and benchmarks.
@@ -57,26 +54,11 @@ and every deliberate divergence from its paper:
   states; see the [detector API reference](api/detectors.md) for every
   signature.
 
-## SMOCC
+## MR-MOCD
 
-SMOCC (Sparse Multi-Objective Co-evolutionary Community detection) co-evolves
-a macro population of medoid community centres optimising kernel *k*-means /
-ratio cut with a micro population of per-node labels optimising the
-intra/inter modularity decomposition, bridged by a sparse similarity carried
-on the graph's edges rather than a dense *n*×*n* kernel — so memory is
-*O(n+m)* and it scales to graphs the dense macro–micro baseline cannot build.
-The merged rank-1 front is enriched by a union refinement, and one partition
-is returned with no ground truth by minimising a min–max-normalised
-scalarisation of all four objectives across the front.
-
-The frontier is exposed for inspection via
-[`smocc_fronts`](api/fronts.md#pymocd.smocc_fronts).
-
-## MO-POTS
-
-MO-POTS (Multi-Objective Potts) minimises the exact affine decomposition of
-the Constant Potts Model into two conflicting objectives with a parallel
-NSGA-II:
+MR-MOCD (Multi-Resolution Multi-Objective Community Detection) minimises the
+exact affine decomposition of the Constant Potts Model into two conflicting
+objectives:
 
 ```text
 cut(C)  = 1 - sum_c |E(c)| / m        fraction of edges leaving their community
@@ -94,13 +76,33 @@ at resolution `g = g_d*b/a`. The resolution is therefore not a search
 parameter but the exchange rate between the two objectives, and the Pareto
 front *is* the resolution profile — a single run sweeps the whole ladder.
 
-[`mopots`](api/detectors.md#pymocd.mopots) returns the max-*Q* member of that
-front, [`mopots_fronts`](api/fronts.md#pymocd.mopots_fronts) returns every
-member, and [`mopots_ladder`](api/fronts.md#pymocd.mopots_ladder) returns the
-front's lower convex hull as `(partition, cut, pair, gamma)` in increasing
-`gamma` — each partition paired with the resolution at which it becomes
-CPM-optimal. All three take `pop_size=100`, `num_gens=100`, `cross_rate=0.7`
-and `mut_rate=0.5` as kwargs.
+**The search.** A particle swarm populates that front, each particle pinned to
+its own resolution on a geometric ladder over `[1/n^2, 1]` — the whole range
+where `gamma` can still change the answer. Per node, velocity is the
+probability that the node is unstable: an unstable node adopts an attractor's
+label, a stable one gets a resolution-directed local move. Every tenth
+iteration the particle is repaired back to a CPM local optimum and a
+community-merge sweep runs, which is what makes the flight an optimiser rather
+than a drift — the repair sharpens, the merge coarsens, and no run of
+single-node moves can do the latter.
+
+**The archive.** The external Pareto archive is truncated by keeping the best
+member at each rung of the ladder rather than the least crowded. Crowding
+distance is a diversity criterion with no notion of quality, and was measured
+evicting the archive's best member while nothing dominated it.
+
+**The selection.** One partition is returned with no ground truth and no
+parameter: the member whose two-level map-equation code length is shortest,
+falling back to the widest resolution plateau on the front's lower convex hull
+when no member compresses the walk better than a single module, and to maximum
+modularity behind that.
+
+[`mr_mocd`](api/detectors.md#pymocd.mr_mocd) returns the selected member,
+[`mr_mocd_fronts`](api/fronts.md#pymocd.mr_mocd_fronts) returns every member
+with its `(cut, pair)` point and the selected index, and
+[`mr_mocd_select`](api/fronts.md#pymocd.mr_mocd_select) runs the selection
+chain alone over partitions produced elsewhere. MR-MOCD is **deterministic** —
+byte-identical output at any thread count.
 
 ## HP-MOCD
 
@@ -157,10 +159,10 @@ published model-selection rules.
 
 ## Deprecated aliases
 
-`pymocd.scale` and `pymocd.scale_fronts` are kept from before SMOCC was
-renamed. They are the same objects as
-[`smocc`](api/detectors.md#pymocd.smocc) and
-[`smocc_fronts`](api/fronts.md#pymocd.smocc_fronts); use the new names.
+`pymocd.scale` and `pymocd.scale_fronts` are kept from earlier names of
+this detector. They are the same objects as
+[`mr_mocd`](api/detectors.md#pymocd.mr_mocd) and
+[`mr_mocd_fronts`](api/fronts.md#pymocd.mr_mocd_fronts); use the new names.
 
 ## Citation
 

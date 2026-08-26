@@ -18,14 +18,14 @@ make build
 
 ## First detection
 
-`pymocd.smocc` is the recommended entry point:
+`pymocd.mr_mocd` is the recommended entry point:
 
 ```python
 import networkx as nx
 import pymocd
 
 G = nx.karate_club_graph()
-communities = pymocd.smocc(G)
+communities = pymocd.mr_mocd(G)
 ```
 
 !!! important "Graph format"
@@ -33,30 +33,33 @@ communities = pymocd.smocc(G)
 
 ## Tuning
 
-`smocc` takes the evolutionary budget as keyword arguments, shown here at its
-defaults:
+`mr_mocd` takes its budget as keyword arguments, shown here at its defaults:
 
 ```python
-communities = pymocd.smocc(
+communities = pymocd.mr_mocd(
     G,
     pop_size=100,
     num_gens=100,
-    cross_rate=0.7,
-    mut_rate=0.5,
-    gap=10,
+    inertia=0.4,
+    cognitive=0.7,
+    social=0.7,
+    local_rate=0.35,
+    archive=100,
+    ls_period=10,
 )
 ```
 
-`gap` is the macro/micro co-evolution interval. `num_gens` is the generation
-count: the search always runs all of them. `smocc` also takes `macro_cap` (a
-multiplier on the macro population's `ceil(sqrt(n))` community ceiling) and
-`micro_mut`.
+`num_gens` is the generation count: the search always runs all of them.
+`inertia`, `cognitive` and `social` are the swarm's three velocity terms;
+`local_rate` is the per-node rate of the resolution-directed local move;
+`archive` is the capacity of the external Pareto archive, one slot per
+particle so it holds the whole profile; and `ls_period` is how often the full
+local search runs. **Resolution is not a parameter** — a single run covers the
+whole ladder.
 
-`mmcomo` shares the same four knobs plus `gap`, at its own paper's defaults
-(`pop_size=100`, `num_gens=50`, `cross_rate=0.1`, `mut_rate=0.1`, `gap=10`),
-and additionally takes `beta`, the exponent of its dense diffusion-kernel
-similarity. `smocc` has no such parameter: it replaces that kernel with a
-sparse edge similarity reinforced from the elite consensus.
+`mmcomo` takes a different four knobs plus `gap` and `beta`, at its own
+paper's defaults (`pop_size=100`, `num_gens=50`, `cross_rate=0.1`,
+`mut_rate=0.1`, `gap=10`).
 
 Every other detector takes its own paper's parameters as keyword arguments —
 `r` and `alpha` for `moga_net` and `ccm`, `divisions` for `ccm` and `krm`, `w`
@@ -105,24 +108,23 @@ Each metric is also available on its own: `pymocd.nmi`, `pymocd.ami`, `pymocd.ar
 
 ## Inspecting Pareto fronts
 
-Seven detectors pick one partition from a Pareto front of candidates:
-`smocc`, `mopots`, `hpmocd`, `mmcomo`, `ccm`, `krm` and `moga_net`. To see the
-whole candidate set, use `smocc_fronts`, `mopots_fronts`, `hpmocd_fronts`,
-`mmcomo_fronts`, `ccm_fronts`, `krm_fronts` or `moga_net_fronts`, which accept
-the same kwargs as their detector (`smocc_fronts` adds `refine`, `topo_mode`
-and `obj_mode`) and return a `list[dict[node, community]]`:
+Six detectors pick one partition from a Pareto front of candidates:
+`mr_mocd`, `hpmocd`, `mmcomo`, `ccm`, `krm` and `moga_net`. To see the whole
+candidate set, use `mr_mocd_fronts`, `hpmocd_fronts`, `mmcomo_fronts`,
+`ccm_fronts`, `krm_fronts` or `moga_net_fronts`, which accept the same kwargs
+as their detector and return a `list[dict[node, community]]`:
 
 ```python
-front = pymocd.smocc_fronts(G)
+front, points, selected = pymocd.mr_mocd_fronts(G)
 best = max(front, key=lambda p: pymocd.ari(p, gt))
 ```
 
 `gdpso` and `cdrme` optimize a single scalar, so they have no front;
 `mocd_q` and `mocd_d` do not expose theirs.
 
-`mopots` adds [`mopots_ladder`](api/fronts.md#pymocd.mopots_ladder), which
-returns the front's convex hull as `(partition, cut, pair, gamma)` tuples in
-increasing `gamma` — each partition paired with the Constant Potts resolution
-at which it becomes optimal.
+`mr_mocd_fronts` returns `(partitions, points, selected)`: every member, its
+`(cut, pair)` point, and the index the selector picked.
+[`mr_mocd_select`](api/fronts.md#pymocd.mr_mocd_select) runs that selection
+chain alone over partitions produced elsewhere.
 
 See the [fronts API reference](api/fronts.md) for details.

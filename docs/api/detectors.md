@@ -2,13 +2,11 @@
 
 Every detector takes a graph and returns a partition as `dict[node, community]`. Isolated nodes are assigned community `-1`.
 
-Three of these are this library's own algorithms — `smocc`, `mopots` and `hpmocd`. The other eight entry points re-implement published methods by other authors; see [Algorithms](../algorithms.md) for the paper, the selection rule and the original implementation (where the authors released one) behind each.
+Two of these are this library's own algorithms — `mr_mocd` and `hpmocd`. The other eight entry points re-implement published methods by other authors; see [Algorithms](../algorithms.md) for the paper, the selection rule and the original implementation (where the authors released one) behind each.
 
 ## This library's algorithms
 
-::: pymocd.smocc
-
-::: pymocd.mopots
+::: pymocd.mr_mocd
 
 ::: pymocd.hpmocd
 
@@ -35,4 +33,4 @@ Three of these are this library's own algorithms — `smocc`, `mopots` and `hpmo
 
 ## Deprecated aliases
 
-`pymocd.scale` is `pymocd.smocc` and `pymocd.scale_fronts` is [`pymocd.smocc_fronts`](fronts.md#pymocd.smocc_fronts), kept from before SMOCC was renamed. Use the new names.
+`pymocd.scale` is `pymocd.mr_mocd` and `pymocd.scale_fronts` is [`pymocd.mr_mocd_fronts`](fronts.md#pymocd.mr_mocd_fronts), kept from earlier names of this detector. Use the new names.
