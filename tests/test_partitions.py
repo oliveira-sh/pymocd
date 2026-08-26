@@ -27,14 +27,11 @@ class TestPartitions(unittest.TestCase):
         for community, members in groups.items():
             self.assertTrue(members, f"community {community} is empty")
 
-    def test_smocc(self):
-        self.assert_valid_partition(pymocd.smocc(self.graph))
+    def test_mr_mocd(self):
+        self.assert_valid_partition(pymocd.mr_mocd(self.graph))
 
     def test_hpmocd(self):
         self.assert_valid_partition(pymocd.hpmocd(self.graph))
-
-    def test_mopots(self):
-        self.assert_valid_partition(pymocd.mopots(self.graph))
 
     def test_mocd_q(self):
         self.assert_valid_partition(pymocd.mocd_q(self.graph))
@@ -54,10 +51,12 @@ class TestPartitions(unittest.TestCase):
     def test_mmcomo(self):
         self.assert_valid_partition(pymocd.mmcomo(self.graph))
 
-    def test_smocc_fronts(self):
-        front = pymocd.smocc_fronts(self.graph)
+    def test_mr_mocd_fronts(self):
+        front, points, selected = pymocd.mr_mocd_fronts(self.graph)
         self.assertIsInstance(front, list)
         self.assertTrue(front)
+        self.assertEqual(len(front), len(points))
+        self.assertLess(selected, len(front))
         for partition in front:
             self.assert_valid_partition(partition)
 
@@ -68,53 +67,11 @@ class TestPartitions(unittest.TestCase):
         for partition in front:
             self.assert_valid_partition(partition)
 
-    def test_mopots_fronts(self):
-        front = pymocd.mopots_fronts(self.graph)
-        self.assertIsInstance(front, list)
-        self.assertTrue(front)
-        for partition in front:
-            self.assert_valid_partition(partition)
-
-    def test_mopots_ladder(self):
-        ladder = pymocd.mopots_ladder(self.graph)
-        self.assertIsInstance(ladder, list)
-        self.assertTrue(ladder)
-        previous = None
-        for partition, cut, pair, gamma in ladder:
-            self.assert_valid_partition(partition)
-            self.assertGreaterEqual(gamma, 0.0)
-            self.assertGreaterEqual(cut, 0.0)
-            self.assertLessEqual(cut, 1.0)
-            self.assertGreaterEqual(pair, 0.0)
-            self.assertLessEqual(pair, 1.0)
-            if previous is not None:
-                previous_cut, previous_pair, previous_gamma = previous
-                self.assertGreater(gamma, previous_gamma)
-                self.assertGreaterEqual(cut, previous_cut)
-                self.assertLessEqual(pair, previous_pair)
-            previous = (cut, pair, gamma)
-
-
-class TestTwoCliquePartition(unittest.TestCase):
-    def setUp(self):
-        self.graph = build_two_clique_graph()
-
-    def assert_exact_two_clique_split(self, result):
-        groups = {}
-        for node, community in result.items():
-            groups.setdefault(community, set()).add(node)
-        self.assertEqual(len(groups), 2)
-        parts = tuple(sorted(tuple(sorted(nodes)) for nodes in groups.values()))
-        self.assertEqual(parts, ((0, 1, 2), (3, 4, 5)))
-
     def test_hpmocd_recovers_exact_partition(self):
         self.assert_exact_two_clique_split(pymocd.hpmocd(self.graph))
 
-    def test_smocc_recovers_exact_partition(self):
-        self.assert_exact_two_clique_split(pymocd.smocc(self.graph))
-
-    def test_mopots_recovers_exact_partition(self):
-        self.assert_exact_two_clique_split(pymocd.mopots(self.graph))
+    def test_mr_mocd_recovers_exact_partition(self):
+        self.assert_exact_two_clique_split(pymocd.mr_mocd(self.graph))
 
 
 if __name__ == "__main__":
