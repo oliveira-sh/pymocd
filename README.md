@@ -33,7 +33,7 @@ import networkx as nx
 import pymocd
 
 G = nx.karate_club_graph()          # any NetworkX / igraph graph, integer node ids
-communities = pymocd.smocc(G)       # -> dict[node, community]
+communities = pymocd.mr_mocd(G)     # -> dict[node, community]
 ```
 
 > [!IMPORTANT]
@@ -44,10 +44,10 @@ Every detector returns a single crisp partition as `dict[node, community]`.
 
 ### Algorithms
 
-`pymocd` exposes **ten community-detection algorithms** through **eleven
+`pymocd` exposes **nine community-detection algorithms** through **ten
 detector entry points** (Shi-MOCD ships under two selection rules).
 
-Only three of them are this library's own work — **SMOCC**, **MO-POTS** and
+Only two of them are this library's own work — **MR-MOCD** and
 **HP-MOCD**. *Every other detector is a re-implementation of someone else's
 published method*, written from the paper in this repository. The last column
 says whether the original authors released code: three of the seven did, four
@@ -55,22 +55,20 @@ did not.
 
 | API | Algorithm | Objectives & engine | Selection rule | Original implementation |
 |---|---|---|---|---|
-| `smocc` | **SMOCC** — Santos, *in prep.* (2026) | sparse macro–micro co-evolutionary NSGA-II: micro kernel *k*-means/ratio-cut, macro Constant Potts; similarity carried on the edges, so memory is *O(n+m)* | label-free min–max-normalised scalarisation over the merged rank-1 front | **this library** |
-| `mopots` | **MO-POTS** — Santos, *in prep.* (2026) | exact Constant Potts split into cut fraction + pair fraction, parallel NSGA-II — the front *is* the resolution ladder | max modularity *Q* | **this library** |
+| `mr_mocd` | **MR-MOCD** — Santos, *in prep.* (2026) | exact Constant Potts split into cut fraction + pair coverage, so one Pareto front *is* the graph's whole resolution profile; memetic particle swarm niched along a geometric resolution ladder, with decomposition-based archive truncation | shortest two-level map-equation code length, falling back to the widest resolution plateau, then max *Q* | **this library** |
 | `hpmocd` | **HP-MOCD** — [Santos et al., *SNAM* 2025](https://doi.org/10.1007/s13278-025-01519-7) | decomposed modularity (intra, inter), parallel NSGA-II | max modularity *Q* | **this library** |
-| `cdrme` | **CDRME** — [Dabaghi-Zarandi et al., *JNCA* 2025](https://doi.org/10.1016/j.jnca.2024.104070) | softmax-weighted random walks build a primary community set; stochastic agglomerative merge chains optimise the paper's Eq. 12 linkage scalar (single objective) | max modularity *Q* | a private Python notebook supplied by the authors — **no public repository exists**, so there is no URL to cite |
+| `cdrme` | **CDRME** — [Dabaghi-Zarandi et al., *JNCA* 2025](https://doi.org/10.1016/j.jnca.2024.104070) | softmax-weighted random walks build a primary community set; stochastic agglomerative merge chains optimise the paper's Eq. 12 linkage scalar (single objective) | max modularity *Q* | original source supplied by the authors |
 | `mmcomo` | **MMCoMO** — [Zhang et al., *IEEE CIM* 2023](https://ieeexplore.ieee.org/document/10188453) | kernel *k*-means + ratio cut, macro/micro co-evolutionary NSGA-II over a dense diffusion kernel | max *Q* | — |
 | `ccm` | **CCM** — [Shaik et al., *SN Computer Science* 2021](https://doi.org/10.1007/s42979-020-00382-x) | community score + community fitness + modularity, NSGA-III | max *Q* | — |
 | `krm` | **KRM** — [Shaik et al., *SN Computer Science* 2021](https://doi.org/10.1007/s42979-020-00382-x) | kernel *k*-means + ratio cut + modularity, NSGA-III | max *Q* | — |
-| `gdpso` | **GDPSO** — [Cai et al., *Information Sciences* 2015](https://doi.org/10.1016/j.ins.2014.09.041) | Newman–Girvan modularity (single objective), greedy discrete particle swarm | best position the swarm ever held | [doctor-cai/GDPSO](https://github.com/doctor-cai/GDPSO) — C++, no licence file |
+| `gdpso` | **GDPSO** — [Cai et al., *Information Sciences* 2015](https://doi.org/10.1016/j.ins.2014.09.041) | Newman–Girvan modularity (single objective), greedy discrete particle swarm | best position the swarm ever held | [doctor-cai/GDPSO](https://github.com/doctor-cai/GDPSO) |
 | `mocd_q` | **Shi-MOCD** — [Shi et al., *Applied Soft Computing* 2012](https://doi.org/10.1016/j.asoc.2011.10.005) | decomposed modularity, PESA-II | max *Q* (Shi Eq. 3.8) | — |
 | `mocd_d` | **Shi-MOCD** — [Shi et al., *Applied Soft Computing* 2012](https://doi.org/10.1016/j.asoc.2011.10.005) | decomposed modularity, PESA-II | max–min distance to Erdős–Rényi control fronts (Shi Eqs. 3.9–3.11) | — |
-| `moga_net` | **MOGA-Net** — [Pizzuti, *IEEE TEC* 2012](https://doi.org/10.1109/TEVC.2011.2161090) | community score + community fitness, NSGA-II | max *Q* (Pizzuti Sec. V-E) | [Moganet2016.zip](https://staff.icar.cnr.it/pizzuti/codice/Moganet2016.zip) — MATLAB, shipped as obfuscated P-code |
+| `moga_net` | **MOGA-Net** — [Pizzuti, *IEEE TEC* 2012](https://doi.org/10.1109/TEVC.2011.2161090) | community score + community fitness, NSGA-II | max *Q* (Pizzuti Sec. V-E) | [Moganet2016.zip](https://staff.icar.cnr.it/pizzuti/codice/Moganet2016.zip) |
 
 Each detector has a module README with its full derivation, its parameter
 table and the list of every deliberate divergence from its paper:
-[`smocc`](src/core/algorithms/smocc/README.md) ·
-[`mopots`](src/core/algorithms/mopots/README.md) ·
+[`mr_mocd`](src/core/algorithms/mr_mocd/README.md) ·
 [`hpmocd`](src/core/algorithms/hpmocd/README.md) ·
 [`cdrme`](src/core/algorithms/cdrme/README.md) ·
 [`mmcomo`](src/core/algorithms/mmcomo/README.md) ·
@@ -87,8 +85,7 @@ table and the list of every deliberate divergence from its paper:
 import pymocd
 
 # This library's own detectors
-part = pymocd.smocc(G)            # SMOCC          (recommended default)
-part = pymocd.mopots(G)           # MO-POTS
+part = pymocd.mr_mocd(G)          # MR-MOCD        (recommended default)
 part = pymocd.hpmocd(G)           # HP-MOCD
 
 # Re-implemented baselines
@@ -109,9 +106,8 @@ values below are the shipped defaults, which follow each paper wherever the
 paper states them:
 
 ```python
-pymocd.smocc(G,  pop_size=100, num_gens=100, cross_rate=0.7, mut_rate=0.5, gap=10,
-             macro_cap=1.0, micro_mut=0.5)
-pymocd.mopots(G, pop_size=100, num_gens=100, cross_rate=0.7, mut_rate=0.5)
+pymocd.mr_mocd(G, pop_size=100, num_gens=100, inertia=0.4, cognitive=0.7, social=0.7,
+               local_rate=0.35, archive=100, ls_period=10)
 pymocd.mmcomo(G, pop_size=100, num_gens=50, cross_rate=0.1, mut_rate=0.1, gap=10, beta=0.05)
 pymocd.ccm(G,    pop_size=200, num_gens=100, cross_rate=0.8, mut_rate=1/68, r=1.0, alpha=1.0, divisions=12)
 pymocd.krm(G,    pop_size=100, num_gens=100, cross_rate=0.8, mut_rate=1/34, divisions=12)
@@ -139,17 +135,16 @@ Seven of the eleven entry points expose the candidate set their selection
 rule picks from:
 
 ```python
-fronts = pymocd.smocc_fronts(G)      # list[dict[node, community]]
-fronts = pymocd.mopots_fronts(G)
+fronts = pymocd.mr_mocd_fronts(G)    # list[dict[node, community]]
 fronts = pymocd.hpmocd_fronts(G)
 fronts = pymocd.mmcomo_fronts(G)
 fronts = pymocd.ccm_fronts(G)
 fronts = pymocd.krm_fronts(G)
 fronts = pymocd.moga_net_fronts(G)
 
-# MO-POTS only: the front's convex hull as (partition, cut, pair, gamma),
-# each partition paired with the resolution at which it becomes CPM-optimal
-ladder = pymocd.mopots_ladder(G)
+# MR-MOCD only: run its label-free selection chain over partitions produced
+# elsewhere, which separates the search's contribution from the selector's
+pick, points = pymocd.mr_mocd_select(G, candidates)
 ```
 
 Those are *exactly* the detectors with a front accessor. `gdpso` and `cdrme`
@@ -157,8 +152,8 @@ are single-objective, and `mocd_q` / `mocd_d` do not expose theirs, so there is
 no `gdpso_fronts`, `cdrme_fronts` or `mocd_fronts`.
 
 `pymocd.scale` and `pymocd.scale_fronts` are deprecated aliases kept from
-before SMOCC was renamed; they are the same functions as `smocc` and
-`smocc_fronts`.
+earlier names of this detector; they are the same functions as `mr_mocd` and
+`mr_mocd_fronts`.
 
 ### Helpers
 
