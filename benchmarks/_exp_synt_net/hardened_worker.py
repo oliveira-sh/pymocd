@@ -36,9 +36,8 @@ def run_algorithm(alg, n, edges, seed, threads):
     pymocd.max_cores(threads)
     shim = Shim(n, edges)
     lib = {
-        "SMOCC": lambda: pymocd.smocc(shim),
+        "MR-MOCD": lambda: pymocd.mr_mocd(shim),
         "HP-MOCD": lambda: pymocd.hpmocd(shim),
-        "MO-POTS": lambda: pymocd.mopots(shim),
         "MMCoMO": lambda: pymocd.mmcomo(shim),
         "NSGA-III CCM": lambda: pymocd.ccm(shim),
         "NSGA-III KRM": lambda: pymocd.krm(shim),
@@ -90,7 +89,7 @@ def run_algorithm(alg, n, edges, seed, threads):
 
 # detectors whose whole Pareto front is scored, keeping the ground-truth-best member
 ORACLE_LIB = {
-    "MO-POTS (oracle)": lambda pymocd, shim: pymocd.mopots_fronts(shim),
+    "MR-MOCD (oracle)": lambda pymocd, shim: pymocd.mr_mocd_fronts(shim)[0],
 }
 
 

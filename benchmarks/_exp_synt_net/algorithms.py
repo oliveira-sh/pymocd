@@ -22,12 +22,12 @@ def _restore_labels(part, inverse):
     return {inverse[n]: c for n, c in part.items()}
 
 
-@algorithm("SMOCC", needs_conversion=False, parallel=False)
+@algorithm("MR-MOCD", needs_conversion=False, parallel=False)
 @_safe
 @_with_seed
-def smocc_algorithm(G):
+def mr_mocd_algorithm(G):
     H, inverse = _ensure_int_nodes(G)
-    return _restore_labels(pymocd.smocc(H), inverse)
+    return _restore_labels(pymocd.mr_mocd(H), inverse)
 
 
 @algorithm("HPMOCD", needs_conversion=False, parallel=False)
@@ -36,14 +36,6 @@ def smocc_algorithm(G):
 def hpmocd_algorithm(G):
     H, inverse = _ensure_int_nodes(G)
     return _restore_labels(pymocd.hpmocd(H), inverse)
-
-
-@algorithm("MO-POTS", needs_conversion=False, parallel=False)
-@_safe
-@_with_seed
-def mopots_algorithm(G):
-    H, inverse = _ensure_int_nodes(G)
-    return _restore_labels(pymocd.mopots(H), inverse)
 
 
 # Dense n x n diffusion kernel + eigendecomposition, roughly O(n^3):

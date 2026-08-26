@@ -19,7 +19,7 @@ ALL_THREADS = int(os.environ.get("HARD_ALL_THREADS", "2" if SMOKE else "48"))
 # Rayon-parallel detectors: run one at a time with the whole machine, BEFORE
 # the single-threaded algorithms (which fan out one worker per core). Tuple
 # order = run order.
-PARALLEL_ALGS = ("SMOCC", "HP-MOCD", "MO-POTS", "MO-POTS (oracle)")
+PARALLEL_ALGS = ("MR-MOCD", "HP-MOCD", "MR-MOCD (oracle)")
 
 LFR_DIR = os.path.join(BENCH, "data", "lfr")
 OUT = os.path.join(BENCH, "results", "hardened")
@@ -58,11 +58,10 @@ if HARD_LFR_MAX_N:
     NODES_SWEEP_N = [n for n in NODES_SWEEP_N if n <= HARD_LFR_MAX_N]
 
 ALGORITHMS = {
-    "SMOCC": dict(deterministic=True, max_nodes=None, needs="shim"),
+    "MR-MOCD": dict(deterministic=True, max_nodes=None, needs="shim"),
     "HP-MOCD": dict(deterministic=False, max_nodes=None, needs="shim"),
-    "MO-POTS": dict(deterministic=True, max_nodes=None, needs="shim"),
     # scores the whole front against ground truth: the ceiling any selector could reach
-    "MO-POTS (oracle)": dict(deterministic=True, max_nodes=None, needs="shim"),
+    "MR-MOCD (oracle)": dict(deterministic=True, max_nodes=None, needs="shim"),
     "MMCoMO": dict(deterministic=False, max_nodes=None, needs="shim"),
     "NSGA-III CCM": dict(deterministic=False, max_nodes=None, needs="shim"),
     "NSGA-III KRM": dict(deterministic=False, max_nodes=None, needs="shim"),
