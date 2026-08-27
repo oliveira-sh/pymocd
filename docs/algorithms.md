@@ -16,7 +16,7 @@ four did not.
 |---|---|---|---|---|
 | [`mr_mocd`](api/detectors.md#pymocd.mr_mocd) | **MR-MOCD** — Santos, *in prep.* (2026) | exact Constant Potts split into cut fraction + pair coverage — the front *is* the resolution profile; memetic particle swarm niched along a geometric resolution ladder, with decomposition-based archive truncation | shortest two-level map-equation code length, then the widest resolution plateau, then max *Q* (front via [`mr_mocd_fronts`](api/fronts.md#pymocd.mr_mocd_fronts)) | **this library** |
 | [`hpmocd`](api/detectors.md#pymocd.hpmocd) | **HP-MOCD** — [Santos et al., *SNAM* 2025](https://doi.org/10.1007/s13278-025-01519-7) | decomposed modularity (intra, inter), parallel NSGA-II | max modularity *Q* (front via [`hpmocd_fronts`](api/fronts.md#pymocd.hpmocd_fronts)) | **this library** |
-| [`cdrme`](api/detectors.md#pymocd.cdrme) | **CDRME** — [Dabaghi-Zarandi et al., *JNCA* 2025](https://doi.org/10.1016/j.jnca.2024.104070) | softmax-weighted random walks build a primary community set; stochastic agglomerative merge chains optimise the paper's Eq. (12) linkage scalar — a single objective, so there is no front | max modularity *Q* | a private Python notebook supplied by the authors — **no public repository exists**, so there is no URL to cite |
+| [`cdrme`](api/detectors.md#pymocd.cdrme) | **CDRME** — [Dabaghi-Zarandi et al., *JNCA* 2025](https://doi.org/10.1016/j.jnca.2024.104070) | softmax-weighted random walks build a primary community set; stochastic agglomerative merge chains optimise the paper's Eq. (12) linkage scalar — a single objective, so there is no front | max modularity *Q* | a private Python notebook supplied by the authors — **no public repository exists**, so it is vendored in this repository at [`res/original_algs/cdrme`](https://github.com/oliveira-sh/pymocd/tree/master/res/original_algs/cdrme) |
 | [`mmcomo`](api/detectors.md#pymocd.mmcomo) | **MMCoMO** — [Zhang et al., *IEEE CIM* 2023](https://ieeexplore.ieee.org/document/10188453) | kernel *k*-means + ratio cut, macro/micro co-evolutionary NSGA-II over a dense diffusion kernel | max *Q* (front via [`mmcomo_fronts`](api/fronts.md#pymocd.mmcomo_fronts)) | — |
 | [`ccm`](api/detectors.md#pymocd.ccm) | **CCM** — [Shaik et al., *SN Computer Science* 2021](https://doi.org/10.1007/s42979-020-00382-x) | community score + community fitness + modularity, NSGA-III | max *Q* (front via [`ccm_fronts`](api/fronts.md#pymocd.ccm_fronts)) | — |
 | [`krm`](api/detectors.md#pymocd.krm) | **KRM** — [Shaik et al., *SN Computer Science* 2021](https://doi.org/10.1007/s42979-020-00382-x) | kernel *k*-means + ratio cut + modularity, NSGA-III | max *Q* (front via [`krm_fronts`](api/fronts.md#pymocd.krm_fronts)) | — |
@@ -134,7 +134,8 @@ diverges from it.
 - **GDPSO** ([doctor-cai/GDPSO](https://github.com/doctor-cai/GDPSO)) is C++
   with no licence file, so this port was written clean-room from a description
   of it; no reference source was copied.
-- **CDRME**'s reference is a private Python notebook supplied by the authors.
+- **CDRME**'s reference is a private Python notebook supplied by the authors,
+  vendored in this repository at `res/original_algs/cdrme` as plain Python.
   It is **not published at any public URL**, so none is cited here. It was
   consulted only to disambiguate what the paper leaves open, and four of its
   choices were deliberately not reproduced.
