@@ -1,17 +1,9 @@
-//! Sec. 4.4.2 chromosome evaluation and Sec. 4.4.3 mutation, looped to a fixed point.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use crate::core::algorithms::cdrme::topology::Topology;
 
-/// Moves every gene below the threshold `alpha` to the neighbour community its
-/// neighbours' similarities favour most, while that raises the gene's own
-/// similarity (Fig. 7).
-///
-/// Genes are rewritten in place in ascending node order, so a move is visible
-/// to the rest of the sweep; the paper fixes neither the order nor the number
-/// of iterations, and the loop stops on the first sweep that changes nothing.
 pub fn mutate(
     topology: &Topology,
     labels: &mut [u32],
@@ -42,8 +34,6 @@ pub fn mutate(
                 total += sim[u as usize];
             }
             if total > 0.0 {
-                // "we select the maximum of these summations"; equal sums go to
-                // the lower community id
                 let mut best = touched[0];
                 for &c in &touched[1..] {
                     let sum = sums[c as usize];
@@ -53,9 +43,6 @@ pub fn mutate(
                     }
                 }
                 let raised = sums[best as usize] / total;
-                // a node whose neighbours are all in its own community has
-                // nothing to move to; Fig. 7 is a membership change, and
-                // rewriting it in place would pin its similarity at 1.0
                 if best != labels[v as usize] && raised > sim[v as usize] {
                     labels[v as usize] = best;
                     sim[v as usize] = raised;
@@ -77,7 +64,6 @@ pub fn mutate(
 mod tests {
     use super::*;
 
-    // a pendant node 3 mis-assigned away from the triangle it hangs off
     fn pendant() -> (Topology, Vec<u32>, Vec<f64>) {
         let topology = Topology::from_edges(&[0, 1, 2, 3], &[(0, 1), (1, 2), (0, 2), (2, 3)]);
         (topology, vec![0, 0, 0, 1], vec![0.9, 0.8, 0.7, 0.1])
@@ -101,7 +87,6 @@ mod tests {
 
     #[test]
     fn a_move_that_would_lower_the_similarity_is_refused() {
-        // node 0 sits between two communities; the winning share is 2/3 < 0.9
         let topology = Topology::from_edges(&[0, 1, 2, 3], &[(0, 1), (0, 2), (0, 3)]);
         let mut labels = vec![0, 1, 1, 2];
         let mut sim = vec![0.9, 0.5, 0.5, 0.5];

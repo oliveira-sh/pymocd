@@ -1,4 +1,3 @@
-//! The deterministic per-slot RNG contract for cdrme and its roulette wheel.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -7,25 +6,18 @@ use rand::RngExt;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 
-// shared with mr_mocd and gdpso so every module documents one contract
 const RNG_BASE: u64 = 0x5CA1_E5EED;
 
 pub const SALT_CENTER: u64 = 0x0CD_0001;
 pub const SALT_WALK: u64 = 0x0CD_0002;
 pub const SALT_MERGE: u64 = 0x0CD_0003;
 
-/// One independent stream per `(salt, slot)` pair; never depends on the thread count.
 pub fn slot_rng(salt: u64, slot: usize) -> StdRng {
     StdRng::seed_from_u64(
         RNG_BASE ^ salt.rotate_left(32) ^ (slot as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15),
     )
 }
 
-/// Fenwick-indexed roulette over non-negative weights.
-///
-/// Sec. 4.2.1 draws `ENC` centres with `P(v) proportional to degree(v)` and
-/// rewrites weights after every walk, so a flat cumulative scan would cost
-/// `O(|V|^2 / AvgDegree)` on its own; both operations here are `O(log |V|)`.
 pub struct Wheel {
     weight: Vec<f64>,
     tree: Vec<f64>,
@@ -76,8 +68,6 @@ impl Wheel {
         sum
     }
 
-    /// Draws an index with probability proportional to its weight, or `None`
-    /// when nothing carries positive weight.
     pub fn draw(&self, rng: &mut StdRng) -> Option<usize> {
         let total = self.total();
         if !total.is_finite() || total <= 0.0 {
@@ -94,7 +84,6 @@ impl Wheel {
             }
             step >>= 1;
         }
-        // rounding can land one slot past the intended one on a zero weight
         while pos < self.weight.len() && self.weight[pos] <= 0.0 {
             pos += 1;
         }
@@ -131,6 +120,9 @@ mod tests {
     fn an_empty_wheel_draws_nothing() {
         let wheel = Wheel::new(vec![0.0, 0.0]);
         assert_eq!(wheel.draw(&mut slot_rng(SALT_CENTER, 0)), None);
-        assert_eq!(Wheel::new(Vec::new()).draw(&mut slot_rng(SALT_CENTER, 0)), None);
+        assert_eq!(
+            Wheel::new(Vec::new()).draw(&mut slot_rng(SALT_CENTER, 0)),
+            None
+        );
     }
 }

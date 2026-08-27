@@ -1,5 +1,3 @@
-//! Sec. 4.2 end to end: ENC rounds of centre, walk and Eq. (8), folded into one
-//! primary community set.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -11,8 +9,6 @@ use super::similarity::avg_similarity;
 use super::topology::Topology;
 use super::walk::{Centers, Walker, walk_length};
 
-/// Runs the 4.2.1 -> 4.2.2 -> 4.2.3 -> 4.2.4 loop `ENC` times (Fig. 2) and
-/// returns the merged chromosome of Sec. 4.2.5.
 pub fn compose(topology: &Topology, cfg: &Config) -> Chromosome {
     let mut chromosome = Chromosome::new(topology.n);
     let mut centers = Centers::new(topology);

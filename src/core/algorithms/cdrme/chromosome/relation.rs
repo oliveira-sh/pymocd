@@ -1,4 +1,3 @@
-//! Sec. 4.3.1's lighter chromosome: the community relation graph of Fig. 6.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -7,10 +6,6 @@ use rustc_hash::FxHashMap;
 
 use crate::core::algorithms::cdrme::topology::Topology;
 
-/// One gene per community instead of one per node: `inner[c]` is the loop
-/// weight of Fig. 6 (`innerLinks`), `adj[c][d]` the link weight
-/// (`outerLinks(c,d)`) and `total[c]` is `totalLinks(c)`, the links with at
-/// least one end in `c`.
 pub struct Relation {
     pub inner: Vec<u32>,
     pub total: Vec<u32>,
@@ -54,15 +49,12 @@ impl Relation {
         self.live.len()
     }
 
-    /// The neighbour communities of `c`, in ascending id order so the uniform
-    /// draw of Sec. 4.3.2 never depends on hash order.
     pub fn neighbors(&self, c: u32) -> Vec<u32> {
         let mut neighbors: Vec<u32> = self.adj[c as usize].keys().copied().collect();
         neighbors.sort_unstable();
         neighbors
     }
 
-    /// Folds `j` into `i`; `j` stops being live.
     pub fn merge(&mut self, i: u32, j: u32) {
         let bridge = self.adj[i as usize].remove(&j).unwrap_or(0);
         self.adj[j as usize].remove(&i);
@@ -89,7 +81,6 @@ impl Relation {
 mod tests {
     use super::*;
 
-    // three triangles bridged 2-3 and 5-6
     fn chain() -> (Topology, Vec<u32>) {
         let nodes: Vec<i32> = (0..9).collect();
         let edges = [

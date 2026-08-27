@@ -1,4 +1,3 @@
-//! The CDRME entry points and the boundary conversion back to a `Partition`.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -13,9 +12,8 @@ use super::evolve::{Candidate, best, diversify, modularity, mutate};
 use super::objective::objective;
 use super::primary::compose;
 use super::topology::Topology;
-use crate::core::graph::{CommunityId, Graph, NodeId, Partition, normalize_community_ids};
+use crate::core::graph::{CommunityId, NodeId, Partition};
 
-// dense ids handed out in ascending node order; isolated nodes report -1
 fn to_partition(topology: &Topology, labels: &[u32]) -> Partition {
     let mut remap: FxHashMap<u32, CommunityId> = FxHashMap::default();
     let mut partition = Partition::default();
@@ -35,17 +33,6 @@ fn to_partition(topology: &Topology, labels: &[u32]) -> Partition {
     partition
 }
 
-/// Run CDRME over an explicit node list and edge list.
-///
-/// `nodes` is what pins the isolated vertices, which never appear in `edges`;
-/// they are outside every equation of the paper and come back as community
-/// `-1`. Self-loops and repeated edges are dropped, so `|E|` and every degree
-/// are those of the simple graph.
-///
-/// `alpha_walk` is Eq. (7)'s length coefficient and `alpha_mut` the Sec. 4.4.2
-/// mutation threshold; the paper calls both `alpha`. `pop_size` is `N_p` and
-/// `elite_size` is `N_sp`. Eq. (12) is one maximised scalar, so there is no
-/// Pareto front to return.
 #[allow(clippy::too_many_arguments)]
 pub fn cdrme(
     nodes: &[NodeId],
@@ -71,7 +58,6 @@ pub fn cdrme(
     )
 }
 
-/// CDRME with the full configuration block.
 pub fn cdrme_with(nodes: &[NodeId], edges: &[(NodeId, NodeId)], cfg: &Config) -> Partition {
     let topology = Topology::from_edges(nodes, edges);
     if topology.n == 0 {
@@ -81,30 +67,6 @@ pub fn cdrme_with(nodes: &[NodeId], edges: &[(NodeId, NodeId)], cfg: &Config) ->
     to_partition(&topology, &labels)
 }
 
-/// CDRME on an already-built `Graph`, the form the hashmap side of the crate
-/// carries graphs in.
-pub fn cdrme_on_graph(graph: &Graph, cfg: &Config) -> Partition {
-    let topology = Topology::from_edges(graph.nodes_vec(), &graph.edges);
-    if topology.n == 0 {
-        return Partition::default();
-    }
-    let labels = search(&topology, cfg);
-    let partition: Partition = (0..topology.n)
-        .map(|d| {
-            let community = if labels[d] == NO_COMMUNITY {
-                -1
-            } else {
-                labels[d] as CommunityId
-            };
-            (topology.labels[d], community)
-        })
-        .collect();
-    normalize_community_ids(graph, partition)
-}
-
-// the four components in order: pre-processing and primary composition, then
-// one merge chain per population slot, then mutation of the N_sp best, then
-// Sec. 4.4.4's selection
 fn search(topology: &Topology, cfg: &Config) -> Vec<u32> {
     let cfg = cfg.sanitised();
     if topology.active.is_empty() {
@@ -114,8 +76,6 @@ fn search(topology: &Topology, cfg: &Config) -> Vec<u32> {
     let primary = compose(topology, &cfg);
     let (base, k) = primary.communities(topology);
 
-    // Sec. 4.3.2's uniform draw is stratified over the slots instead, so the
-    // merge ladder is covered for every k (README, "Divergences").
     let budget = MERGE_ATTEMPTS_PER_COMMUNITY * k;
     let mut chains: Vec<_> = (0..cfg.pop_size)
         .into_par_iter()
@@ -158,7 +118,11 @@ fn search(topology: &Topology, cfg: &Config) -> Vec<u32> {
 }
 
 fn distinct(labels: &[u32]) -> usize {
-    let mut seen: Vec<u32> = labels.iter().copied().filter(|&c| c != NO_COMMUNITY).collect();
+    let mut seen: Vec<u32> = labels
+        .iter()
+        .copied()
+        .filter(|&c| c != NO_COMMUNITY)
+        .collect();
     seen.sort_unstable();
     seen.dedup();
     seen.len()
@@ -182,7 +146,6 @@ mod tests {
         )
     }
 
-    // two 5-cliques joined by the single edge (4,5)
     fn two_cliques() -> (Vec<NodeId>, Vec<(NodeId, NodeId)>) {
         let mut edges = vec![(4, 5)];
         for base in [0, 5] {
@@ -294,7 +257,11 @@ mod tests {
         }
         let part = run(&nodes, &edges);
         let communities: FxHashSet<CommunityId> = part.values().copied().collect();
-        assert_eq!(communities.len(), 1, "a clique was cut into {communities:?}");
+        assert_eq!(
+            communities.len(),
+            1,
+            "a clique was cut into {communities:?}"
+        );
     }
 
     #[test]
@@ -315,38 +282,6 @@ mod tests {
             10
         );
         assert_eq!(cdrme(&nodes, &edges, -5.0, 1, 2, 1, 9.0, 3).len(), 10);
-    }
-
-    #[test]
-    fn the_graph_entry_point_agrees_with_the_edge_list_one() {
-        let (nodes, edges) = two_cliques();
-        let mut graph = Graph::new();
-        for &node in &nodes {
-            graph.nodes.insert(node);
-            graph.adjacency_list.entry(node).or_default();
-        }
-        for &(u, v) in &edges {
-            graph.add_edge(u, v);
-        }
-        graph.finalize();
-
-        let cfg = Config {
-            pop_size: 20,
-            elite_size: 10,
-            n_walk: 20,
-            ..Config::default()
-        };
-        let from_graph = cdrme_on_graph(&graph, &cfg);
-        let from_edges = run(&nodes, &edges);
-        for &a in &nodes {
-            for &b in &nodes {
-                assert_eq!(
-                    from_graph[&a] == from_graph[&b],
-                    from_edges[&a] == from_edges[&b],
-                    "nodes {a} and {b} disagree"
-                );
-            }
-        }
     }
 
     #[test]

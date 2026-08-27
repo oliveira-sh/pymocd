@@ -1,14 +1,9 @@
-//! The whole Eq. (4) column of one node, accumulated without materialising it.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use crate::core::algorithms::cdrme::topology::Topology;
 
-/// Adds `weight * similarity(v, r)` to `acc[v]` for every `v`, Eq. (4).
-///
-/// Summing over `N(r)`'s rows costs `O(sum of deg(w) for w in N(r))` and touches
-/// only the nodes within distance two of `r`, the only ones Eq. (4) can score.
 pub fn accumulate_column(topology: &Topology, r: u32, weight: f64, acc: &mut [f64]) {
     for &w in topology.neighbors(r) {
         acc[w as usize] += weight;

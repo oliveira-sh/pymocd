@@ -1,4 +1,3 @@
-//! Sec. 4.3.2: one stochastic agglomerative merge chain per population slot.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -11,18 +10,12 @@ use crate::core::algorithms::cdrme::objective::{objective, objective_if_merged};
 use crate::core::algorithms::cdrme::sampling::{SALT_MERGE, slot_rng};
 use crate::core::algorithms::cdrme::topology::Topology;
 
-/// The best community set one chain ever held, with its Eq. (12) value.
 pub struct Chain {
     pub labels: Vec<u32>,
     pub k: usize,
     pub objective: f64,
 }
 
-// Sec. 4.3.2 replaces C by C' "with a probability of 1 - 1/(ObjFunc(C') -
-// ObjFunc(C))", which is a probability only when the difference is at least 1.
-// This is that formula clamped into [0,1]; the perverse middle branch (a gain
-// under 1 is refused) is the paper's, not a typo. README, "The Sec. 4.3.2
-// acceptance rule", derives all three branches.
 fn accept(delta: f64, rng: &mut StdRng) -> bool {
     if delta.is_nan() || delta <= 0.0 {
         return true;
@@ -64,14 +57,6 @@ fn compress(base: &[u32], parent: &mut [u32], k: usize) -> (Vec<u32>, usize) {
     (labels, next as usize)
 }
 
-/// Runs `attempts` merge attempts on one population slot and returns the set it
-/// ends on.
-///
-/// Sec. 4.3.2 draws one random chromosome per iteration and merges it once, so
-/// the chromosomes sit at different depths of their own merge chains while the
-/// process runs; that spread is the population's only diversity, and it is what
-/// Sec. 4.4.4 later picks from. A merge on one slot never reads another, so the
-/// interleaving is immaterial and each slot runs its own attempts at once.
 pub fn diversify(
     topology: &Topology,
     base: &[u32],
@@ -119,7 +104,6 @@ mod tests {
     use super::*;
     use crate::core::algorithms::cdrme::chromosome::NO_COMMUNITY;
 
-    // four triangles in a path, bridged 2-3, 5-6, 8-9
     fn path_of_triangles() -> (Topology, Vec<u32>) {
         let nodes: Vec<i32> = (0..12).collect();
         let mut edges = Vec::new();
@@ -162,8 +146,13 @@ mod tests {
     #[test]
     fn different_slots_reach_different_sets() {
         let (topology, base) = path_of_triangles();
-        let sizes: Vec<usize> = (0..32).map(|s| diversify(&topology, &base, 4, s, s / 8).k).collect();
-        assert!(sizes.iter().any(|&k| k != sizes[0]), "the chains are frozen");
+        let sizes: Vec<usize> = (0..32)
+            .map(|s| diversify(&topology, &base, 4, s, s / 8).k)
+            .collect();
+        assert!(
+            sizes.iter().any(|&k| k != sizes[0]),
+            "the chains are frozen"
+        );
         assert!(sizes.iter().all(|&k| (1..=4).contains(&k)));
     }
 

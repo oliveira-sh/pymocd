@@ -1,11 +1,9 @@
-//! Sec. 4.4.4: the label-free measure of Sec. 2.3.3 that picks the final set.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use crate::core::algorithms::cdrme::topology::Topology;
 
-/// One mutated chromosome and the two scores that rank it.
 pub struct Candidate {
     pub labels: Vec<u32>,
     pub k: usize,
@@ -13,8 +11,6 @@ pub struct Candidate {
     pub objective: f64,
 }
 
-/// Eq. (1) at the standard resolution `gamma = 1`, which the paper leaves
-/// unspecified: `Q = sum_c l_c/m - (d_c/2m)^2`.
 pub fn modularity(topology: &Topology, labels: &[u32], k: usize) -> f64 {
     if topology.m == 0 {
         return 0.0;
@@ -36,9 +32,6 @@ pub fn modularity(topology: &Topology, labels: &[u32], k: usize) -> f64 {
         .sum()
 }
 
-/// Picks the final community set on Eq. (1) modularity, the only label-free
-/// measure of the three Sec. 4.4.4 names (README, "Selection rule"). The rest of
-/// the order only makes the choice reproducible.
 pub fn best(candidates: Vec<Candidate>) -> Option<Vec<u32>> {
     candidates
         .into_iter()
@@ -78,8 +71,18 @@ mod tests {
     #[test]
     fn the_highest_modularity_candidate_wins() {
         let picked = best(vec![
-            Candidate { labels: vec![0, 0, 0, 0, 0, 0], k: 1, quality: 0.0, objective: 9.0 },
-            Candidate { labels: vec![0, 0, 0, 1, 1, 1], k: 2, quality: 0.39, objective: 1.0 },
+            Candidate {
+                labels: vec![0, 0, 0, 0, 0, 0],
+                k: 1,
+                quality: 0.0,
+                objective: 9.0,
+            },
+            Candidate {
+                labels: vec![0, 0, 0, 1, 1, 1],
+                k: 2,
+                quality: 0.39,
+                objective: 1.0,
+            },
         ]);
         assert_eq!(picked, Some(vec![0, 0, 0, 1, 1, 1]));
         assert_eq!(best(Vec::new()), None);
@@ -88,9 +91,24 @@ mod tests {
     #[test]
     fn ties_fall_through_to_the_objective_then_to_fewer_communities() {
         let picked = best(vec![
-            Candidate { labels: vec![0, 1], k: 2, quality: 0.5, objective: 1.0 },
-            Candidate { labels: vec![1, 0], k: 2, quality: 0.5, objective: 2.0 },
-            Candidate { labels: vec![0, 0], k: 1, quality: 0.5, objective: 2.0 },
+            Candidate {
+                labels: vec![0, 1],
+                k: 2,
+                quality: 0.5,
+                objective: 1.0,
+            },
+            Candidate {
+                labels: vec![1, 0],
+                k: 2,
+                quality: 0.5,
+                objective: 2.0,
+            },
+            Candidate {
+                labels: vec![0, 0],
+                k: 1,
+                quality: 0.5,
+                objective: 2.0,
+            },
         ]);
         assert_eq!(picked, Some(vec![0, 0]));
     }

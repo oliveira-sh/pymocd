@@ -1,16 +1,9 @@
-//! The sanitised undirected topology CDRME searches on, plus Eq. (5) and Eq. (6).
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
 use crate::core::graph::{CsrGraph, NodeId};
 
-/// CSR topology with sorted, duplicate-free neighbour lists.
-///
-/// Isolated nodes keep a dense id so they can be reported, but are absent from
-/// `active` and from every equation: Eq. (4) scores them 0 against everything,
-/// Algorithm 1 cannot step out of them, and Eq. (5) would deflate `AvgDegree`
-/// with vertices the method never touches (the paper never mentions them).
 pub struct Topology {
     pub n: usize,
     pub m: usize,
@@ -76,7 +69,6 @@ impl Topology {
         (self.xadj[u as usize + 1] - self.xadj[u as usize]) as usize
     }
 
-    /// `|Neighbor(u) INTERSECT Neighbor(v)|` over the two sorted rows.
     pub fn common_neighbors(&self, u: u32, v: u32) -> u32 {
         let (mut a, mut b) = (self.neighbors(u), self.neighbors(v));
         if a.len() > b.len() {
@@ -99,10 +91,6 @@ impl Topology {
         count
     }
 
-    /// Eq. (4): `similarity(v,u) = connection(v,u) + |Neighbor(v) INTERSECT Neighbor(u)|`.
-    ///
-    /// The search never scores one pair at a time; this is the reference form
-    /// that `similarity::accumulate_column`'s whole-column pass is checked against.
     #[cfg(test)]
     pub fn similarity(&self, v: u32, u: u32) -> u32 {
         u32::from(self.neighbors(v).binary_search(&u).is_ok()) + self.common_neighbors(v, u)
@@ -125,7 +113,6 @@ mod tests {
 
     #[test]
     fn similarity_is_connection_plus_common_neighbours() {
-        // path 0-1-2 with a triangle chord 0-2
         let t = Topology::from_edges(&[0, 1, 2, 3], &[(0, 1), (1, 2), (0, 2), (2, 3)]);
         assert_eq!(t.similarity(0, 1), 1 + 1);
         assert_eq!(t.similarity(0, 3), 1);
@@ -135,7 +122,6 @@ mod tests {
 
     #[test]
     fn enc_follows_equations_five_and_six() {
-        // 4-cycle: AvgDegree = 2, ENC = 4/2 = 2
         let t = Topology::from_edges(&[0, 1, 2, 3], &[(0, 1), (1, 2), (2, 3), (3, 0)]);
         assert!((t.avg_degree - 2.0).abs() < 1e-12);
         assert_eq!(t.enc, 2);

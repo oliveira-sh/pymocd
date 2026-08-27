@@ -1,4 +1,3 @@
-//! Eq. (8), rescaled onto the [0,1] range every downstream unit assumes.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -6,11 +5,6 @@
 use super::pairwise::accumulate_column;
 use crate::core::algorithms::cdrme::topology::Topology;
 
-/// Fills `out` with `AvgSimilarity(v, primWalk)` (Eq. 8) divided by its own
-/// maximum, and pins the centre's own gene to 1.0.
-///
-/// Eq. (8) is an unbounded count; the rescale is a deliberate divergence that
-/// Figs. 4-5 and the Sec. 4.4.2 threshold both require (README, "Divergences").
 pub fn avg_similarity(topology: &Topology, center: u32, prim: &[(u32, u32)], out: &mut [f64]) {
     out.fill(0.0);
     let mut frequency = 0.0;

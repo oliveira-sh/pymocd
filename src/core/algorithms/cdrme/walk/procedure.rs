@@ -1,4 +1,3 @@
-//! Eq. (7) and Algorithm 1: softmax-weighted walks and the primWalk they leave.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -8,20 +7,11 @@ use rand::rngs::StdRng;
 
 use crate::core::algorithms::cdrme::topology::Topology;
 
-/// Eq. (7): `RandomWalkLength(v) = Degree(v) + alpha * |V|/ENC`.
 pub fn walk_length(topology: &Topology, v: u32, alpha_walk: f64) -> usize {
-    // |V|/ENC is AvgDegree by Eq. (6), so ENC cancels out of Eq. (7) entirely
     let raw = topology.degree(v) as f64 + alpha_walk * topology.avg_degree;
     raw.round().max(1.0) as usize
 }
 
-/// Algorithm 1, with the transition law of line 10 cached per node.
-///
-/// `softmax(|Neighbor(current) INTERSECT Neighbor(v)|)` is a property of
-/// `current` alone, so each row is built once and reused across every walk of
-/// every centre. The exponent is shifted by the row maximum before `exp`, the
-/// accurate-softmax form of the paper's own citation, without which a dense
-/// row overflows on raw counts.
 pub struct Walker {
     transitions: Vec<Option<Box<[f64]>>>,
     freq: Vec<u32>,
@@ -70,14 +60,6 @@ impl Walker {
         topology.neighbors(u)[index.min(cumulative.len() - 1)]
     }
 
-    /// Runs `n_walk` walks of `length` steps from `start` and returns the
-    /// `length` most frequent nodes with their frequencies (lines 15-17).
-    ///
-    /// Line 9 unions each node into a per-walk set and line 15 counts "its
-    /// repetition in different walks", so a frequency is the number of walks
-    /// that contained the node, not the number of visits. Visits survive only
-    /// as the tie-break of line 16, which the paper leaves open and which would
-    /// otherwise fall through to the node id and bias the primWalk low.
     pub fn run(
         &mut self,
         topology: &Topology,
@@ -145,7 +127,6 @@ mod tests {
     #[test]
     fn equation_seven_adds_the_average_degree() {
         let topology = barbell();
-        // AvgDegree = 2*21/10 = 4.2, deg(0) = 4  ->  round(4 + 4.2) = 8
         assert_eq!(walk_length(&topology, 0, 1.0), 8);
         assert_eq!(walk_length(&topology, 0, 2.0), 12);
     }
@@ -155,7 +136,10 @@ mod tests {
         let topology = barbell();
         let mut walker = Walker::new(&topology);
         let prim = walker.run(&topology, 0, 8, 50, &mut slot_rng(SALT_WALK, 0));
-        assert_eq!(prim[0].1, 50, "the centre is not among the most frequent nodes");
+        assert_eq!(
+            prim[0].1, 50,
+            "the centre is not among the most frequent nodes"
+        );
         assert!(prim.len() <= 8);
         let inside: u32 = prim.iter().filter(|&&(v, _)| v < 5).map(|&(_, f)| f).sum();
         let outside: u32 = prim.iter().filter(|&&(v, _)| v >= 5).map(|&(_, f)| f).sum();

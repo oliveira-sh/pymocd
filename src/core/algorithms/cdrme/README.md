@@ -12,8 +12,11 @@ functions", *IMA Journal of Numerical Analysis* 41(4):2311–2330, 2021.
 
 **Original implementation**
 No public repository exists. The reference is a **private Python notebook
-supplied by the user** (`src_community_detection_randomwalk.zip`); there is no
-URL to cite and none should be invented. It was consulted only to disambiguate
+supplied by the authors** (`src_community_detection_randomwalk.zip`); there is
+no URL to cite and none should be invented, so it is vendored in this
+repository at [`res/original_algs/cdrme`](../../../../res/original_algs/cdrme),
+converted from the notebook to plain Python with its code cells verbatim and
+its rendered outputs dropped. It was consulted only to disambiguate
 what the paper leaves open, and is followed nowhere it contradicts the text.
 Four of its choices were deliberately **not** reproduced:
 
