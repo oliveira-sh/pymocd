@@ -67,6 +67,19 @@ class TestPartitions(unittest.TestCase):
         for partition in front:
             self.assert_valid_partition(partition)
 
+
+class TestTwoCliquePartition(unittest.TestCase):
+    def setUp(self):
+        self.graph = build_two_clique_graph()
+
+    def assert_exact_two_clique_split(self, result):
+        groups = {}
+        for node, community in result.items():
+            groups.setdefault(community, set()).add(node)
+        self.assertEqual(len(groups), 2)
+        parts = tuple(sorted(tuple(sorted(nodes)) for nodes in groups.values()))
+        self.assertEqual(parts, ((0, 1, 2), (3, 4, 5)))
+
     def test_hpmocd_recovers_exact_partition(self):
         self.assert_exact_two_clique_split(pymocd.hpmocd(self.graph))
 

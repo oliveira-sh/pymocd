@@ -19,7 +19,8 @@ def cut_and_pair(graph, partition):
     for node in active:
         sizes[partition[node]] = sizes.get(partition[node], 0) + 1
     co_clustered = sum(size * (size - 1) // 2 for size in sizes.values())
-    all_pairs = len(active) * (len(active) - 1) // 2
+    n = graph.number_of_nodes()
+    all_pairs = n * (n - 1) // 2
     m = graph.number_of_edges()
     cut = 1.0 - internal / m if m else 0.0
     pair = co_clustered / all_pairs if all_pairs else 0.0
