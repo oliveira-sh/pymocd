@@ -47,13 +47,6 @@ Every detector returns a single crisp partition as `dict[node, community]`.
 `pymocd` exposes **nine community-detection algorithms** through **ten
 detector entry points** (Shi-MOCD ships under two selection rules).
 
-Only two of them are this library's own work — **MR-MOCD** and
-**HP-MOCD**. *Every other detector is a re-implementation of someone else's
-published method*, written from the paper in this repository. The **Code**
-column says whether the original authors released an implementation: two of
-the seven published one, CDRME's authors supplied theirs privately, and four
-released nothing.
-
 | API | Source | Objectives | Engine | Decision Making | Code |
 |---|---|---|---|---|---|
 | `mr_mocd` | Santos, *in prep.* (2026) | Constant Potts split: cut fraction + pair coverage | memetic MOPSO over a resolution ladder | min code length | this library |
