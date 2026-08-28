@@ -1,4 +1,4 @@
-//! Zachary's karate club.
+//! Zachary's karate club, the in-crate test fixture.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -87,6 +87,11 @@ pub const KARATE_EDGES: [(NodeId, NodeId); 78] = [
 ];
 
 /// The two-faction ground truth (0 = Mr. Hi, 1 = Officer), indexed by node id.
+///
+/// This is NetworkX's split, which puts node 8 with Mr. Hi. Much of the
+/// literature puts node 8 with the Officers instead; the two conventions score
+/// NMI 0.8372 against each other, so a "wrong" karate number is often only
+/// this disagreement.
 pub const KARATE_CLUB: [CommunityId; 34] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
     1, 1,

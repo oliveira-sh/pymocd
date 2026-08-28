@@ -15,7 +15,11 @@ pub use contingency::{Contingency, contingency, entropy};
 pub use mi::mutual_info;
 
 /// (NMI, AMI, ARI, F1) between two label vectors of equal length.
-/// NMI/AMI use arithmetic mean normalisation.
+///
+/// NMI and AMI both normalise by the ARITHMETIC mean of the two marginal
+/// entropies, matching scikit-learn's default. Geometric normalisation would
+/// return different numbers, and AMI is not NMI — every table in this repo
+/// depends on which of the four columns it reads.
 pub fn gt_metrics(a: &[i64], b: &[i64]) -> (f64, f64, f64, f64) {
     assert_eq!(a.len(), b.len());
     if a.is_empty() {

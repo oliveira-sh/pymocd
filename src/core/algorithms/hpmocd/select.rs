@@ -1,0 +1,24 @@
+//! Front selection: the rank-1 member of highest modularity.
+//! This Source Code Form is subject to the terms of The GNU General Public License v3.0
+//! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+
+use std::cmp::Ordering;
+
+use super::nsga2::Individual;
+
+#[inline(always)]
+fn q(ind: &Individual) -> f64 {
+    let n: f64 = ind.objectives.len() as f64;
+    n - ind.objectives.iter().sum::<f64>()
+}
+
+/// `n − Σ objectives` is an order-preserving shift of `Q = 1 − intra − inter`,
+/// so this is max-`Q` only under the built-in encoding.
+#[inline(always)]
+pub fn max_q_selection(population: &[Individual]) -> &Individual {
+    population
+        .iter()
+        .max_by(|a, b| q(a).partial_cmp(&q(b)).unwrap_or(Ordering::Equal))
+        .expect("Empty population")
+}

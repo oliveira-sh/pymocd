@@ -1,117 +1,20 @@
-//! NSGA-III-KRM (Shaik, Ravi & Deb, SN Computer Science 2:13, 2021): a
-//! self-contained, single-threaded reimplementation of the paper's method —
-//! locus genome (`locus.rs`), from-scratch NSGA-III loop with paper
-//! customizations (`nsga3.rs`), (KKM, RC, Q) objectives, max-modularity
-//! rank-1 decision rule. Deliberately avoids the shared NSGA-III engine and
-//! Rayon so this baseline's cost tracks the published method.
+//! NSGA-III-KRM (Shaik, Ravi & Deb 2021) module root; see README.md.
+//!
+//! Sequential and self-contained on purpose — no shared engine, no Rayon — so
+//! this baseline's cost tracks the published method.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use crate::core::graph::normalize_community_ids;
-use crate::core::graph::{Graph, Partition};
-use std::cmp::Ordering;
-
+mod api;
 mod defaults;
-mod individual;
 mod locus;
 mod nsga3;
 mod objectives;
 mod operators;
 
-pub use defaults::*;
-
-use individual::fast_non_dominated_sort;
-use locus::Locus;
-
-/// Run NSGA-III-KRM and return the **max-modularity** member of the rank-1
-/// Pareto front (Shaik et al. recommend modularity-only decision-making when
-/// no ground truth is available), normalized (isolated nodes → community `-1`).
-pub fn krm(
-    graph: &Graph,
-    pop_size: usize,
-    num_gens: usize,
-    cross_rate: f64,
-    mut_rate: f64,
-    divisions: usize,
-) -> Partition {
-    let locus = Locus::build(graph);
-    let mut pop = nsga3::run(
-        graph, &locus, pop_size, num_gens, cross_rate, mut_rate, divisions,
-    );
-
-    fast_non_dominated_sort(&mut pop);
-    let best = pop
-        .iter()
-        .filter(|ind| ind.rank == 1)
-        // objectives[2] holds −Q from the in-module labels evaluator.
-        .map(|ind| (-ind.objectives[2], ind))
-        .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal))
-        .expect("empty Pareto front")
-        .1;
-
-    // Labels -> shared Partition only here, at the module boundary.
-    let partition: Partition = locus
-        .nodes
-        .iter()
-        .enumerate()
-        .map(|(p, &node)| (node, best.labels[p]))
-        .collect();
-    normalize_community_ids(graph, partition)
-}
-
-/// The rank-1 Pareto front `krm` selects from, as normalized partitions —
-/// the paper's Table 1/2 protocol (best-NMI / best-Q over the front) needs it.
-pub fn krm_fronts(
-    graph: &Graph,
-    pop_size: usize,
-    num_gens: usize,
-    cross_rate: f64,
-    mut_rate: f64,
-    divisions: usize,
-) -> Vec<Partition> {
-    let locus = Locus::build(graph);
-    let mut pop = nsga3::run(
-        graph, &locus, pop_size, num_gens, cross_rate, mut_rate, divisions,
-    );
-
-    fast_non_dominated_sort(&mut pop);
-    pop.iter()
-        .filter(|ind| ind.rank == 1)
-        .map(|ind| {
-            let partition: Partition = locus
-                .nodes
-                .iter()
-                .enumerate()
-                .map(|(p, &node)| (node, ind.labels[p]))
-                .collect();
-            normalize_community_ids(graph, partition)
-        })
-        .collect()
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
+mod fixtures;
 
-    // Triangle {0,1,2}, triangle {3,4,5}, single bridge edge (2,3).
-    fn two_triangles() -> Graph {
-        let mut g = Graph::new();
-        for (a, b) in [(0, 1), (1, 2), (0, 2), (3, 4), (4, 5), (3, 5), (2, 3)] {
-            g.add_edge(a, b);
-        }
-        g.finalize();
-        g
-    }
-
-    #[test]
-    fn finds_two_community_split() {
-        let g = two_triangles();
-        let res = krm(&g, 100, 100, 0.8, 0.2, 12);
-        assert_eq!(res[&0], res[&1]);
-        assert_eq!(res[&1], res[&2]);
-        assert_eq!(res[&3], res[&4]);
-        assert_eq!(res[&4], res[&5]);
-        assert_ne!(res[&0], res[&3]);
-    }
-}
+pub use api::{krm, krm_fronts};
+pub use defaults::*;

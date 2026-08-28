@@ -33,18 +33,18 @@ def plot_communities(G, labels, title="Community assignment"):
 !!! note "Isolated nodes"
     pymocd assigns isolated nodes the community id `-1`. They show up as their own color group; filter them out of `labels` beforehand if unwanted.
 
-## Example: karate club with `smocc`
+## Example: karate club with `mr_mocd`
 
 ```python
 import networkx as nx
 import pymocd
 
 G = nx.karate_club_graph()
-labels = pymocd.smocc(G)
+labels = pymocd.mr_mocd(G)
 plot_communities(G, labels)
 ```
 
-All module-level detectors (`smocc`, `hpmocd`, `mmcomo`, ...) return the same `dict[node, community]` shape.
+Every module-level detector — `mr_mocd`, `hpmocd`, `cdrme`, `mmcomo`, `ccm`, `krm`, `gdpso`, `mocd_q`, `mocd_d` and `moga_net` — returns the same `dict[node, community]` shape, so the helper works with any of them.
 
 ## Plotting the Pareto front
 

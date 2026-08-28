@@ -1,24 +1,27 @@
-//! Pizzuti's MOGA-Net bi-objective (ICTAI 2009 / IEEE TEC 16(3):418–430, 2012)
-//! plus Newman modularity, all evaluated on decoded label arrays.
+//! CCM's three objectives on decoded label arrays: MOGA-Net's (Community Score,
+//! Community Fitness) plus Newman modularity.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-/// MOGA-Net bi-objective on decoded labels (Pizzuti 2012, Sec. V-A).
-/// `labels[p]` is the community of position `p` (union-find root positions in
-/// `0..n`, so accumulators index them directly). Returns
-/// `(community_score, community_fitness)` = `(CS, CF)`, **both maximized**
-/// (Pizzuti maximizes CS and the community fitness — the latter peaks when no
-/// edges leave a community, i.e. maximizing it minimizes inter-module links). For
-/// node `i` in its community `S`, with `k_in` = neighbours of `i` inside `S`:
+/// The paper maximizes all three; `Individual::dominates` assumes
+/// minimization, so what the engine gets is `(-CS, -CF, -Q)`.
+pub fn evaluate(neighbor_pos: &[Vec<usize>], labels: &[i32], r: f64, alpha: f64) -> Vec<f64> {
+    let (cs, cf) = community_objectives(neighbor_pos, labels, r, alpha);
+    let q = modularity_labels(neighbor_pos, labels);
+    vec![-cs, -cf, -q]
+}
+
+/// MOGA-Net's bi-objective (Pizzuti, IEEE TEC 16(3):418–430, 2012, Sec. V-A),
+/// **both maximized**. For node `i` of community `S`, `k_in` = its neighbours
+/// inside `S`:
 /// ```text
-///   mu_i   = k_in / |S|                         (|S| = node count, ∈ [0,1))
-///   M(S)   = (Σ_{i∈S} mu_i^r) / |S|             (mean of mu_i^r — NO outer root)
-///   v_S    = Σ_{i∈S} k_in = 2·(internal edges of S)
-///   score(S) = M(S) · v_S ; CS = Σ_S score(S)
-///   CF     = Σ_S Σ_{i∈S} k_in / deg(i)^α        (deg(i)=0 → term 0)
+///   mu_i     = k_in / |S|                       (|S| = node count)
+///   M(S)     = (Σ_{i∈S} mu_i^r) / |S|           (mean of mu_i^r — NO outer root)
+///   v_S      = Σ_{i∈S} k_in = 2·(internal edges of S)
+///   score(S) = M(S) · v_S ;  CS = Σ_S score(S)
+///   CF       = Σ_S Σ_{i∈S} k_in / deg(i)^α      (deg(i)=0 → term 0)
 /// ```
-/// An NSGA-II that minimizes feeds `(−CS, −CF)`.
 pub fn community_objectives(
     neighbor_pos: &[Vec<usize>],
     labels: &[i32],
@@ -31,9 +34,9 @@ pub fn community_objectives(
         size[c as usize] += 1.0;
     }
 
-    let mut m_num = vec![0.0f64; n]; // per community: Σ mu_i^r
-    let mut v_s = vec![0.0f64; n]; // per community: Σ k_in = 2·internal edges
-    let mut p_s = vec![0.0f64; n]; // per community: Σ k_in / deg^α
+    let mut mu_pow_sum = vec![0.0f64; n];
+    let mut internal_degree_sum = vec![0.0f64; n];
+    let mut fitness_sum = vec![0.0f64; n];
     for p in 0..n {
         let c = labels[p] as usize;
         let k_in = neighbor_pos[p]
@@ -41,12 +44,12 @@ pub fn community_objectives(
             .filter(|&&q| labels[q] == labels[p])
             .count();
         let k = k_in as f64;
-        v_s[c] += k;
+        internal_degree_sum[c] += k;
         let mu = k / size[c];
-        m_num[c] += mu.powf(r);
+        mu_pow_sum[c] += mu.powf(r);
         let deg = neighbor_pos[p].len() as f64;
         if deg > 0.0 {
-            p_s[c] += k / deg.powf(alpha);
+            fitness_sum[c] += k / deg.powf(alpha);
         }
     }
 
@@ -54,15 +57,16 @@ pub fn community_objectives(
     let mut cf = 0.0;
     for c in 0..n {
         if size[c] > 0.0 {
-            cs += (m_num[c] / size[c]) * v_s[c];
-            cf += p_s[c];
+            cs += (mu_pow_sum[c] / size[c]) * internal_degree_sum[c];
+            cf += fitness_sum[c];
         }
     }
     (cs, cf)
 }
 
-/// Newman modularity `Q = Σ_c l_c/m − (d_c/2m)²` on decoded labels (internal
-/// edges `l_c` counted once). Local so the hot loop never builds a `Partition`.
+/// Newman modularity `Q = Σ_c l_c/m − (d_c/2m)²` (internal edges `l_c` counted
+/// once, `d_c` = Σ degrees), kept local to `core::metrics::modularity` so the
+/// hot loop never builds a `Partition`.
 pub fn modularity_labels(neighbor_pos: &[Vec<usize>], labels: &[i32]) -> f64 {
     let n = labels.len();
     let two_m: usize = neighbor_pos.iter().map(std::vec::Vec::len).sum();
@@ -71,8 +75,8 @@ pub fn modularity_labels(neighbor_pos: &[Vec<usize>], labels: &[i32]) -> f64 {
         return 0.0;
     }
 
-    let mut l_c = vec![0.0f64; n]; // per community: internal edges, counted once
-    let mut d_c = vec![0.0f64; n]; // per community: Σ degrees
+    let mut l_c = vec![0.0f64; n];
+    let mut d_c = vec![0.0f64; n];
     for p in 0..n {
         let c = labels[p] as usize;
         d_c[c] += neighbor_pos[p].len() as f64;
@@ -95,18 +99,10 @@ pub fn modularity_labels(neighbor_pos: &[Vec<usize>], labels: &[i32]) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::algorithms::ccm::fixtures::two_triangles;
     use crate::core::algorithms::ccm::locus;
-    use crate::core::graph::{Graph, Partition};
+    use crate::core::graph::Partition;
     use crate::core::metrics::modularity::modularity;
-
-    fn two_triangles() -> Graph {
-        let mut g = Graph::new();
-        for (a, b) in [(0, 1), (1, 2), (0, 2), (3, 4), (4, 5), (3, 5), (2, 3)] {
-            g.add_edge(a, b);
-        }
-        g.finalize();
-        g
-    }
 
     #[test]
     fn modularity_labels_matches_shared_metric() {

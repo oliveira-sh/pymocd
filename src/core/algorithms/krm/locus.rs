@@ -1,21 +1,19 @@
-//! Locus-based genome (Pizzuti GA-Net style, used by Shaik, Ravi & Deb's
-//! NSGA-III-KRM): a `Vec<usize>` of node *positions* where cell `p` MUST hold
-//! `p` itself or the position of one of `nodes[p]`'s neighbours; decoding
-//! unions positions into communities. Many distinct genomes can encode one
-//! partition -- see `canonical_labels`.
+//! The locus genome and the per-graph bookkeeping it is decoded against.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use crate::core::graph::{Graph, NodeId};
-use rand::{Rng, RngExt}; // rand 0.10: random_range lives on RngExt
+use rand::{Rng, RngExt};
 use std::collections::HashMap;
 
+use crate::core::graph::{Graph, NodeId};
+
+/// Cell `p` holds `p` itself or the position of one of `nodes[p]`'s neighbours.
+/// Every operator preserves that, so no repair pass exists anywhere.
 pub type Genome = Vec<usize>;
 
-/// Precomputed locus bookkeeping for one graph: stable node ordering
-/// (`position -> NodeId`, the module's only boundary map) and per-position
-/// candidate lists (`{position itself} ∪ neighbour positions`).
+/// `nodes` maps a position to a `NodeId`; `candidates[p]` is `p` itself
+/// followed by the positions of `nodes[p]`'s neighbours, in that order.
 pub struct Locus {
     pub nodes: Vec<NodeId>,
     pub candidates: Vec<Vec<usize>>,
@@ -24,7 +22,6 @@ pub struct Locus {
 impl Locus {
     pub fn build(graph: &Graph) -> Self {
         let nodes = graph.nodes_vec().clone();
-        // NodeId -> position map, needed only while building (cold path).
         let index_of: HashMap<NodeId, usize> =
             nodes.iter().enumerate().map(|(p, &v)| (v, p)).collect();
         let candidates: Vec<Vec<usize>> = nodes
@@ -45,7 +42,6 @@ impl Locus {
         self.nodes.len()
     }
 
-    /// Random genome: each cell independently uniform over its candidates.
     pub fn random_genome(&self, rng: &mut impl Rng) -> Genome {
         self.candidates
             .iter()
@@ -53,9 +49,9 @@ impl Locus {
             .collect()
     }
 
-    /// Decode genome -> per-position community labels via union-find over
-    /// positions: for each position `p`, union `p` with `genome[p]`. Labels
-    /// are union-find roots: arbitrary ids `< n`, not compacted.
+    /// Per-position labels, by union-find of `p` with `genome[p]`. A label is a
+    /// component root: an arbitrary id `< n`, not compacted, which is what lets
+    /// callers index flat `n`-sized arrays by it.
     pub fn decode(&self, genome: &Genome) -> Vec<i32> {
         let n = self.n();
         let mut parent: Vec<usize> = (0..n).collect();
@@ -81,10 +77,10 @@ impl Locus {
         (0..n).map(|p| find(&mut parent, p) as i32).collect()
     }
 
-    /// Permutation-invariant label vector (communities relabeled by first-seen
-    /// position order); used by the duplicate-permutation filter.
+    /// Communities relabelled by first-seen position order, so permutations of
+    /// one partition compare equal.
     pub fn canonical_labels(&self, labels: &[i32]) -> Vec<i32> {
-        let mut remap = vec![-1i32; labels.len()]; // raw labels are roots < n
+        let mut remap = vec![-1i32; labels.len()];
         let mut next = 0i32;
         labels
             .iter()
@@ -99,7 +95,6 @@ impl Locus {
             .collect()
     }
 
-    /// True iff `labels` puts every node into a single community.
     pub fn is_single_community(&self, labels: &[i32]) -> bool {
         labels.windows(2).all(|w| w[0] == w[1])
     }

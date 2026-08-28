@@ -1,17 +1,17 @@
+//! Shi's decomposed-modularity objectives and their value type.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
-//! Shi's decomposed-modularity objectives and their value type.
 
-use super::locus::NodeIndex;
 use crate::core::graph::Graph;
 
-/// Shi's decomposed-modularity objectives (Shi et al. 2012, Eqs. 3.5/3.6),
-/// both **minimized**:
-///   `intra = 1 − Σ_c l_c/m`   (Eq. 3.5; `l_c` = internal edges counted once)
-///   `inter = Σ_c (d_c/2m)^2`   (Eq. 3.6; `d_c` = Σ deg over c, each internal edge ×2)
-/// so that modularity `Q = 1 − intra − inter`. `labels` are compacted dense
-/// community ids and `degrees` node degrees, both indexed by node position.
+use super::locus::NodeIndex;
+
+/// Shi et al. 2012, Eqs. 3.5/3.6, both **minimized**:
+///   `intra = 1 − Σ_c l_c/m`  (`l_c` = edges internal to `c`, counted once)
+///   `inter = Σ_c (d_c/2m)^2` (`d_c` = Σ deg over `c`, internal edges ×2)
+/// so that modularity `Q = 1 − intra − inter` (Eq. 3.7). `labels` and
+/// `degrees` are both indexed by node position.
 pub fn calculate_objectives(
     graph: &Graph,
     idx: &NodeIndex,
@@ -30,8 +30,8 @@ pub fn calculate_objectives(
     for pos in 0..labels.len() {
         let comm = labels[pos] as usize;
         community_degree[comm] += degrees[pos] as f64;
-        // `neighbor_candidates` = real neighbours in dense positions; the
-        // isolated-node self-allele fails the pos < neighbor guard.
+        // The guard counts each internal edge once, and drops the self-allele
+        // `neighbor_candidates` carries for an isolated node.
         for &neighbor in &idx.neighbor_candidates[pos] {
             if pos < neighbor && labels[neighbor] == labels[pos] {
                 community_edges[comm] += 1.0;
