@@ -6,11 +6,13 @@
 
 use super::Contingency;
 
+/// Pairwise F1 of two labelings. This is a pair-counting score, NOT the
+/// community-matching F1 some papers report under the same name.
 pub fn f1(ct: &Contingency) -> f64 {
-    let c2 = |x: f64| x * (x - 1.0) / 2.0;
-    let tp: f64 = ct.cells.values().map(|&v| c2(v)).sum();
-    let pairs_a: f64 = ct.rows.values().map(|&v| c2(v)).sum();
-    let pairs_b: f64 = ct.cols.values().map(|&v| c2(v)).sum();
+    let pairs = |x: f64| x * (x - 1.0) / 2.0;
+    let tp: f64 = ct.cells.values().map(|&v| pairs(v)).sum();
+    let pairs_a: f64 = ct.rows.values().map(|&v| pairs(v)).sum();
+    let pairs_b: f64 = ct.cols.values().map(|&v| pairs(v)).sum();
     if pairs_a + pairs_b == 0.0 {
         return 1.0; // both all-singletons: trivially identical
     }

@@ -3,6 +3,11 @@
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
+/// Normalised mutual information, `mi / mean(hu, hv)`.
+///
+/// The ARITHMETIC mean is deliberate (scikit-learn's default); the geometric
+/// mean is the other common convention and returns different numbers. Both
+/// entropies zero means both labelings are constant, hence perfect agreement.
 pub fn nmi(mi: f64, hu: f64, hv: f64) -> f64 {
     let mean_h = 0.5 * (hu + hv);
     if mean_h > 0.0 { mi / mean_h } else { 1.0 }

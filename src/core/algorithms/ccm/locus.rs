@@ -1,7 +1,5 @@
-//! Locus-based (Pizzuti GA-Net style) genome for NSGA-III-CCM: a `Vec<usize>`
-//! of node *positions* in the stable node ordering. Cell `p` always holds `p`
-//! itself or the position of one of `p`'s neighbours, so every genome the
-//! operators produce is valid by construction — no repair step needed.
+//! Locus-based (Pizzuti GA-Net style) genome for NSGA-III-CCM, and the label
+//! array it decodes to.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
@@ -9,10 +7,10 @@
 use crate::core::graph::{Graph, NodeId};
 use rand::{Rng, RngExt};
 
+/// Cell `p` holds `p` itself or the position of one of `p`'s neighbours, so
+/// every genome the operators produce is valid by construction: no repair step.
 pub type Genome = Vec<usize>;
 
-/// Per-position neighbour candidates, built ONCE per run at the module
-/// boundary: `neighbor_pos[p]` lists the positions of `nodes[p]`'s neighbours.
 pub fn neighbor_positions(graph: &Graph, nodes: &[NodeId]) -> Vec<Vec<usize>> {
     let index_of: std::collections::HashMap<NodeId, usize> = nodes
         .iter()
@@ -25,8 +23,8 @@ pub fn neighbor_positions(graph: &Graph, nodes: &[NodeId]) -> Vec<Vec<usize>> {
         .collect()
 }
 
-/// Uniformly pick a value for position `p`'s locus cell from
-/// `{p} ∪ neighbour positions of p`. Degree-0 nodes have no choice but themselves.
+/// Uniform over `{p} ∪ neighbours(p)`: the extra index in the `0..=len` draw is
+/// the self slot.
 #[inline]
 fn pick_cell(neighbor_pos: &[Vec<usize>], p: usize, rng: &mut impl Rng) -> usize {
     let neighbors = &neighbor_pos[p];
@@ -42,17 +40,15 @@ fn pick_cell(neighbor_pos: &[Vec<usize>], p: usize, rng: &mut impl Rng) -> usize
     }
 }
 
-/// Random genome: every cell independently uniform over `{p} ∪ neighbours(p)`.
 pub fn random_genome(neighbor_pos: &[Vec<usize>], rng: &mut impl Rng) -> Genome {
     (0..neighbor_pos.len())
         .map(|p| pick_cell(neighbor_pos, p, rng))
         .collect()
 }
 
-/// Decode a locus genome into `Vec<i32>` labels indexed by position, by
-/// union-find over positions; each connected component is one community,
-/// labelled by its union-find root position. Isolated nodes decode to
-/// singletons (`normalize_community_ids` forces them to `-1` later).
+/// Union-find over positions: one community per connected component, labelled
+/// by its root *position*, so every label is an index in `0..n` and the
+/// objectives can accumulate into flat `n`-sized arrays.
 pub fn decode(genome: &Genome) -> Vec<i32> {
     let n = genome.len();
     let mut uf = UnionFind::new(n);
@@ -62,8 +58,22 @@ pub fn decode(genome: &Genome) -> Vec<i32> {
     (0..n).map(|p| uf.find(p) as i32).collect()
 }
 
-/// Uniform locus-respecting crossover: each gene taken from parent `a` or `b`
-/// independently with 50/50 odds.
+/// Relabel by first-seen order so permutation-equivalent partitions compare equal.
+pub fn canonical_labels(labels: &[i32]) -> Vec<i32> {
+    let mut next_id = 0i32;
+    let mut remap = vec![-1i32; labels.len()]; // labels are root positions in 0..n
+    labels
+        .iter()
+        .map(|&c| {
+            if remap[c as usize] == -1 {
+                remap[c as usize] = next_id;
+                next_id += 1;
+            }
+            remap[c as usize]
+        })
+        .collect()
+}
+
 pub fn uniform_crossover(a: &Genome, b: &Genome, rng: &mut impl Rng) -> Genome {
     a.iter()
         .zip(b.iter())
@@ -71,8 +81,6 @@ pub fn uniform_crossover(a: &Genome, b: &Genome, rng: &mut impl Rng) -> Genome {
         .collect()
 }
 
-/// Adjacency-constrained mutation: each gene independently resampled (with
-/// probability `mut_rate`) from `{p} ∪ neighbours(p)`.
 pub fn mutate(genome: &mut Genome, neighbor_pos: &[Vec<usize>], mut_rate: f64, rng: &mut impl Rng) {
     for (p, gene) in genome.iter_mut().enumerate() {
         if rng.random_bool(mut_rate) {
@@ -120,19 +128,11 @@ impl UnionFind {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn two_triangles() -> Graph {
-        let mut g = Graph::new();
-        for (a, b) in [(0, 1), (1, 2), (0, 2), (3, 4), (4, 5), (3, 5), (2, 3)] {
-            g.add_edge(a, b);
-        }
-        g.finalize();
-        g
-    }
+    use crate::core::algorithms::ccm::fixtures::two_triangles;
 
     #[test]
     fn decode_groups_by_component() {
-        // Each cell points at the next position within its own triangle.
+        // each cell points at the next position within its own triangle
         let genome: Genome = vec![1, 2, 0, 4, 5, 3];
         let labels = decode(&genome);
         assert_eq!(labels[0], labels[1]);
@@ -154,5 +154,10 @@ mod tests {
                 assert!(v == p || neighbor_pos[p].contains(&v));
             }
         }
+    }
+
+    #[test]
+    fn canonical_labels_first_seen_order() {
+        assert_eq!(canonical_labels(&[3, 3, 0, 0, 3]), vec![0, 0, 1, 1, 0]);
     }
 }

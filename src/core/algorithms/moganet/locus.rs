@@ -1,22 +1,18 @@
-//! Locus-based adjacency genome (Park & Song 1989, as used by Pizzuti's
-//! GA-Net / MOGA-Net): gene `i` holding value `j` is a link between nodes
-//! `i` and `j`; decoding unions every gene-edge and the connected components
-//! are the communities (no fixed community count). Local copy so the engine
-//! is fully self-contained.
+//! Locus-based adjacency genome (Park & Song 1998) and its decoding.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use crate::core::graph::{Graph, NodeId};
-use rand::{Rng, RngExt}; // rand 0.10: random_range lives on RngExt
+use rand::{Rng, RngExt};
 use std::collections::HashMap;
 
-/// Position-valued alleles: gene `p` holds a *position* in `0..n-1`.
+use crate::core::graph::{Graph, NodeId};
+
+/// Gene `p` holds a *position* in `0..n-1`: "link position `p` to that position".
 pub type Genome = Vec<usize>;
 
-/// Precomputed locus bookkeeping: stable node ordering (position -> `NodeId`,
-/// used only at the module boundary) and per-position neighbour-position
-/// lists (allele domain + adjacency for evaluation).
+/// Position -> `NodeId` (used only at the module boundary) plus per-position
+/// neighbour lists, which are both the allele domain and the adjacency.
 pub struct Locus {
     pub nodes: Vec<NodeId>,
     pub neighbors: Vec<Vec<usize>>,
@@ -25,12 +21,11 @@ pub struct Locus {
 impl Locus {
     pub fn build(graph: &Graph) -> Self {
         let nodes = graph.nodes_vec().clone();
-        // NodeId -> position boundary map: built once per run (cold path).
-        let index_of: HashMap<NodeId, usize> =
+        let position_of: HashMap<NodeId, usize> =
             nodes.iter().enumerate().map(|(p, &v)| (v, p)).collect();
         let neighbors: Vec<Vec<usize>> = nodes
             .iter()
-            .map(|v| graph.neighbors(v).iter().map(|u| index_of[u]).collect())
+            .map(|v| graph.neighbors(v).iter().map(|u| position_of[u]).collect())
             .collect();
         Self { nodes, neighbors }
     }
@@ -40,9 +35,8 @@ impl Locus {
         self.nodes.len()
     }
 
-    /// Safe allele for position `p` (Pizzuti 2009, Sec. 4): a uniform pick
-    /// from neighbours(p); the self-allele exists only for isolated nodes
-    /// (the paper's repair maps invalid genes to "one of the neighbors of i").
+    /// Safe allele for position `p` (Pizzuti 2009, Sec. 4): uniform over
+    /// neighbours(p). The self-allele exists only for isolated nodes.
     #[inline]
     pub fn random_allele(&self, p: usize, rng: &mut impl Rng) -> usize {
         let nb = &self.neighbors[p];
@@ -53,16 +47,15 @@ impl Locus {
         }
     }
 
-    /// "Biased"/safe initialization (Pizzuti 2009, Sec. 4): every gene is a
-    /// safe allele by construction, so no repair pass is needed anywhere in
-    /// the pipeline.
+    /// Safe initialization: every gene is a safe allele by construction, so no
+    /// repair pass is needed anywhere in the pipeline.
     pub fn random_genome(&self, rng: &mut impl Rng) -> Genome {
         (0..self.n()).map(|p| self.random_allele(p, rng)).collect()
     }
 
-    /// Decode genome -> compact community labels indexed by position, via
-    /// union-find over positions (labels assigned in ascending-position
-    /// first-visit order, so equal partitions get identical label arrays).
+    /// Union-find decode to compact labels indexed by position. Labels are
+    /// assigned in ascending-position first-visit order, so equal partitions
+    /// always get identical label arrays.
     pub fn decode(&self, genome: &Genome) -> Vec<i32> {
         let n = self.n();
         let mut parent: Vec<usize> = (0..n).collect();

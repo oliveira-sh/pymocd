@@ -10,8 +10,9 @@ fn ln_fact(x: f64) -> f64 {
     gammln(x + 1.0)
 }
 
-/// Exact expected mutual information under the permutation model,
-/// log-space hypergeometric weights.
+/// Exact expected mutual information under the permutation model (Vinh et al.
+/// 2010, eq. 24a). The hypergeometric cell weight is accumulated in log space
+/// via `ln_fact`; computing it directly overflows for moderate `n`.
 fn expected_mi(ct: &Contingency) -> f64 {
     let n = ct.n;
     let ln_n_fact = ln_fact(n);
@@ -36,6 +37,9 @@ fn expected_mi(ct: &Contingency) -> f64 {
     emi
 }
 
+/// Adjusted mutual information, normalised by the ARITHMETIC mean of the two
+/// marginal entropies (scikit-learn's default). Two labelings that agree only
+/// by chance score 0; agreement worse than chance is negative.
 pub fn ami(ct: &Contingency, mi: f64, hu: f64, hv: f64) -> f64 {
     if hu == 0.0 && hv == 0.0 {
         return 1.0;
@@ -71,7 +75,6 @@ mod tests {
 
     #[test]
     fn worse_than_chance_is_negative() {
-        // chance-adjusted: crossing labelings must score below zero
         assert!(
             score(
                 &[0, 1, 2, 0, 1, 2, 0, 1, 2, 0],

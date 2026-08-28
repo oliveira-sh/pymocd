@@ -1,23 +1,19 @@
-//! Locus-based adjacency representation (Park & Song; Shi et al. 2012
-//! §3.1.3, Fig. 1). Gene `g_i` holds one of node `i`'s neighbours (or node
-//! `i` itself, which makes degree-0 nodes safe by construction). Decoding
-//! identifies connected components of the implied graph `i -> g_i` via
-//! union-find — same components as the paper's backtracking scheme.
+//! The locus-based adjacency genome (Shi et al. 2012, §3.1.3): its node
+//! index, random initialisation, and the union-find decode.
 //! This Source Code Form is subject to the terms of The GNU General Public License v3.0
 //! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use crate::core::graph::{Graph, NodeId};
 use rand::RngExt;
 use std::collections::HashMap;
 
-/// Dense `[0, n)` index for a graph's NodeId set (NodeIds are not guaranteed
-/// contiguous), plus per-index legal alleles (the node's neighbours, or
-/// `[self]` for isolated nodes). Built once per run; the NodeId map is a
-/// cold boundary structure, hence std `HashMap`.
+use crate::core::graph::{Graph, NodeId};
+
+/// Dense `[0, n)` positions for a graph's (not necessarily contiguous) NodeId
+/// set, plus each position's legal alleles: its neighbours, or itself when it
+/// has none.
 pub struct NodeIndex {
     pub index_to_node: Vec<NodeId>,
-    // Only used during `build` and by tests; allowed dead in non-test builds.
     #[allow(dead_code)]
     pub node_to_index: HashMap<NodeId, usize>,
     pub neighbor_candidates: Vec<Vec<usize>>,
@@ -38,7 +34,6 @@ impl NodeIndex {
             .map(|(i, &node)| {
                 let neighbors = graph.neighbors(&node);
                 if neighbors.is_empty() {
-                    // Degree-0 node: self-allele.
                     vec![i]
                 } else {
                     neighbors.iter().map(|n| node_to_index[n]).collect()
@@ -59,7 +54,7 @@ impl NodeIndex {
     }
 }
 
-/// gene i (dense index) -> allele (dense index of a neighbour, or self).
+/// Gene `i` holds the allele node `i` points at, both as dense positions.
 pub type Genome = Vec<usize>;
 
 pub fn random_genome(idx: &NodeIndex, rng: &mut impl rand::Rng) -> Genome {
@@ -79,10 +74,9 @@ fn find(parent: &mut [usize], mut x: usize) -> usize {
     x
 }
 
-/// Decode a locus genome into dense community labels (`labels[i]` = compacted
-/// community id `0..k` of node position `i`, first-seen order over ascending
-/// positions): communities are the connected components of the implied graph
-/// `i -> genome[i]`.
+/// Communities are the connected components of the implied graph
+/// `i -> genome[i]`; ids are compacted to `0..k` in first-seen order over
+/// ascending positions.
 pub fn decode(genome: &Genome) -> Vec<i32> {
     let n = genome.len();
     let mut parent: Vec<usize> = (0..n).collect();
@@ -109,28 +103,6 @@ pub fn decode(genome: &Genome) -> Vec<i32> {
     labels
 }
 
-/// Shi's "uniform two-point crossover" — per the paper's own functional
-/// description this is plain per-gene uniform crossover, not classic
-/// two-segment crossover. Always valid: each allele is inherited verbatim
-/// from a parent at the same position.
-pub fn uniform_crossover(p1: &Genome, p2: &Genome, rng: &mut impl rand::Rng) -> Genome {
-    p1.iter()
-        .zip(p2.iter())
-        .map(|(&a, &b)| if rng.random_bool(0.5) { a } else { b })
-        .collect()
-}
-
-/// Per-gene adjacency mutation with independent probability `p_m`; the
-/// resample may repeat the current allele (uniform draw over the same
-/// candidate set used at init).
-pub fn mutate(genome: &mut Genome, idx: &NodeIndex, p_m: f64, rng: &mut impl rand::Rng) {
-    for (gene, cands) in genome.iter_mut().zip(&idx.neighbor_candidates) {
-        if rng.random_bool(p_m) {
-            *gene = cands[rng.random_range(0..cands.len())];
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -143,7 +115,6 @@ mod tests {
             g.add_edge(a, b);
         }
         g.finalize();
-        // Genome forming exactly two triangle components (no use of the bridge).
         let genome: Genome = vec![1, 2, 0, 4, 5, 3];
         let labels = decode(&genome);
         assert_eq!(labels[0], labels[1]);
@@ -151,7 +122,6 @@ mod tests {
         assert_eq!(labels[3], labels[4]);
         assert_eq!(labels[4], labels[5]);
         assert_ne!(labels[0], labels[3]);
-        // Compacted labels: ascending first-seen order starts at 0.
         assert_eq!(labels[0], 0);
         assert_eq!(labels[3], 1);
     }
@@ -160,7 +130,7 @@ mod tests {
     fn isolated_node_gets_self_allele() {
         let mut g = Graph::new();
         g.add_edge(0, 1);
-        g.nodes.insert(2); // isolated
+        g.nodes.insert(2);
         g.adjacency_list.entry(2).or_default();
         g.finalize();
         let idx = NodeIndex::build(&g);

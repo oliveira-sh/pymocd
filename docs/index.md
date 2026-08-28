@@ -27,8 +27,8 @@ pip install pymocd
     <span>Rayon parallelism on every core</span>
   </div>
   <div>
-    <strong>NSGA-II · NSGA-III · PESA-II</strong>
-    <span>Multi-objective evolutionary engines</span>
+    <strong>Ten algorithms</strong>
+    <span>NSGA-II · NSGA-III · PESA-II · PSO</span>
   </div>
   <div>
     <strong>GPL-3.0-or-later</strong>

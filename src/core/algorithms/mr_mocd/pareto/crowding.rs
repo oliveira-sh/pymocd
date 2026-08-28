@@ -1,0 +1,66 @@
+//! This Source Code Form is subject to the terms of The GNU General Public License v3.0
+//! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
+
+use crate::core::algorithms::mr_mocd::objectives::Obj;
+
+pub fn crowding(objs: &[Obj]) -> Vec<f64> {
+    let n = objs.len();
+    if n <= 2 {
+        return vec![f64::INFINITY; n];
+    }
+    let mut dist = vec![0.0f64; n];
+
+    let mut order: Vec<u32> = (0..n as u32).collect();
+    #[allow(clippy::needless_range_loop)]
+    for obj in 0..2 {
+        order.sort_unstable_by(|&a, &b| {
+            objs[a as usize][obj]
+                .partial_cmp(&objs[b as usize][obj])
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.cmp(&b))
+        });
+        let lo = objs[order[0] as usize][obj];
+        let hi = objs[order[n - 1] as usize][obj];
+        let span = hi - lo;
+        debug_assert!(span > 0.0, "a constant objective in a non-dominated set");
+        dist[order[0] as usize] = f64::INFINITY;
+        dist[order[n - 1] as usize] = f64::INFINITY;
+        for k in 1..n - 1 {
+            let i = order[k] as usize;
+            if dist[i].is_finite() {
+                let prev = objs[order[k - 1] as usize][obj];
+                let next = objs[order[k + 1] as usize][obj];
+                dist[i] += (next - prev) / span;
+            }
+        }
+    }
+    dist
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extremes_are_infinite_and_the_middle_is_not() {
+        let objs = vec![[0.0, 1.0], [0.5, 0.5], [1.0, 0.0]];
+        let d = crowding(&objs);
+        assert!(d[0].is_infinite() && d[2].is_infinite());
+        assert!(d[1].is_finite() && d[1] > 0.0);
+    }
+
+    #[test]
+    fn an_isolated_point_beats_a_crowded_one() {
+        let objs = vec![
+            [0.0, 1.0],
+            [0.10, 0.90],
+            [0.11, 0.89],
+            [0.60, 0.40],
+            [1.0, 0.0],
+        ];
+        let d = crowding(&objs);
+        assert!(d[3] > d[1], "the isolated point scored lower: {d:?}");
+        assert!(d[3] > d[2], "the isolated point scored lower: {d:?}");
+    }
+}

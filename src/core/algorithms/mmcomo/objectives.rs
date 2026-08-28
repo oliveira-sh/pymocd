@@ -1,14 +1,21 @@
-use super::*;
+//! The MMCoMO search objectives and the Newman modularity used for selection.
+//! This Source Code Form is subject to the terms of The GNU General Public License v3.0
+//! Copyright 2025 - Guilherme Santos. If a copy of the MPL was not distributed with this
+//! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-/// Eq.1 — KKM/RC bi-objective (Shi 2012, Gong), both minimized.
-///
-/// ```text
-///   KKM = 2(n − k) − Σ_i L(V_i, V_i) / |V_i|
-///   RC  =            Σ_i L(V_i, V̄_i) / |V_i|
-/// ```
-/// `L(V_i,V_i)` = twice the internal-edge count; cut = Σ deg − L(V_i,V_i).
-pub fn kkm_rc(g: &Graph, labels: &Labels) -> (f64, f64) {
-    // Labels are node-index-valued (< n); compact first-seen over ascending v for deterministic sums.
+use crate::core::algorithms::mmcomo::{Graph, Labels};
+
+/// Per-community `|V_i|`, `L(V_i,V_i)` and degree sum, in first-seen-label order
+/// over ascending node index. That order is what makes both objectives sum
+/// their terms the same way on every run; every entry has at least one member,
+/// so `size` is never zero.
+struct CommunityStats {
+    size: Vec<f64>,
+    l_in: Vec<f64>,
+    deg_sum: Vec<f64>,
+}
+
+fn community_stats(g: &Graph, labels: &Labels) -> CommunityStats {
     let mut compact: Vec<i32> = vec![-1; g.n];
     let mut size: Vec<f64> = Vec::new();
     let mut l_in: Vec<f64> = Vec::new();
@@ -34,15 +41,35 @@ pub fn kkm_rc(g: &Graph, labels: &Labels) -> (f64, f64) {
         l_in[c] += internal;
     }
 
+    CommunityStats {
+        size,
+        l_in,
+        deg_sum,
+    }
+}
+
+/// Eq.1 — KKM/RC bi-objective (Shi 2012, Gong), both minimized.
+///
+/// ```text
+///   KKM = 2(n − k) − Σ_i L(V_i, V_i) / |V_i|
+///   RC  =            Σ_i L(V_i, V̄_i) / |V_i|
+/// ```
+/// `L(V_i,V_i)` = twice the internal-edge count; cut = Σ deg − L(V_i,V_i).
+pub fn kkm_rc(g: &Graph, labels: &Labels) -> (f64, f64) {
+    let stats = community_stats(g, labels);
     let n = g.n as f64;
-    let k = size.len() as f64;
+    let k = stats.size.len() as f64;
 
     let mut kkm_internal = 0.0;
     let mut rc = 0.0;
-    for c in 0..size.len() {
-        let sz = size[c]; // every compacted id has ≥1 member
-        kkm_internal += l_in[c] / sz;
-        rc += (deg_sum[c] - l_in[c]) / sz;
+    for ((&sz, &l_in), &deg_sum) in stats
+        .size
+        .iter()
+        .zip(stats.l_in.iter())
+        .zip(stats.deg_sum.iter())
+    {
+        kkm_internal += l_in / sz;
+        rc += (deg_sum - l_in) / sz;
     }
 
     (2.0 * (n - k) - kkm_internal, rc)
@@ -56,33 +83,12 @@ pub fn modularity(g: &Graph, labels: &Labels) -> f64 {
     }
     let m = m2 / 2.0;
 
-    // Labels are node-index-valued (< n); compact first-seen over ascending v for deterministic sums.
-    let mut compact: Vec<i32> = vec![-1; g.n];
-    let mut l_in: Vec<f64> = Vec::new();
-    let mut deg_sum: Vec<f64> = Vec::new();
-
-    for v in 0..g.n {
-        let lab = labels[v] as usize;
-        if compact[lab] < 0 {
-            compact[lab] = l_in.len() as i32;
-            l_in.push(0.0);
-            deg_sum.push(0.0);
-        }
-        let c = compact[lab] as usize;
-        deg_sum[c] += g.deg[v];
-        let mut internal = 0.0;
-        for &u in &g.adj[v] {
-            if labels[u] == labels[v] {
-                internal += 1.0;
-            }
-        }
-        l_in[c] += internal;
-    }
+    let stats = community_stats(g, labels);
 
     let mut q = 0.0;
-    for c in 0..deg_sum.len() {
-        let lc = l_in[c] / 2.0; // l_in counts each internal edge twice
-        q += lc / m - (deg_sum[c] / m2).powi(2);
+    for (&l_in, &deg_sum) in stats.l_in.iter().zip(stats.deg_sum.iter()) {
+        let lc = l_in / 2.0; // l_in counts each internal edge twice
+        q += lc / m - (deg_sum / m2).powi(2);
     }
     q
 }
@@ -90,20 +96,7 @@ pub fn modularity(g: &Graph, labels: &Labels) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // Triangle {0,1,2}, triangle {3,4,5}, single bridge edge (2,3).
-    fn two_triangles() -> Graph {
-        let edges = [(0, 1), (1, 2), (0, 2), (3, 4), (4, 5), (3, 5), (2, 3)];
-        let n = 6;
-        let mut adj: Vec<Vec<usize>> = vec![Vec::new(); n];
-        for &(a, b) in &edges {
-            adj[a].push(b);
-            adj[b].push(a);
-        }
-        let deg: Vec<f64> = adj.iter().map(|a| a.len() as f64).collect();
-        let m2: f64 = deg.iter().sum();
-        Graph { n, adj, deg, m2 }
-    }
+    use crate::core::algorithms::mmcomo::fixtures::two_triangles;
 
     #[test]
     fn kkm_rc_exact_values_on_split() {

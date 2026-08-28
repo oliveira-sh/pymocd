@@ -5,18 +5,20 @@
 
 use super::Contingency;
 
+/// Adjusted Rand index: the pair-counting agreement, corrected for chance.
+/// Returns 1.0 in the degenerate case where the maximum index equals the
+/// expected one (both labelings all-singletons or all-one-cluster).
 pub fn ari(ct: &Contingency) -> f64 {
-    let c2 = |x: f64| x * (x - 1.0) / 2.0;
-    let z: f64 = ct.cells.values().map(|&v| c2(v)).sum();
-    let rb: f64 = ct.rows.values().map(|&v| c2(v)).sum();
-    let cb: f64 = ct.cols.values().map(|&v| c2(v)).sum();
-    let m = c2(ct.n);
-    let exp = rb * cb / m;
-    let max_idx = 0.5 * (rb + cb);
-    if (max_idx - exp).abs() < 1e-15 {
+    let pairs = |x: f64| x * (x - 1.0) / 2.0;
+    let index: f64 = ct.cells.values().map(|&v| pairs(v)).sum();
+    let row_pairs: f64 = ct.rows.values().map(|&v| pairs(v)).sum();
+    let col_pairs: f64 = ct.cols.values().map(|&v| pairs(v)).sum();
+    let expected = row_pairs * col_pairs / pairs(ct.n);
+    let max_index = 0.5 * (row_pairs + col_pairs);
+    if (max_index - expected).abs() < 1e-15 {
         1.0
     } else {
-        (z - exp) / (max_idx - exp)
+        (index - expected) / (max_index - expected)
     }
 }
 
@@ -31,7 +33,8 @@ mod tests {
 
     #[test]
     fn hand_computed_value() {
-        // z=2, rb=6, cb=3, exp=6*3/15=1.2, max=4.5 -> (2-1.2)/(4.5-1.2) = 8/33
+        // index=2, row_pairs=6, col_pairs=3, expected=6*3/15=1.2, max=4.5
+        // -> (2 - 1.2) / (4.5 - 1.2) = 8/33
         assert!((score(&[0, 0, 0, 1, 1, 1], &[0, 0, 1, 1, 2, 2]) - 8.0 / 33.0).abs() < 1e-12);
     }
 

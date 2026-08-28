@@ -5,13 +5,21 @@
 
 use rustc_hash::FxHashMap;
 
+/// Sparse joint count table of two labelings. Counts are stored as `f64`
+/// because every consumer divides by `n` or takes a log; zero cells are absent.
 pub struct Contingency {
+    /// `(label_a, label_b)` -> number of nodes with that pair.
     pub cells: FxHashMap<(i64, i64), f64>,
+    /// Marginal counts of the first labeling.
     pub rows: FxHashMap<i64, f64>,
+    /// Marginal counts of the second labeling.
     pub cols: FxHashMap<i64, f64>,
+    /// Number of nodes scored.
     pub n: f64,
 }
 
+/// Joint count table of two label vectors, which must be the same length and
+/// aligned node by node.
 pub fn contingency(a: &[i64], b: &[i64]) -> Contingency {
     let mut cells: FxHashMap<(i64, i64), f64> = FxHashMap::default();
     let mut rows: FxHashMap<i64, f64> = FxHashMap::default();
@@ -29,6 +37,9 @@ pub fn contingency(a: &[i64], b: &[i64]) -> Contingency {
     }
 }
 
+/// Shannon entropy of a marginal, in NATS (natural log). NMI and AMI are
+/// ratios of quantities from this function, so the base cancels — but only as
+/// long as `mutual_info` uses the same one.
 pub fn entropy(marg: &FxHashMap<i64, f64>, n: f64) -> f64 {
     marg.values()
         .filter(|&&c| c > 0.0)

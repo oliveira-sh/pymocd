@@ -5,6 +5,7 @@
 
 use super::Contingency;
 
+/// Mutual information in NATS, matching [`super::entropy`]'s base.
 pub fn mutual_info(ct: &Contingency) -> f64 {
     let n = ct.n;
     ct.cells
