@@ -56,16 +56,16 @@ released nothing.
 
 | API | Source | Objectives | Engine | Decision Making | Code |
 |---|---|---|---|---|---|
-| `mr_mocd` | Santos, *in prep.* (2026) | Constant Potts split: cut fraction + pair coverage | memetic MOPSO over a resolution ladder | map-equation code length | this library |
+| `mr_mocd` | Santos, *in prep.* (2026) | Constant Potts split: cut fraction + pair coverage | memetic MOPSO over a resolution ladder | min code length | this library |
 | `hpmocd` | [Santos et al., *SNAM* 2025](https://doi.org/10.1007/s13278-025-01519-7) | decomposed modularity (intra, inter) | NSGA-II | max *Q* | this library |
 | `cdrme` | [Dabaghi-Zarandi et al., *JNCA* 2025](https://doi.org/10.1016/j.jnca.2024.104070) | Eq. 12 linkage scalar (single) | random walks + agglomerative merge | max *Q* | [private, vendored here](res/original_algs/cdrme) |
 | `mmcomo` | [Zhang et al., *IEEE CIM* 2023](https://ieeexplore.ieee.org/document/10188453) | kernel *k*-means + ratio cut | macro/micro co-evolutionary NSGA-II | max *Q* | — |
 | `ccm` | [Shaik et al., *SN Comp. Sci.* 2021](https://doi.org/10.1007/s42979-020-00382-x) | community score + fitness + modularity | NSGA-III | max *Q* | — |
 | `krm` | [Shaik et al., *SN Comp. Sci.* 2021](https://doi.org/10.1007/s42979-020-00382-x) | kernel *k*-means + ratio cut + modularity | NSGA-III | max *Q* | — |
 | `gdpso` | [Cai et al., *Inf. Sciences* 2015](https://doi.org/10.1016/j.ins.2014.09.041) | Newman–Girvan modularity (single) | greedy discrete PSO | swarm best | [doctor-cai/GDPSO](https://github.com/doctor-cai/GDPSO) |
-| `mocd_q` | [Shi et al., *Applied Soft Computing* 2012](https://doi.org/10.1016/j.asoc.2011.10.005) | decomposed modularity | PESA-II | max *Q* (Eq. 3.8) | — |
-| `mocd_d` | [Shi et al., *Applied Soft Computing* 2012](https://doi.org/10.1016/j.asoc.2011.10.005) | decomposed modularity | PESA-II | max–min distance to random-graph fronts (Eqs. 3.9–3.11) | — |
-| `moga_net` | [Pizzuti, *IEEE TEC* 2012](https://doi.org/10.1109/TEVC.2011.2161090) | community score + fitness | NSGA-II | max *Q* (Sec. V-E) | [Moganet2016.zip](https://staff.icar.cnr.it/pizzuti/codice/Moganet2016.zip) |
+| `mocd_q` | [Shi et al., *Applied Soft Computing* 2012](https://doi.org/10.1016/j.asoc.2011.10.005) | decomposed modularity | PESA-II | max *Q* | — |
+| `mocd_d` | [Shi et al., *Applied Soft Computing* 2012](https://doi.org/10.1016/j.asoc.2011.10.005) | decomposed modularity | PESA-II | max–min random-graph distance | — |
+| `moga_net` | [Pizzuti, *IEEE TEC* 2012](https://doi.org/10.1109/TEVC.2011.2161090) | community score + fitness | NSGA-II | max *Q* | [Moganet2016.zip](https://staff.icar.cnr.it/pizzuti/codice/Moganet2016.zip) |
 
 Each detector has a module README with its full derivation, its parameter
 table and the list of every deliberate divergence from its paper:
