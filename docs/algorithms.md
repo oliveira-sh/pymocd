@@ -65,12 +65,13 @@ cut(C)  = 1 - sum_c |E(c)| / m        fraction of edges leaving their community
 pair(C) = sum_c C(n_c, 2) / C(n, 2)   fraction of node pairs put together
 ```
 
-with `n` the number of **non-isolated** nodes, the only ones both objectives
-range over — isolated nodes never move and are returned as community `-1`.
+with `n` every node of the graph. Isolated nodes never move and are returned
+as community `-1`; each is its own singleton, so they add nothing to `pair`'s
+numerator while still counting in its denominator.
 
 One giant community gives `cut = 0, pair = 1`; all singletons give
 `cut = 1, pair = 0`. Because `H_g(C)/m = 1 - cut(C) - (g/g_d)*pair(C)`, with
-`g_d = 2m/(n(n-1))` the edge density over those same `n` non-isolated nodes,
+`g_d = 2m/(n(n-1))` the edge density over those same `n` nodes,
 minimising any positive weighting `a*cut + b*pair` is exactly maximising CPM
 at resolution `g = g_d*b/a`. The resolution is therefore not a search
 parameter but the exchange rate between the two objectives, and the Pareto
