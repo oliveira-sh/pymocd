@@ -2,8 +2,8 @@
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-use crate::core::algorithms::mr_mocd::Labels;
-use crate::core::algorithms::mr_mocd::objectives::{Counts, Obj, load_sizes, measure, obj_of};
+use crate::core::algorithms::rimpso::Labels;
+use crate::core::algorithms::rimpso::objectives::{Counts, Obj, load_sizes, measure, obj_of};
 use crate::core::graph::CsrGraph;
 
 pub struct Particle {
@@ -172,8 +172,8 @@ pub fn seeded(g: &CsrGraph, pos: Labels, gamma: f64) -> (Particle, Scratch) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::algorithms::mr_mocd::objectives::measure;
-    use crate::core::algorithms::mr_mocd::utils::fixtures::{ring_of_cliques, two_triangles};
+    use crate::core::algorithms::rimpso::objectives::measure;
+    use crate::core::algorithms::rimpso::utils::fixtures::{ring_of_cliques, two_triangles};
 
     fn rescan(g: &CsrGraph, pos: &[i32]) -> Counts {
         let mut size = vec![0u32; g.n];

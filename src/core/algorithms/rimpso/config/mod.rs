@@ -6,7 +6,7 @@ pub mod defaults;
 
 use defaults::{
     DEFAULT_COGNITIVE, DEFAULT_INERTIA, DEFAULT_LOCAL_RATE, DEFAULT_LS_PERIOD, DEFAULT_NUM_GENS,
-    DEFAULT_POP_SIZE, DEFAULT_SOCIAL,
+    DEFAULT_POP_SIZE, DEFAULT_SEED, DEFAULT_SOCIAL,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -19,6 +19,9 @@ pub struct Cfg {
     pub local_rate: f64,
     pub archive: usize,
     pub ls_period: usize,
+    /// Run seed. Two runs with the same seed on the same graph are identical;
+    /// different seeds explore independent trajectories.
+    pub seed: u64,
 }
 
 impl Default for Cfg {
@@ -32,6 +35,7 @@ impl Default for Cfg {
             local_rate: DEFAULT_LOCAL_RATE,
             archive: DEFAULT_POP_SIZE,
             ls_period: DEFAULT_LS_PERIOD,
+            seed: DEFAULT_SEED,
         }
     }
 }
@@ -56,6 +60,7 @@ impl Cfg {
             local_rate: rate(local_rate),
             archive: archive.max(2),
             ls_period: DEFAULT_LS_PERIOD,
+            seed: DEFAULT_SEED,
         }
     }
 }

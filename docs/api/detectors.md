@@ -2,11 +2,11 @@
 
 Every detector takes a graph and returns a partition as `dict[node, community]`. Isolated nodes are assigned community `-1`.
 
-Two of these are this library's own algorithms — `mr_mocd` and `hpmocd`. The other eight entry points re-implement published methods by other authors; see [Algorithms](../algorithms.md) for the paper, the selection rule and the original implementation (where the authors released one) behind each.
+Two of these are this library's own algorithms — `rimpso` and `hpmocd`. The other eight entry points re-implement published methods by other authors; see [Algorithms](../algorithms.md) for the paper, the selection rule and the original implementation (where the authors released one) behind each.
 
 ## This library's algorithms
 
-::: pymocd.mr_mocd
+::: pymocd.rimpso
 
 ::: pymocd.hpmocd
 
@@ -33,4 +33,4 @@ Two of these are this library's own algorithms — `mr_mocd` and `hpmocd`. The o
 
 ## Deprecated aliases
 
-`pymocd.scale` is `pymocd.mr_mocd` and `pymocd.scale_fronts` is [`pymocd.mr_mocd_fronts`](fronts.md#pymocd.mr_mocd_fronts), kept from earlier names of this detector. Use the new names.
+`pymocd.mr_mocd`, `pymocd.mr_mocd_fronts` and `pymocd.mr_mocd_select` are the names this detector carried before it was renamed to RIMPSO; `pymocd.scale` and `pymocd.scale_fronts` are older still. All five are the same function objects as [`rimpso`](#pymocd.rimpso), [`rimpso_fronts`](fronts.md#pymocd.rimpso_fronts) and [`rimpso_select`](fronts.md#pymocd.rimpso_select), kept so pinned callers keep working. They emit no warning and do not appear in the type stubs. Use the new names.

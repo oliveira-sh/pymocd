@@ -82,8 +82,8 @@ pub fn merge_sweep(g: &CsrGraph, p: &mut Particle, s: &mut Scratch) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::algorithms::mr_mocd::swarm::particle::seeded;
-    use crate::core::algorithms::mr_mocd::utils::fixtures::{ring_of_cliques, two_cliques};
+    use crate::core::algorithms::rimpso::swarm::particle::seeded;
+    use crate::core::algorithms::rimpso::utils::fixtures::{ring_of_cliques, two_cliques};
 
     fn distinct(p: &Particle) -> usize {
         let mut c = p.pos.clone();

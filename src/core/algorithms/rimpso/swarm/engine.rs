@@ -4,24 +4,24 @@
 
 use rayon::prelude::*;
 
-use crate::core::algorithms::mr_mocd::Labels;
-use crate::core::algorithms::mr_mocd::config::Cfg;
-use crate::core::algorithms::mr_mocd::objectives::Obj;
-use crate::core::algorithms::mr_mocd::pareto::Archive;
-use crate::core::algorithms::mr_mocd::utils::sampling::slot_rng;
+use crate::core::algorithms::rimpso::Labels;
+use crate::core::algorithms::rimpso::config::Cfg;
+use crate::core::algorithms::rimpso::objectives::Obj;
+use crate::core::algorithms::rimpso::pareto::Archive;
+use crate::core::algorithms::rimpso::utils::sampling::slot_rng;
 use crate::core::graph::CsrGraph;
 
 use super::init::seed;
 use super::ladder::ladder;
 use super::motion::advance;
-use super::particle::Scratch;
+use super::particle::ScratchPool;
 
 pub fn run(g: &CsrGraph, cfg: &Cfg) -> (Vec<Labels>, Vec<Obj>) {
     if g.n == 0 {
         return (Vec::new(), Vec::new());
     }
     let gammas = ladder(g, cfg.pop);
-    let mut swarm = seed(g, &gammas);
+    let mut swarm = seed(g, &gammas, cfg.seed);
 
     let mut archive = {
         let pairs = 0.5 * g.n as f64 * (g.n as f64 - 1.0);
@@ -37,23 +37,23 @@ pub fn run(g: &CsrGraph, cfg: &Cfg) -> (Vec<Labels>, Vec<Obj>) {
     }
     archive.prune();
 
+    let pool = ScratchPool::new(g.n);
     for t in 1..=cfg.gens as u64 {
         let step = t as usize;
         let ls = cfg.ls_period > 0 && step.is_multiple_of(cfg.ls_period);
         let view = &archive;
-        swarm.par_iter_mut().enumerate().for_each_init(
-            || Scratch::new(g.n),
-            |s, (i, p)| {
-                let mut r = slot_rng(t, i);
-                let leader = view.leader(&mut r);
-                advance(g, p, view.position(leader), cfg, s, &mut r, ls);
-                let score = p.score();
-                if score > p.best_score {
-                    p.best_score = score;
-                    p.best.copy_from_slice(&p.pos);
-                }
-            },
-        );
+        swarm.par_iter_mut().enumerate().for_each(|(i, p)| {
+            let mut held = pool.get();
+            let s = &mut *held;
+            let mut r = slot_rng(cfg.seed, t, i);
+            let leader = view.leader(&mut r);
+            advance(g, p, view.position(leader), cfg, s, &mut r, ls);
+            let score = p.score();
+            if score > p.best_score {
+                p.best_score = score;
+                p.best.copy_from_slice(&p.pos);
+            }
+        });
 
         for p in &swarm {
             archive.offer(p.objective(g), &p.pos);
@@ -67,8 +67,8 @@ pub fn run(g: &CsrGraph, cfg: &Cfg) -> (Vec<Labels>, Vec<Obj>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::algorithms::mr_mocd::pareto::dominates;
-    use crate::core::algorithms::mr_mocd::utils::fixtures::ring_of_cliques;
+    use crate::core::algorithms::rimpso::pareto::dominates;
+    use crate::core::algorithms::rimpso::utils::fixtures::ring_of_cliques;
 
     fn small() -> Cfg {
         Cfg::new(24, 20, 0.4, 0.7, 0.7, 0.35, 24)
@@ -140,8 +140,8 @@ mod tests {
 #[cfg(test)]
 mod fuzz {
     use super::*;
-    use crate::core::algorithms::mr_mocd::front::select_index;
-    use crate::core::algorithms::mr_mocd::objectives::{measure, obj_of};
+    use crate::core::algorithms::rimpso::front::select_index;
+    use crate::core::algorithms::rimpso::objectives::{measure, obj_of};
 
     fn rnd_graph(n: i32, e: usize, seed: u64) -> CsrGraph {
         let mut st = seed;
@@ -240,7 +240,7 @@ mod fuzz {
                     "trial {trial}: objective drift"
                 );
             }
-            let idx = select_index(&g, &front, &objs);
+            let idx = select_index(&g, &front);
             assert!(
                 idx < front.len(),
                 "trial {trial}: selected {idx} of {}",

@@ -6,7 +6,7 @@
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 
-// deliberately duplicated across mr_mocd and gdpso: one seeding
+// deliberately duplicated across rimpso and gdpso: one seeding
 // contract stated per module, no cross-module dependency
 const RNG_BASE: u64 = 0x5CA1_E5EED;
 

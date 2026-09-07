@@ -2,15 +2,9 @@
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-mod api;
-mod config;
-mod front;
-mod objectives;
-mod pareto;
-mod swarm;
-mod utils;
+use crate::core::algorithms::rimpso::objectives::Obj;
 
-pub type Labels = Vec<i32>;
-
-pub use api::{Profile, mr_mocd, mr_mocd_fronts, mr_mocd_select};
-pub use config::defaults::*;
+#[inline(always)]
+pub fn dominates(a: &Obj, b: &Obj) -> bool {
+    (a[0] <= b[0] && a[1] <= b[1]) && (a[0] < b[0] || a[1] < b[1])
+}

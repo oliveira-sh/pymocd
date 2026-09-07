@@ -2,9 +2,8 @@
 //! Copyright 2026 - Guilherme Santos. If a copy of the MPL was not distributed with this
 //! file, You can obtain one at https://www.gnu.org/licenses/gpl-3.0.html
 
-mod codelength;
-mod modularity;
-mod plateau;
-mod select;
+mod cpm;
 
-pub(super) use select::{select_best, select_index};
+pub type Obj = [f64; 2];
+
+pub(super) use cpm::{Counts, load_sizes, measure, obj_of};

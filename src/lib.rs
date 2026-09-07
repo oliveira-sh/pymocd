@@ -42,7 +42,7 @@ use api::metrics::*;
 /// Python Multi-objective Community Detection (pymocd) is a Python library, powered by
 /// a Rust backend, for performing efficient community detection in complex networks.
 /// Get your graph, call a method, and we'll offer you a community.
-/// Recommended Methods: `mr_mocd` or `hpmocd`.
+/// Recommended Methods: `rimpso` or `hpmocd`.
 #[pymodule]
 #[pyo3(name = "pymocd")]
 fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -63,19 +63,25 @@ fn pymocd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(cdrme_fn, m)?)?;
     m.add_function(wrap_pyfunction!(krm_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mmcomo_fn, m)?)?;
-    m.add_function(wrap_pyfunction!(mr_mocd_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(rimpso_fn, m)?)?;
 
     // detectors -> pareto frontier
     m.add_function(wrap_pyfunction!(ccm_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(krm_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(moga_net_fronts_fn, m)?)?;
     m.add_function(wrap_pyfunction!(mmcomo_fronts_fn, m)?)?;
-    m.add_function(wrap_pyfunction!(mr_mocd_fronts_fn, m)?)?;
-    m.add_function(wrap_pyfunction!(mr_mocd_select_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(rimpso_fronts_fn, m)?)?;
+    m.add_function(wrap_pyfunction!(rimpso_select_fn, m)?)?;
 
-    // deprecated aliases (pre-rename API)
-    m.add("scale", m.getattr("mr_mocd")?)?;
-    m.add("scale_fronts", m.getattr("mr_mocd_fronts")?)?;
+    // Deprecated aliases, oldest name last.  `mr_mocd*` are the names this
+    // detector carried while every published campaign was run; `scale*` are
+    // older still.  Each is the same function object under a former name, so
+    // callers pinned to an older API keep working.  New code uses `rimpso*`.
+    m.add("mr_mocd", m.getattr("rimpso")?)?;
+    m.add("mr_mocd_fronts", m.getattr("rimpso_fronts")?)?;
+    m.add("mr_mocd_select", m.getattr("rimpso_select")?)?;
+    m.add("scale", m.getattr("rimpso")?)?;
+    m.add("scale_fronts", m.getattr("rimpso_fronts")?)?;
 
     // evaluation metrics
     m.add_function(wrap_pyfunction!(gt_metrics_fn, m)?)?;

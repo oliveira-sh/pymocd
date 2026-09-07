@@ -22,7 +22,7 @@ pub fn ladder(g: &CsrGraph, pop: usize) -> Vec<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::algorithms::mr_mocd::utils::fixtures::ring_of_cliques;
+    use crate::core::algorithms::rimpso::utils::fixtures::ring_of_cliques;
 
     #[test]
     fn the_ladder_is_increasing_and_spans_the_whole_useful_range() {

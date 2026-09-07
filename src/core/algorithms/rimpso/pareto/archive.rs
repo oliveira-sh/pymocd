@@ -4,8 +4,8 @@
 
 use rand::{Rng, RngExt};
 
-use crate::core::algorithms::mr_mocd::Labels;
-use crate::core::algorithms::mr_mocd::objectives::Obj;
+use crate::core::algorithms::rimpso::Labels;
+use crate::core::algorithms::rimpso::objectives::Obj;
 
 use super::crowding::crowding;
 use super::dominance::dominates;
@@ -115,7 +115,8 @@ impl Archive {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::algorithms::mr_mocd::utils::sampling::slot_rng;
+    use crate::core::algorithms::rimpso::config::defaults::DEFAULT_SEED;
+    use crate::core::algorithms::rimpso::utils::sampling::slot_rng;
 
     fn rungs(k: usize) -> Vec<f64> {
         (0..k)
@@ -213,7 +214,7 @@ mod tests {
         }
         a.prune();
         let draw = || {
-            let mut r = slot_rng(3, 5);
+            let mut r = slot_rng(DEFAULT_SEED, 3, 5);
             (0..32).map(|_| a.leader(&mut r)).collect::<Vec<_>>()
         };
         assert_eq!(draw(), draw());
