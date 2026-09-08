@@ -100,8 +100,10 @@ communities one shared density, and profiling those densities out, leaves a
 log-likelihood ratio against the configuration model that is two bincounts,
 `L(C) = sum_c e_c ln(e_c/E_c) + e_out ln(e_out/E_out)` with `E_c = d_c^2/4m`;
 each community brings a free density, so they are charged
-`(B+1)/2 * ln(2m)`. Both degenerate partitions have `L = 0` and still pay the
-penalty, so there is no degeneracy filter, no fallback stage and no abstention.
+`(B+1)/2 * ln(2m)`. Neither degenerate partition needs a special case: one
+community explains nothing the degrees do not, so `L = 0` and it pays `ln(2m)`
+anyway, while all-singletons puts no edge inside a community and is rejected as
+disassortative. There is no degeneracy filter and no fallback stage.
 
 [`rimpso`](api/detectors.md#pymocd.rimpso) returns the selected member,
 [`rimpso_fronts`](api/fronts.md#pymocd.rimpso_fronts) returns every member

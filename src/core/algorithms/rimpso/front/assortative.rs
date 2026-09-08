@@ -78,7 +78,13 @@ fn load(g: &CsrGraph, p: &Labels, e_c: &mut [f64], d_c: &mut [f64], live: &mut V
 /// gives `e_1 = m` and `E_1 = m`, so `L = 0` and the score is `-ln(2m)`. All
 /// singletons give `e_c = 0` everywhere, so `edges_in = 0` while `expect_in > 0`,
 /// and the assortativity guard below rejects the partition outright. There is no
-/// degeneracy filter, no fallback stage and nothing to abstain with.
+/// degeneracy filter and no fallback stage.
+///
+/// One caveat on a candidate set this module did not produce: if EVERY candidate
+/// is at or below chance they all score `NEG_INFINITY`, and `select_index` then
+/// returns the lowest index rather than signalling. A CPM front always carries the
+/// one-community member, whose score is the finite `-ln(2m)`, so `rimpso` and
+/// `rimpso_fronts` never reach that branch; `rimpso_select` can.
 fn fit(g: &CsrGraph, p: &Labels, e_c: &mut [f64], d_c: &mut [f64], live: &mut Vec<u32>) -> f64 {
     if g.m == 0 {
         return 0.0;

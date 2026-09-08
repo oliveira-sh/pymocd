@@ -60,7 +60,7 @@ best = min(front, key=lambda p: abs(len(set(p.values())) - target))
 
 Each `*_fronts` function takes the same kwargs as its detector. `rimpso_fronts` returns `(partitions, points, selected)` rather than a bare list: every member, its `(cut, pair)` point, and the index the selector picked.
 
-`rimpso` also offers [`rimpso_select`](../api/fronts.md#pymocd.rimpso_select), which runs its label-free selection chain over a candidate set this library did not produce — the control that separates the search's contribution from the selector's:
+`rimpso` also offers [`rimpso_select`](../api/fronts.md#pymocd.rimpso_select), which runs its label-free selection rule over a candidate set this library did not produce — the control that separates the search's contribution from the selector's:
 
 ```python
 pick, points = pymocd.rimpso_select(G, candidates)

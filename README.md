@@ -49,7 +49,7 @@ detector entry points** (Shi-MOCD ships under two selection rules).
 
 | API | Source | Objectives | Engine | Decision Making | Code |
 |---|---|---|---|---|---|
-| `rimpso` | Santos, *in prep.* (2026) | Constant Potts split: cut fraction + pair coverage | memetic MOPSO over a resolution ladder | min code length | this library |
+| `rimpso` | Santos, *in prep.* (2026) | Constant Potts split: cut fraction + pair coverage | memetic MOPSO over a resolution ladder | best-fit assortative block model | this library |
 | `hpmocd` | [Santos et al., *SNAM* 2025](https://doi.org/10.1007/s13278-025-01519-7) | decomposed modularity (intra, inter) | NSGA-II | max *Q* | this library |
 | `cdrme` | [Dabaghi-Zarandi et al., *JNCA* 2025](https://doi.org/10.1016/j.jnca.2024.104070) | Eq. 12 linkage scalar (single) | random walks + agglomerative merge | max *Q* | [private, vendored here](res/original_algs/cdrme) |
 | `mmcomo` | [Zhang et al., *IEEE CIM* 2023](https://ieeexplore.ieee.org/document/10188453) | kernel *k*-means + ratio cut | macro/micro co-evolutionary NSGA-II | max *Q* | — |
@@ -79,7 +79,7 @@ table and the list of every deliberate divergence from its paper:
 import pymocd
 
 # This library's own detectors
-part = pymocd.rimpso(G)           # RIMPSO    (recommended default)
+part = pymocd.rimpso(G)           # RIMPSO         (recommended default)
 part = pymocd.hpmocd(G)           # HP-MOCD
 
 # Re-implemented baselines
@@ -101,7 +101,7 @@ paper states them:
 
 ```python
 pymocd.rimpso(G, pop_size=100, num_gens=100, inertia=0.4, cognitive=0.7, social=0.7,
-               local_rate=0.35, archive=100, ls_period=10)
+              local_rate=0.35, archive=100, ls_period=10, seed=0)
 pymocd.mmcomo(G, pop_size=100, num_gens=50, cross_rate=0.1, mut_rate=0.1, gap=10, beta=0.05)
 pymocd.ccm(G,    pop_size=200, num_gens=100, cross_rate=0.8, mut_rate=1/68, r=1.0, alpha=1.0, divisions=12)
 pymocd.krm(G,    pop_size=100, num_gens=100, cross_rate=0.8, mut_rate=1/34, divisions=12)
@@ -136,7 +136,7 @@ fronts = pymocd.ccm_fronts(G)
 fronts = pymocd.krm_fronts(G)
 fronts = pymocd.moga_net_fronts(G)
 
-# RIMPSO only: run its label-free selection chain over partitions produced
+# RIMPSO only: run its label-free selection rule over partitions produced
 # elsewhere, which separates the search's contribution from the selector's
 pick, points = pymocd.rimpso_select(G, candidates)
 ```

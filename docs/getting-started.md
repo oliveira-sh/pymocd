@@ -46,6 +46,7 @@ communities = pymocd.rimpso(
     local_rate=0.35,
     archive=100,
     ls_period=10,
+    seed=0,
 )
 ```
 
@@ -53,9 +54,10 @@ communities = pymocd.rimpso(
 `inertia`, `cognitive` and `social` are the swarm's three velocity terms;
 `local_rate` is the per-node rate of the resolution-directed local move;
 `archive` is the capacity of the external Pareto archive, one slot per
-particle so it holds the whole profile; and `ls_period` is how often the full
-local search runs. **Resolution is not a parameter** — a single run covers the
-whole ladder.
+particle so it holds the whole profile; `ls_period` is how often the full
+local search runs; and `seed` is the run seed, whose default of `0` reproduces
+the single trajectory the search flew before the seed was a parameter.
+**Resolution is not a parameter** — a single run covers the whole ladder.
 
 `mmcomo` takes a different four knobs plus `gap` and `beta`, at its own
 paper's defaults (`pop_size=100`, `num_gens=50`, `cross_rate=0.1`,
@@ -125,6 +127,6 @@ best = max(front, key=lambda p: pymocd.ari(p, gt))
 `rimpso_fronts` returns `(partitions, points, selected)`: every member, its
 `(cut, pair)` point, and the index the selector picked.
 [`rimpso_select`](api/fronts.md#pymocd.rimpso_select) runs that selection
-chain alone over partitions produced elsewhere.
+rule alone over partitions produced elsewhere.
 
 See the [fronts API reference](api/fronts.md) for details.

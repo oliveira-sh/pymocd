@@ -546,32 +546,37 @@ pub fn mmcomo_fronts_fn(
 /// Selection is label-free and has no parameter: of the archive's members, the one
 /// a degree-corrected assortative block model fits best once its own free
 /// densities are paid for. Both degenerate partitions carry no evidence and pay
-/// the penalty anyway, so there is no fallback stage and no abstention.
+/// the penalty anyway, so there is no degeneracy filter and no fallback stage.
 ///
-/// Deterministic: the same graph and parameters give the same partition on any
-/// number of threads.
+/// Deterministic: the same graph and the same parameters, ``seed`` included, give
+/// the same partition on any number of threads.
 ///
 /// Args:
+///     pop_size: particles in the swarm, one per rung of the resolution ladder.
+///     num_gens: generations to fly; the search always runs all of them.
 ///     inertia: fraction of a node's instability carried to the next iteration.
 ///     cognitive: pull toward the particle's own best partition.
 ///     social: pull toward a leader drawn from the archive by binary
 ///         tournament on crowding distance.
-///     local_rate: per-node rate of the resolution-directed CPM local move. Read only
-///         when ``repair`` is false; the repair supersedes it.
-///     repair: after perturbing a particle toward its attractors, drive it back to a local
-///         optimum of CPM at its own resolution, and prune the archive by keeping the best
-///         member at each rung of the resolution ladder rather than the least crowded.
-///         This is what makes the flight a search: with it off, 100 generations of 100
-///         particles improve a particle's own objective between 0 and 9 times in total and
-///         the net effect on the LFR grid is negative. Set false to reproduce the original
-///         flight exactly.
+///     local_rate: per-node rate of the resolution-directed CPM local move, applied
+///         on the iterations the full local search does not run.
 ///     archive: capacity of the external Pareto archive.
+///     ls_period: run the full local search — drive the particle back to a local
+///         optimum of CPM at its own resolution, then sweep for community merges —
+///         every ``ls_period`` iterations; 0 turns it off. This is what makes the
+///         flight a search: without it, 100 generations of 100 particles improve a
+///         particle's own objective between 0 and 9 times in total and the net
+///         effect on the LFR grid is negative.
+///     seed: run seed. The default, 0, contributes nothing to the random stream, so
+///         it reproduces the single trajectory this searched before the seed was a
+///         parameter; any other value flies an independent one.
 ///
-/// There is no seeding local search and no ``seed_rounds``: every particle starts at a
-/// raw scatter and the flight does all of the optimisation. Driving each particle to a
-/// CPM local optimum first was measured to be worth only a handful of iterations, and
-/// asymptotically to cost quality, because a particle already at a local optimum must be
-/// dragged out of it before it can move.
+/// ``seed`` is the random seed, not a seeding budget: there is no seeding local
+/// search and no ``seed_rounds``. Every particle starts at a raw scatter and the
+/// flight does all of the optimisation. Driving each particle to a CPM local optimum
+/// first was measured to be worth only a handful of iterations, and asymptotically to
+/// cost quality, because a particle already at a local optimum must be dragged out of
+/// it before it can move.
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(name = "rimpso", signature = (graph, pop_size = rimpso::DEFAULT_POP_SIZE, num_gens = rimpso::DEFAULT_NUM_GENS, inertia = rimpso::DEFAULT_INERTIA, cognitive = rimpso::DEFAULT_COGNITIVE, social = rimpso::DEFAULT_SOCIAL, local_rate = rimpso::DEFAULT_LOCAL_RATE, archive = rimpso::DEFAULT_POP_SIZE, ls_period = rimpso::DEFAULT_LS_PERIOD, seed = rimpso::DEFAULT_SEED))]
@@ -620,7 +625,8 @@ pub fn rimpso_fn(
 /// edges leaving their community — the partition's own mixing parameter — and
 /// ``pair`` the fraction of node pairs sharing one.
 ///
-/// Args:
+/// Takes the same keyword arguments as [`rimpso`][pymocd.rimpso], with the same
+/// defaults, and searches identically — only the return shape differs.
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(name = "rimpso_fronts", signature = (graph, pop_size = rimpso::DEFAULT_POP_SIZE, num_gens = rimpso::DEFAULT_NUM_GENS, inertia = rimpso::DEFAULT_INERTIA, cognitive = rimpso::DEFAULT_COGNITIVE, social = rimpso::DEFAULT_SOCIAL, local_rate = rimpso::DEFAULT_LOCAL_RATE, archive = rimpso::DEFAULT_POP_SIZE, ls_period = rimpso::DEFAULT_LS_PERIOD, seed = rimpso::DEFAULT_SEED))]
