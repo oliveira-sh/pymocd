@@ -61,25 +61,10 @@ pub fn obj_of(g: &CsrGraph, (internal, pair_sum): Counts) -> Obj {
     [cut, pair]
 }
 
-pub fn community_count(labels: &[i32], seen: &mut [bool]) -> usize {
-    let mut k = 0;
-    for &c in labels {
-        let c = c as usize;
-        if !seen[c] {
-            seen[c] = true;
-            k += 1;
-        }
-    }
-    for &c in labels {
-        seen[c as usize] = false;
-    }
-    k
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::algorithms::mr_mocd::utils::fixtures::two_triangles;
+    use crate::core::algorithms::rimpso::utils::fixtures::two_triangles;
 
     fn eval(g: &CsrGraph, part: &[i32]) -> Obj {
         let mut size = vec![0u32; g.n];
@@ -139,12 +124,4 @@ mod tests {
         assert_eq!(measure(&g, &[0, 0, 0, 1, 1, 1], &mut size, &mut live), a);
     }
 
-    #[test]
-    fn community_count_counts_distinct_labels_and_leaves_no_residue() {
-        let mut seen = vec![false; 6];
-        assert_eq!(community_count(&[0, 0, 0, 1, 1, 1], &mut seen), 2);
-        assert_eq!(community_count(&[0, 1, 2, 3, 4, 5], &mut seen), 6);
-        assert_eq!(community_count(&[3; 6], &mut seen), 1);
-        assert!(seen.iter().all(|&b| !b), "seen was left dirty");
-    }
 }

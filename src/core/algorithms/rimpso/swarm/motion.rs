@@ -4,8 +4,8 @@
 
 use rand::rngs::StdRng;
 
-use crate::core::algorithms::mr_mocd::config::Cfg;
-use crate::core::algorithms::mr_mocd::utils::sampling::unit;
+use crate::core::algorithms::rimpso::config::Cfg;
+use crate::core::algorithms::rimpso::utils::sampling::unit;
 use crate::core::graph::CsrGraph;
 
 use super::local::best_move;
@@ -113,10 +113,11 @@ pub fn advance(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::algorithms::mr_mocd::Labels;
-    use crate::core::algorithms::mr_mocd::swarm::particle::seeded;
-    use crate::core::algorithms::mr_mocd::utils::fixtures::ring_of_cliques;
-    use crate::core::algorithms::mr_mocd::utils::sampling::slot_rng;
+    use crate::core::algorithms::rimpso::Labels;
+    use crate::core::algorithms::rimpso::swarm::particle::seeded;
+    use crate::core::algorithms::rimpso::utils::fixtures::ring_of_cliques;
+    use crate::core::algorithms::rimpso::config::defaults::DEFAULT_SEED;
+    use crate::core::algorithms::rimpso::utils::sampling::slot_rng;
 
     fn particle(g: &CsrGraph, pos: Labels, best: Labels, gamma: f64) -> Particle {
         let (mut p, _) = seeded(g, pos, gamma);
@@ -139,7 +140,7 @@ mod tests {
         let mut s = Scratch::new(g.n);
         let cfg = Cfg::default();
         for t in 1..=25u64 {
-            let mut r = slot_rng(t, 3);
+            let mut r = slot_rng(DEFAULT_SEED, t, 3);
             advance(&g, &mut p, &leader, &cfg, &mut s, &mut r, true);
             let mut check = Scratch::new(g.n);
             assert_eq!(
@@ -157,7 +158,7 @@ mod tests {
         let cfg = Cfg::new(10, 10, 0.0, 0.0, 0.0, 0.0, 10);
         let mut p = particle(&g, pos.clone(), best, 0.3);
         let mut s = Scratch::new(g.n);
-        let mut r = slot_rng(1, 0);
+        let mut r = slot_rng(DEFAULT_SEED, 1, 0);
         advance(&g, &mut p, &leader, &cfg, &mut s, &mut r, false);
         assert_eq!(
             p.pos, pos,
@@ -174,7 +175,7 @@ mod tests {
         let mut s = Scratch::new(g.n);
         let before = p.pos.iter().zip(&leader).filter(|(a, b)| a == b).count();
         for t in 1..=8u64 {
-            let mut r = slot_rng(t, 1);
+            let mut r = slot_rng(DEFAULT_SEED, t, 1);
             advance(&g, &mut p, &leader, &cfg, &mut s, &mut r, true);
         }
         let after = p.pos.iter().zip(&leader).filter(|(a, b)| a == b).count();
@@ -189,7 +190,7 @@ mod tests {
         let mut p = particle(&g, pos, best, 0.3);
         let mut s = Scratch::new(g.n);
         for t in 1..=10u64 {
-            let mut r = slot_rng(t, 3);
+            let mut r = slot_rng(DEFAULT_SEED, t, 3);
             advance(&g, &mut p, &leader, &cfg, &mut s, &mut r, true);
         }
         let mut check = Scratch::new(g.n);
@@ -214,7 +215,7 @@ mod tests {
             let mut p = particle(&g, pos.clone(), best.clone(), 0.3);
             let mut s = Scratch::new(g.n);
             for t in 1..=8u64 {
-                let mut r = slot_rng(t, 3);
+                let mut r = slot_rng(DEFAULT_SEED, t, 3);
                 advance(&g, &mut p, &leader, &cfg, &mut s, &mut r, ls);
             }
             p.pos

@@ -5,16 +5,16 @@
 use rand::RngExt;
 use rayon::prelude::*;
 
-use crate::core::algorithms::mr_mocd::Labels;
-use crate::core::algorithms::mr_mocd::utils::sampling::slot_rng;
+use crate::core::algorithms::rimpso::Labels;
+use crate::core::algorithms::rimpso::utils::sampling::slot_rng;
 use crate::core::graph::CsrGraph;
 
 use super::particle::{Particle, ScratchPool};
 
 const SEED_SALT: u64 = u64::MAX;
 
-fn scatter(g: &CsrGraph, slot: usize) -> Labels {
-    let mut r = slot_rng(SEED_SALT, slot);
+fn scatter(g: &CsrGraph, rng_seed: u64, slot: usize) -> Labels {
+    let mut r = slot_rng(rng_seed, SEED_SALT, slot);
     (0..g.n)
         .map(|i| {
             let nbrs = g.neighbors(i);
@@ -27,7 +27,7 @@ fn scatter(g: &CsrGraph, slot: usize) -> Labels {
         .collect()
 }
 
-pub fn seed(g: &CsrGraph, gammas: &[f64]) -> Vec<Particle> {
+pub fn seed(g: &CsrGraph, gammas: &[f64], rng_seed: u64) -> Vec<Particle> {
     let pool = ScratchPool::new(g.n);
     gammas
         .par_iter()
@@ -35,7 +35,7 @@ pub fn seed(g: &CsrGraph, gammas: &[f64]) -> Vec<Particle> {
         .map(|(k, &gamma)| {
             let mut held = pool.get();
             let s = &mut *held;
-            let pos = scatter(g, k);
+            let pos = scatter(g, rng_seed, k);
             let (internal, pair_sum) = s.measure(g, &pos);
             let mut p = Particle {
                 vel: vec![0.0; g.n],
@@ -57,9 +57,10 @@ pub fn seed(g: &CsrGraph, gammas: &[f64]) -> Vec<Particle> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::algorithms::mr_mocd::swarm::ladder::ladder;
-    use crate::core::algorithms::mr_mocd::swarm::particle::Scratch;
-    use crate::core::algorithms::mr_mocd::utils::fixtures::ring_of_cliques;
+    use crate::core::algorithms::rimpso::config::defaults::DEFAULT_SEED;
+    use crate::core::algorithms::rimpso::swarm::ladder::ladder;
+    use crate::core::algorithms::rimpso::swarm::particle::Scratch;
+    use crate::core::algorithms::rimpso::utils::fixtures::ring_of_cliques;
 
     fn counts(p: &Particle) -> usize {
         let mut c = p.pos.clone();
@@ -72,7 +73,7 @@ mod tests {
     fn every_particle_starts_at_an_unoptimised_scatter() {
         let g = ring_of_cliques(16, 6);
         let gammas = ladder(&g, 24);
-        let swarm = seed(&g, &gammas);
+        let swarm = seed(&g, &gammas, DEFAULT_SEED);
         for p in &swarm {
             assert!(
                 counts(p) > 16,
@@ -87,9 +88,22 @@ mod tests {
     }
 
     #[test]
+    fn different_seeds_start_the_same_rung_somewhere_else() {
+        let g = ring_of_cliques(16, 6);
+        let a = scatter(&g, DEFAULT_SEED, 3);
+        assert_eq!(a, scatter(&g, DEFAULT_SEED, 3), "one seed, two scatters");
+        let moved = (1..8u64).filter(|&s| scatter(&g, s, 3) != a).count();
+        assert!(
+            moved >= 6,
+            "only {moved} of 7 seeds moved rung 3 off its default start, so the \
+             seed barely reaches the initial population"
+        );
+    }
+
+    #[test]
     fn the_rungs_start_from_different_scatters() {
         let g = ring_of_cliques(16, 6);
-        let swarm = seed(&g, &ladder(&g, 24));
+        let swarm = seed(&g, &ladder(&g, 24), DEFAULT_SEED);
         let distinct = {
             let mut v: Vec<&Vec<i32>> = swarm.iter().map(|p| &p.pos).collect();
             v.sort();
@@ -107,8 +121,8 @@ mod tests {
     fn seeding_is_reproducible_and_the_counts_are_exact() {
         let g = ring_of_cliques(8, 5);
         let gammas = ladder(&g, 12);
-        let a = seed(&g, &gammas);
-        let b = seed(&g, &gammas);
+        let a = seed(&g, &gammas, DEFAULT_SEED);
+        let b = seed(&g, &gammas, DEFAULT_SEED);
         for (x, y) in a.iter().zip(&b) {
             assert_eq!(x.pos, y.pos, "seeding is not reproducible");
         }

@@ -31,8 +31,8 @@ class TestSanity(unittest.TestCase):
     def setUp(self):
         self.graph = nx.karate_club_graph()
 
-    def test_mr_mocd_modularity_floor_on_karate(self):
-        q = modularity(self.graph, as_communities(pymocd.mr_mocd(self.graph)))
+    def test_rimpso_modularity_floor_on_karate(self):
+        q = modularity(self.graph, as_communities(pymocd.rimpso(self.graph)))
         self.assertGreater(q, 0.25)
 
     def test_hpmocd_modularity_floor_on_karate(self):
@@ -40,18 +40,18 @@ class TestSanity(unittest.TestCase):
         self.assertGreater(q, 0.25)
 
     def test_metrics_perfect_self_agreement(self):
-        partition = pymocd.mr_mocd(self.graph)
+        partition = pymocd.rimpso(self.graph)
         for value in pymocd.gt_metrics(partition, partition):
             self.assertAlmostEqual(value, 1.0)
         self.assertAlmostEqual(pymocd.nmi(partition, partition), 1.0)
 
     def test_isolated_node_gets_minus_one(self):
         self.graph.add_node(99)
-        self.assertEqual(pymocd.mr_mocd(self.graph)[99], -1)
+        self.assertEqual(pymocd.rimpso(self.graph)[99], -1)
 
-    def test_mr_mocd_front_points_match_their_partitions(self):
+    def test_rimpso_front_points_match_their_partitions(self):
         self.graph.add_nodes_from([99, 100])
-        front, points, _selected = pymocd.mr_mocd_fronts(
+        front, points, _selected = pymocd.rimpso_fronts(
             self.graph, pop_size=8, num_gens=2
         )
         self.assertTrue(front)
@@ -61,11 +61,11 @@ class TestSanity(unittest.TestCase):
             self.assertEqual((cut, pair), cut_and_pair(self.graph, partition))
 
     def test_single_community_graph(self):
-        partition = pymocd.mr_mocd(nx.complete_graph(6))
+        partition = pymocd.rimpso(nx.complete_graph(6))
         self.assertEqual(set(partition), set(range(6)))
 
     def test_empty_graph(self):
-        self.assertEqual(pymocd.mr_mocd(nx.Graph()), {})
+        self.assertEqual(pymocd.rimpso(nx.Graph()), {})
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
-# MR-MOCD
+# RIMPSO
 
-**Multi-Resolution Multi-Objective Community Detection** — a memetic particle swarm
+**RIMPSO-CD — Resolution-Indexed Memetic Particle Swarm Optimisation for Community Detection** — a memetic particle swarm
 over the Constant Potts Model, with decomposition-based archive truncation and
 parameter-free solution selection.
 
@@ -19,7 +19,7 @@ front is the graph's resolution profile. A separate, label-free **selector** the
 one member out of it.
 
 The split matters: the archive is the deliverable, and choosing one member of it is a
-different problem solved by different code. `mr_mocd_select` exposes the selector alone so
+different problem solved by different code. `rimpso_select` exposes the selector alone so
 it can be run over a candidate set this crate did not produce — for example a front
 pooled from an external CPM solver over the same ladder. That is the control that
 separates the search's contribution from the selector's.
@@ -56,7 +56,7 @@ ladder  ->  seed  ->  [ advance -> archive.offer -> archive.prune ] x gens  ->  
 | seed | `swarm/init.rs` | one particle per rung, each at a raw scatter |
 | flight | `swarm/motion.rs` | velocity update, perturbation, repair, merge |
 | archive | `pareto/archive.rs` | bounded non-dominated set, pruned by rung |
-| selection | `front/select.rs` | codelength, then plateau, then modularity |
+| selection | `front/assortative.rs` | the best-fitting assortative block model |
 
 ### The ladder
 
@@ -171,60 +171,113 @@ front.
 ## 5. Selection
 
 Every member of the archive is CPM-optimal at its own `gamma`, so the profile alone cannot
-say which `gamma` is the graph's. The selector is a three-stage chain, each stage handing
-over only when it has nothing to say.
+say which `gamma` is the graph's. **One criterion answers it: the member that a
+degree-corrected assortative block model fits best, once its own free densities are paid
+for.**
 
-Members with one community, or with at least half of `n` communities, are filtered out
-first as degenerate. If that leaves nothing, the filter is dropped rather than the answer.
+The model gives every community its own internal edge density and lets everything between
+communities share one:
 
-### 1. Shortest two-level code (`front/codelength.rs`)
+```
+A_ij ~ Poisson(k_i k_j omega_c)     both endpoints in community c
+A_ij ~ Poisson(k_i k_j omega_out)   otherwise
+```
 
-The map equation: how many bits per step it costs to describe a random walk under a
-partition. Implemented as `L = q H(Q) + sum_c p_c H(P^c)` in the algebraically equivalent
-form needing only each community's exit rate and volume. Counts accumulate as integers and
-are divided once, so the value depends on neither node order nor summation order.
+Profiling out the densities leaves a log-likelihood ratio against the configuration model
+that is two bincounts and nothing else:
 
-This carries the resolution the front cannot: it answers from the *flow* rather than from
-the hull's geometry, and it has no parameter to set.
+```
+L(C)  = sum_c e_c ln(e_c / E_c)  +  e_out ln(e_out / E_out)
+E_c   = d_c^2 / 4m      E_out = m - sum_c E_c      e_out = m - sum_c e_c
+```
 
-**Measured over the five SNAP `com-` networks** — held out from everything that shaped the
-plateau rule — it scores **0.690 mean AMI against a front ceiling of 0.705**, where the
-plateau alone scores 0.636. That is **78% of the reachable gap**, and **+0.17 on Orkut**
-alone.
+`E_c` is how many intra-community edges the degree sequence alone would produce, so `L` is
+how many nats of edge placement the *partition* explains. Each community brings a free
+density, so the densities are charged the Schwarz penalty — half a nat per parameter per
+log observation, over the `B + 1` densities and the graph's `2m` edge endpoints, where `B`
+counts the communities holding at least one non-isolated vertex:
 
-It **abstains** when no member compresses the walk better than one module. That is
-Infomap's significance test: past the detectability limit there is no partition worth the
-index codebook. It abstains on **8 of 42 LFR archives**, which is where the plateau still
-earns its place.
+```
+score(C) = L(C) - (B + 1)/2 * ln(2m)          maximised
+```
 
-### 2. Widest resolution plateau (`front/plateau.rs`)
+A partition whose communities are internally *sparser* than the space between them fits the
+same model with the two densities swapped and is not a community structure; it is rejected
+outright. That guard changes no choice on any of the 362 archives measured — no such
+partition can sit on a CPM front — but `rimpso_select` takes candidates from anywhere.
 
-Take the lower-left convex hull of the candidates in `(pair, cut)`. Only hull vertices
-optimise `cut + lambda * pair` for some `lambda > 0`. Each interior vertex is the CPM
-optimum for `lambda` between the slopes of its two incident hull edges, and the width of
-that interval in `log lambda` is how long that partition survives as the resolution
-sweeps. The widest span wins.
+`L` does **not** rise monotonically with `B`. That holds for the unrestricted block model,
+where a refinement's model nests the coarser one; it fails here, because splitting a
+community moves the pairs it sheds off its own free density and onto the single shared
+`omega_out`. On `ring_of_cliques(12, 5)` the planted partition scores `L = 259.02` and a
+strict refinement of it `L = 53.52`, a gap of 205 nats before any penalty is charged.
 
-- The two degenerate partitions join the hull as **anchors** so the coarsest and finest
-  real members still get an interval instead of landing on an endpoint. Anchors bound the
-  profile but are never chosen, and are exempt from the dominance staircase — otherwise a
-  disconnected graph would delete the one-community anchor with its own `cut = 0`
-  partition into components.
-- Widths are **pooled by octave** of the community count, because a dense front subdivides
-  one true plateau across several nearly collinear vertices and no single one keeps the
-  full width. A partition with twice as many communities is a different answer; one with a
-  few more is the same answer resampled.
-- A vertex whose interval runs past either end of the ladder's range is **dropped rather
-  than truncated**: a width the range decided is not evidence about the graph.
-- Fewer than 5 hull vertices (two of which are always anchors) is too thin to be evidence,
-  and the stage declines.
+Both degenerate partitions lose, neither by a special case: one community has `e_1 = m` and
+`E_1 = m`, so `L = 0` and the score is `-ln(2m)`; all singletons have `e_c = 0` everywhere,
+so `edges_in = 0` while `expect_in > 0` and the assortativity guard rejects the partition
+outright. **There is no degeneracy filter, no fallback stage and nothing to abstain with**
+— one criterion, evaluated once per member, always returns an answer.
 
-### 3. Maximum modularity (`front/modularity.rs`)
+### What it is worth
 
-The fallback for the one case a plateau cannot speak to — a hull too thin to have an
-interior, which happens only on graphs of a few dozen vertices. Scored as
-`Q = (1 - cut) - sum_c (d_c / 2m)^2`; the first term is already in the archive, so scoring
-a member costs one pass over the labels and none over the edges.
+Measured over **46 benchmark cells** — LFR at `n` in {1000, 10000, 50000, 100000} crossed
+with `mu` from 0.1 to 0.8 (20 seeds at n <= 10000, 3 at 50000, 1 at 100000), five annotated
+social graphs of 34 to 1005 vertices, and the five SNAP `com-` graphs up to 4 million
+vertices — as the mean gap to the **front oracle**, the archive member with the highest AMI
+against ground truth:
+
+| | this criterion | the chain it replaced |
+|---|---|---|
+| mean gap to the oracle, over the 46 cells | **0.021** | 0.044 |
+| worst single cell | **0.368** (karate) | 0.368 (LFR n=1000 mu=0.5) |
+| LFR, mu <= 0.4 | **0.000** | 0.000 |
+| LFR, mu >= 0.5 | **0.008** | 0.065 |
+| the five small annotated graphs | **0.143** | 0.154 |
+| the five SNAP graphs | **0.006** | 0.011 |
+
+It is never worse than the chain on any real network, and the whole gain is at `mu >= 0.5`,
+where the chain's first stage abstains: on LFR `n = 1000, mu = 0.5` it scores **0.666**
+against the chain's 0.330, and on `n = 10000, mu = 0.7`, **0.278** against 0.152.
+
+### What it replaced
+
+A three-stage chain: shortest two-level map-equation code length, then the widest
+resolution plateau on the front's lower convex hull, then maximum modularity. Stage 1
+abstained on 12 of 24 LFR cells at `n = 1000`, all at `mu >= 0.5`, and the plateau that
+caught those is the weakest of the three (0.119 from the oracle on its own).
+
+### What was measured and rejected
+
+Forty-five criteria were scored over the same 362 archives. Mean gap to the oracle over the
+46 cells, against **0.021** for the shipped rule:
+
+| Criterion | Gap | Why it loses |
+|---|---|---|
+| Surprise per bit of partition, `S / L_partition` | 0.036 | scale-free and the best of all on graphs under 1000 vertices, but the denominator collapses for a near-degenerate partition: on orkut it takes one that is 99.5% one community and scores 0.14 against an oracle of 0.69 |
+| Bernoulli planted-partition description length, `S - L_partition` | 0.040 | textbook MDL, and it abstains where MDL should: at LFR `n = 10000, mu = 0.7` *every* member has `S < L` — the AMI-0.294 member costs 66542 nats to state and buys 53163 — so it returns one community |
+| Synwalk | 0.032 | the best random-walk criterion, but it over-splits every graph under a few hundred vertices |
+| degree-corrected Surprise, no penalty | 0.032 | same |
+| Reichardt-Bornholdt self-consistency fixed point | 0.032 | same |
+| two-level map equation | 0.090 | collapses to one module at `mu >= 0.6` |
+| flat degree-corrected SBM description length | 0.162 | the `B(B+1)/2` prior on the block edge counts caps `B` at about `sqrt(n)`; it picks 8 of 30 cliques on `ring_of_cliques(30,5)` |
+| maximum modularity | 0.118 | the resolution limit, whole |
+| the widest resolution plateau | 0.119 | a dense front subdivides one plateau; pooling by octave only half-fixes it |
+| Erdos-Renyi modularity, `(1 - cut) - pair` | 0.165 | **every parameter-free knee rule on this front reduces to exactly this** — Das's maximum bulge, Kneedle, KnEA, the max-min distance to a control front, HP-MOCD's own selector — and it is a linear scalarisation, so it can only ever return a hull vertex |
+| leave-one-pair-out predictive log-loss | 0.045 | the cross-validation family; over-splits on small graphs by a bounded, computable amount |
+| Bethe-Hessian block count, then the member with the nearest `B` | 0.143 | recovers the exact community count at `mu <= 0.3` and collapses at `mu >= 0.5` |
+| max-min distance to a G(n,m) control front | 0.228 | the control front is nearly a point; the rule degenerates to "furthest from the origin" |
+| Bayesian (Dirichlet-regularised) map equation | 0.204 | its regularisation pushes toward *fewer* modules, which is the wrong direction here |
+| Significance, exact Surprise, Z-modularity, Li-Pan structural entropy, the CPM self-consistency fixed point, hierarchical clustering entropy, the Rosvall-Bergstrom 1997 two-part code, the dense SBM, both degree-corrected planted-partition description lengths | 0.054 - 0.632 | measured, all worse |
+
+### The one thing no criterion here can do
+
+At `mu >= 0.7` the archive still holds members that score AMI 0.28-0.35, and **not one of
+them compresses the graph**: at `n = 50000, mu = 0.7` the oracle member's Surprise is 381620
+nats against a partition description length of 428732. karate is the same story at the
+other end — its oracle member (four communities, AMI 0.850) has `S - L = -6`, so no
+description-length criterion in this family can ever return it, and 0.670 is the best any
+of the forty-five reached. Where the answer is not compressive, a criterion that is
+correct by its own lights is wrong by AMI. That is the whole of the residual gap.
 
 ## 6. Parameters
 
@@ -269,7 +322,7 @@ instance-dependent, and on other cells smaller periods win by up to 0.019.
   as 0, which made its guard `step > 0 && (step - 0) % ls_period == 0`, i.e. exactly the
   unconditional schedule. It never did anything and has been removed from the Rust API,
   the Python signature and the docs.
-- **`MR-MOCD_RANDPERT`** — an environment-gated research control that held the perturbation
+- **`MR-MOCD_RANDPERT`** (spelled with the method's former name) — an environment-gated research control that held the perturbation
   rate but sent every unstable vertex to a random neighbour's label instead of an
   attractor's, reducing the flight to a randomised iterated local search. It was the
   control for whether the swarm is load-bearing. Never set in any shipped path; removed.
@@ -295,8 +348,8 @@ The result does not depend on how rayon schedules anything.
   `RNG_BASE ^ salt.rotate_left(32) ^ slot * PHI`. No stream is shared. Seeding uses
   `salt = u64::MAX`, reserved so no iteration can collide with it.
 - **Every tie is broken by the lower index or the lower label** — in `best_move`, in
-  `merge_sweep`'s ranking, in the rung prune, in `shortest_code`'s parallel reduction, in
-  `max_modularity`, and in the hull sort. No outcome follows scan order, neighbour layout,
+  `merge_sweep`'s ranking, in the rung prune, and in `select_index`'s parallel reduction.
+  No outcome follows scan order, neighbour layout,
   or how a parallel reduction happened to split.
 - The archive is offered candidates **in slot order** after each flight, never in
   completion order.
@@ -333,15 +386,17 @@ The result does not depend on how rayon schedules anything.
 - **`bucket_by_community` is a counting sort** off the sizes that are already maintained:
   one pass, no comparison. Filling from the back turns each running end into the start it
   will be read as.
-- **`modularity` reuses `cut` from the archive**, so scoring a member costs one pass over
-  the labels and none over the edges. `deg` is marked with `UNSEEN = -1.0` rather than
-  zero, because an isolated vertex legitimately has degree mass zero.
+- **Selection costs one pass over the labels and one over the edges** per member, and the
+  members are scored in parallel with one pair of `n`-sized buffers per worker, cleared
+  through `live` rather than refilled. Nothing in it is larger than `m ln m`, so unlike a
+  description length written with binomials it needs no special numerics at four million
+  vertices.
 
 ## 10. File map
 
 | File | Contents |
 |---|---|
-| `api.rs` | `mr_mocd`, `mr_mocd_fronts`, `mr_mocd_select` — the public entry points |
+| `api.rs` | `rimpso`, `rimpso_fronts`, `rimpso_select` — the public entry points |
 | `config/mod.rs` | `Cfg`, the parameter bundle, with Python-facing clamping |
 | `config/defaults.rs` | the shipped constants |
 | `objectives/cpm.rs` | the CPM split, size bookkeeping, community counting |
@@ -355,10 +410,7 @@ The result does not depend on how rayon schedules anything.
 | `swarm/merge.rs` | the community-merge sweep |
 | `swarm/motion.rs` | the velocity update, perturbation and repair |
 | `swarm/engine.rs` | the swarm loop |
-| `front/codelength.rs` | the map equation and the abstention test |
-| `front/plateau.rs` | the hull and the widest-plateau rule |
-| `front/modularity.rs` | Newman modularity, the fallback |
-| `front/select.rs` | the three-stage selection chain |
+| `front/assortative.rs` | the degree-corrected assortative block model, its Schwarz penalty, and the two entry points |
 | `utils/sampling.rs` | the per-slot RNG, i.e. the determinism contract |
 | `utils/output.rs` | internal labels to dense output ids, isolated nodes as -1 |
 | `utils/fixtures.rs` | graph builders shared across test modules |

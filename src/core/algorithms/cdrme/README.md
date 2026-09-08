@@ -179,7 +179,7 @@ Internal, not reachable from Python:
 | Constant | Value | Effect |
 |---|---|---|
 | `MERGE_ATTEMPTS_PER_COMMUNITY` | 2 | Sets the total merge budget `2·k`, which slot `s` receives `s/pop_size` of. The paper's only stated stop is "the best objective function is reached or only one community remains"; since a merge that does not gain is always taken, two attempts per starting community lets the deepest slots run the ladder down to a single community. |
-| `RNG_BASE` | `0x5CA1_E5EED` | Shared with `mr_mocd` and `gdpso` so every module documents one RNG contract. |
+| `RNG_BASE` | `0x5CA1_E5EED` | Shared with `rimpso` and `gdpso` so every module documents one RNG contract. |
 | `SALT_CENTER` / `SALT_WALK` / `SALT_MERGE` | `0x0CD_0001` … `0x0CD_0003` | The three independent stream families. |
 
 **Determinism**

@@ -27,8 +27,8 @@ class TestPartitions(unittest.TestCase):
         for community, members in groups.items():
             self.assertTrue(members, f"community {community} is empty")
 
-    def test_mr_mocd(self):
-        self.assert_valid_partition(pymocd.mr_mocd(self.graph))
+    def test_rimpso(self):
+        self.assert_valid_partition(pymocd.rimpso(self.graph))
 
     def test_hpmocd(self):
         self.assert_valid_partition(pymocd.hpmocd(self.graph))
@@ -51,8 +51,8 @@ class TestPartitions(unittest.TestCase):
     def test_mmcomo(self):
         self.assert_valid_partition(pymocd.mmcomo(self.graph))
 
-    def test_mr_mocd_fronts(self):
-        front, points, selected = pymocd.mr_mocd_fronts(self.graph)
+    def test_rimpso_fronts(self):
+        front, points, selected = pymocd.rimpso_fronts(self.graph)
         self.assertIsInstance(front, list)
         self.assertTrue(front)
         self.assertEqual(len(front), len(points))
@@ -83,8 +83,8 @@ class TestTwoCliquePartition(unittest.TestCase):
     def test_hpmocd_recovers_exact_partition(self):
         self.assert_exact_two_clique_split(pymocd.hpmocd(self.graph))
 
-    def test_mr_mocd_recovers_exact_partition(self):
-        self.assert_exact_two_clique_split(pymocd.mr_mocd(self.graph))
+    def test_rimpso_recovers_exact_partition(self):
+        self.assert_exact_two_clique_split(pymocd.rimpso(self.graph))
 
 
 if __name__ == "__main__":

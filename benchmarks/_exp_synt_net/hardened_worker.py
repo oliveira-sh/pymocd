@@ -35,6 +35,16 @@ def run_algorithm(alg, n, edges, seed, threads):
     import pymocd
     pymocd.max_cores(threads)
     shim = Shim(n, edges)
+    # The dict keys are campaign labels -- the `alg` column of results.csv --
+    # so they keep the historical "MR-MOCD" spelling regardless of the rename;
+    # plots/common.py maps them to RIMPSO at load time.
+    #
+    # TODO(rename): the API calls below still use the deprecated `mr_mocd*`
+    # aliases on purpose.  This file's bytes get shipped to the remote host
+    # that is running the live campaign against an older wheel, where only the
+    # old names exist; the aliases are correct under both wheels.  Flip them to
+    # `pymocd.rimpso` / `pymocd.rimpso_fronts` once that campaign finishes and
+    # the remote is rebuilt.
     lib = {
         "MR-MOCD": lambda: pymocd.mr_mocd(shim),
         "HP-MOCD": lambda: pymocd.hpmocd(shim),
@@ -88,6 +98,8 @@ def run_algorithm(alg, n, edges, seed, threads):
 
 
 # detectors whose whole Pareto front is scored, keeping the ground-truth-best member
+# Key is a campaign label (KEEP); the `mr_mocd_fronts` call is the deprecated
+# alias, kept for the running campaign -- see the TODO(rename) in run_algorithm.
 ORACLE_LIB = {
     "MR-MOCD (oracle)": lambda pymocd, shim: pymocd.mr_mocd_fronts(shim)[0],
 }

@@ -129,7 +129,7 @@ def _build_single_generation(
 def _compute_partitions(graph: nx.Graph) -> dict[int, dict[int, int]]:
     partitions: dict[int, dict[int, int]] = {}
     for generation in GENERATIONS:
-        partitions[generation] = pymocd.mr_mocd(graph, num_gens=generation)
+        partitions[generation] = pymocd.rimpso(graph, num_gens=generation)
     return partitions
 
 

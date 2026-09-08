@@ -54,8 +54,8 @@ fn best_move_at(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::algorithms::mr_mocd::swarm::particle::seeded as particle;
-    use crate::core::algorithms::mr_mocd::utils::fixtures::{ring_of_cliques, two_triangles};
+    use crate::core::algorithms::rimpso::swarm::particle::seeded as particle;
+    use crate::core::algorithms::rimpso::utils::fixtures::{ring_of_cliques, two_triangles};
 
     #[test]
     fn a_free_node_joins_the_community_it_has_most_edges_into() {
