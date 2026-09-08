@@ -36,6 +36,11 @@ def main():
     if wilcoxon is None:
         print("\nscipy not installed; skipping significance tests")
         return
+    # "MR-MOCD" here is the `alg` value the compute host wrote into
+    # results.csv, not a display name -- the method is now called RIMPSO.  The
+    # comparisons below select on it, so it must match the data verbatim; see
+    # the RENAME map and its comment in the paper's plots/common.py, which does
+    # the MR-MOCD -> RIMPSO relabelling at load time.
     print(f"\n=== Wilcoxon signed-rank: MR-MOCD vs others on {metric} "
           f"(paired by seed, Bonferroni per cell) ===")
     for cell, sub in ok.groupby("cell"):

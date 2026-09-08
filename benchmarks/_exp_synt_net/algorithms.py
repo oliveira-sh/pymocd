@@ -25,9 +25,9 @@ def _restore_labels(part, inverse):
 @algorithm("MR-MOCD", needs_conversion=False, parallel=False)
 @_safe
 @_with_seed
-def mr_mocd_algorithm(G):
+def rimpso_algorithm(G):
     H, inverse = _ensure_int_nodes(G)
-    return _restore_labels(pymocd.mr_mocd(H), inverse)
+    return _restore_labels(pymocd.rimpso(H), inverse)
 
 
 @algorithm("HPMOCD", needs_conversion=False, parallel=False)

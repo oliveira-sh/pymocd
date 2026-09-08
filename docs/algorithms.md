@@ -4,7 +4,7 @@
 detector entry points** — Shi-MOCD ships under two selection rules, `mocd_q`
 and `mocd_d`.
 
-Two of them are this library's own work: **MR-MOCD** and
+Two of them are this library's own work: **RIMPSO** and
 **HP-MOCD**. *Every other detector is a re-implementation of someone else's
 published method*, written from the paper in this repository. The last column
 records whether the original authors released code — three of the seven did,
@@ -14,7 +14,7 @@ four did not.
 
 | API | Algorithm | Objectives & engine | Selection rule | Original implementation |
 |---|---|---|---|---|
-| [`mr_mocd`](api/detectors.md#pymocd.mr_mocd) | **MR-MOCD** — Santos, *in prep.* (2026) | exact Constant Potts split into cut fraction + pair coverage — the front *is* the resolution profile; memetic particle swarm niched along a geometric resolution ladder, with decomposition-based archive truncation | shortest two-level map-equation code length, then the widest resolution plateau, then max *Q* (front via [`mr_mocd_fronts`](api/fronts.md#pymocd.mr_mocd_fronts)) | **this library** |
+| [`rimpso`](api/detectors.md#pymocd.rimpso) | **RIMPSO** — Santos, *in prep.* (2026) | exact Constant Potts split into cut fraction + pair coverage — the front *is* the resolution profile; memetic particle swarm niched along a geometric resolution ladder, with decomposition-based archive truncation | best-fitting degree-corrected assortative block model, Schwarz-penalised (front via [`rimpso_fronts`](api/fronts.md#pymocd.rimpso_fronts)) | **this library** |
 | [`hpmocd`](api/detectors.md#pymocd.hpmocd) | **HP-MOCD** — [Santos et al., *SNAM* 2025](https://doi.org/10.1007/s13278-025-01519-7) | decomposed modularity (intra, inter), parallel NSGA-II | max modularity *Q* (front via [`hpmocd_fronts`](api/fronts.md#pymocd.hpmocd_fronts)) | **this library** |
 | [`cdrme`](api/detectors.md#pymocd.cdrme) | **CDRME** — [Dabaghi-Zarandi et al., *JNCA* 2025](https://doi.org/10.1016/j.jnca.2024.104070) | softmax-weighted random walks build a primary community set; stochastic agglomerative merge chains optimise the paper's Eq. (12) linkage scalar — a single objective, so there is no front | max modularity *Q* | a private Python notebook supplied by the authors — **no public repository exists**, so it is vendored in this repository at [`res/original_algs/cdrme`](https://github.com/oliveira-sh/pymocd/tree/master/res/original_algs/cdrme) |
 | [`mmcomo`](api/detectors.md#pymocd.mmcomo) | **MMCoMO** — [Zhang et al., *IEEE CIM* 2023](https://ieeexplore.ieee.org/document/10188453) | kernel *k*-means + ratio cut, macro/micro co-evolutionary NSGA-II over a dense diffusion kernel | max *Q* (front via [`mmcomo_fronts`](api/fronts.md#pymocd.mmcomo_fronts)) | — |
@@ -30,7 +30,7 @@ isolated nodes are assigned community `-1`.
 
 Each one has a module README carrying its full derivation, its parameter table
 and every deliberate divergence from its paper:
-[`mr_mocd`](https://github.com/oliveira-sh/pymocd/blob/master/src/core/algorithms/mr_mocd/README.md) ·
+[`rimpso`](https://github.com/oliveira-sh/pymocd/blob/master/src/core/algorithms/rimpso/README.md) ·
 [`hpmocd`](https://github.com/oliveira-sh/pymocd/blob/master/src/core/algorithms/hpmocd/README.md) ·
 [`cdrme`](https://github.com/oliveira-sh/pymocd/blob/master/src/core/algorithms/cdrme/README.md) ·
 [`mmcomo`](https://github.com/oliveira-sh/pymocd/blob/master/src/core/algorithms/mmcomo/README.md) ·
@@ -43,10 +43,10 @@ and every deliberate divergence from its paper:
 
 ## Which one should I use?
 
-- **[`mr_mocd`](api/detectors.md#pymocd.mr_mocd)** — the recommended default:
+- **[`rimpso`](api/detectors.md#pymocd.rimpso)** — the recommended default:
   one run covers every resolution, and the partition is chosen for you with no
   ground truth and no resolution parameter to set. The whole profile is
-  available from [`mr_mocd_fronts`](api/fronts.md#pymocd.mr_mocd_fronts).
+  available from [`rimpso_fronts`](api/fronts.md#pymocd.rimpso_fronts).
 - **[`hpmocd`](api/detectors.md#pymocd.hpmocd)** — the published HP-MOCD
   behaviour with max-modularity selection.
 - **The other seven** — re-implemented baselines, for papers and benchmarks.
@@ -54,9 +54,9 @@ and every deliberate divergence from its paper:
   states; see the [detector API reference](api/detectors.md) for every
   signature.
 
-## MR-MOCD
+## RIMPSO
 
-MR-MOCD (Multi-Resolution Multi-Objective Community Detection) minimises the
+RIMPSO (Resolution-Indexed Memetic Particle Swarm Optimisation) minimises the
 exact affine decomposition of the Constant Potts Model into two conflicting
 objectives:
 
@@ -92,17 +92,24 @@ member at each rung of the ladder rather than the least crowded. Crowding
 distance is a diversity criterion with no notion of quality, and was measured
 evicting the archive's best member while nothing dominated it.
 
-**The selection.** One partition is returned with no ground truth and no
-parameter: the member whose two-level map-equation code length is shortest,
-falling back to the widest resolution plateau on the front's lower convex hull
-when no member compresses the walk better than a single module, and to maximum
-modularity behind that.
+**The selection.** One partition is returned with no ground truth, no target
+community count and no parameter: the member that a **degree-corrected
+assortative block model** fits best once its own free densities are paid for.
+Giving each community its own internal edge density and everything between
+communities one shared density, and profiling those densities out, leaves a
+log-likelihood ratio against the configuration model that is two bincounts,
+`L(C) = sum_c e_c ln(e_c/E_c) + e_out ln(e_out/E_out)` with `E_c = d_c^2/4m`;
+each community brings a free density, so they are charged
+`(B+1)/2 * ln(2m)`. Neither degenerate partition needs a special case: one
+community explains nothing the degrees do not, so `L = 0` and it pays `ln(2m)`
+anyway, while all-singletons puts no edge inside a community and is rejected as
+disassortative. There is no degeneracy filter and no fallback stage.
 
-[`mr_mocd`](api/detectors.md#pymocd.mr_mocd) returns the selected member,
-[`mr_mocd_fronts`](api/fronts.md#pymocd.mr_mocd_fronts) returns every member
+[`rimpso`](api/detectors.md#pymocd.rimpso) returns the selected member,
+[`rimpso_fronts`](api/fronts.md#pymocd.rimpso_fronts) returns every member
 with its `(cut, pair)` point and the selected index, and
-[`mr_mocd_select`](api/fronts.md#pymocd.mr_mocd_select) runs the selection
-chain alone over partitions produced elsewhere. MR-MOCD is **deterministic** —
+[`rimpso_select`](api/fronts.md#pymocd.rimpso_select) runs the selection
+rule alone over partitions produced elsewhere. RIMPSO is **deterministic** —
 byte-identical output at any thread count.
 
 ## HP-MOCD
@@ -161,10 +168,14 @@ published model-selection rules.
 
 ## Deprecated aliases
 
-`pymocd.scale` and `pymocd.scale_fronts` are kept from earlier names of
-this detector. They are the same objects as
-[`mr_mocd`](api/detectors.md#pymocd.mr_mocd) and
-[`mr_mocd_fronts`](api/fronts.md#pymocd.mr_mocd_fronts); use the new names.
+`pymocd.mr_mocd`, `pymocd.mr_mocd_fronts` and `pymocd.mr_mocd_select` are the
+names this detector carried before it was renamed to RIMPSO; `pymocd.scale` and
+`pymocd.scale_fronts` are older still. All five are the same function objects as
+[`rimpso`](api/detectors.md#pymocd.rimpso),
+[`rimpso_fronts`](api/fronts.md#pymocd.rimpso_fronts) and
+[`rimpso_select`](api/fronts.md#pymocd.rimpso_select), kept so pinned callers
+keep working. They emit no warning and do not appear in the type stubs. Use the
+new names.
 
 ## Citation
 

@@ -4,7 +4,7 @@
 
 use crate::core::graph::CsrGraph;
 
-use super::super::mr_mocd::Labels;
+use super::super::rimpso::Labels;
 use super::config::Cfg;
 use super::front::{select_best, select_index};
 use super::objectives::{measure, obj_of};
@@ -12,7 +12,7 @@ use super::swarm::run;
 use super::utils::to_output;
 
 #[allow(clippy::too_many_arguments)]
-pub fn mr_mocd(
+pub fn rimpso(
     nodes: &[i32],
     edges: &[(i32, i32)],
     pop: usize,
@@ -23,6 +23,7 @@ pub fn mr_mocd(
     local_rate: f64,
     archive: usize,
     ls_period: usize,
+    seed: u64,
 ) -> Vec<(i32, i32)> {
     let g = CsrGraph::from_edges(nodes, edges);
     if g.n == 0 {
@@ -32,15 +33,16 @@ pub fn mr_mocd(
         pop, num_gens, inertia, cognitive, social, local_rate, archive,
     );
     cfg.ls_period = ls_period;
-    let (front, objs) = run(&g, &cfg);
-    let best = select_best(&g, front, &objs);
+    cfg.seed = seed;
+    let (front, _objs) = run(&g, &cfg);
+    let best = select_best(&g, front);
     to_output(&g, &best)
 }
 
 pub type Profile = (Vec<Vec<(i32, i32)>>, Vec<[f64; 2]>, usize);
 
 #[allow(clippy::too_many_arguments)]
-pub fn mr_mocd_fronts(
+pub fn rimpso_fronts(
     nodes: &[i32],
     edges: &[(i32, i32)],
     pop: usize,
@@ -51,6 +53,7 @@ pub fn mr_mocd_fronts(
     local_rate: f64,
     archive: usize,
     ls_period: usize,
+    seed: u64,
 ) -> Profile {
     let g = CsrGraph::from_edges(nodes, edges);
     if g.n == 0 {
@@ -60,8 +63,9 @@ pub fn mr_mocd_fronts(
         pop, num_gens, inertia, cognitive, social, local_rate, archive,
     );
     cfg.ls_period = ls_period;
+    cfg.seed = seed;
     let (front, objs) = run(&g, &cfg);
-    let selected = select_index(&g, &front, &objs);
+    let selected = select_index(&g, &front);
     (
         front.iter().map(|l| to_output(&g, l)).collect(),
         objs,
@@ -69,7 +73,7 @@ pub fn mr_mocd_fronts(
     )
 }
 
-pub fn mr_mocd_select(
+pub fn rimpso_select(
     nodes: &[i32],
     edges: &[(i32, i32)],
     candidates: &[Vec<(i32, i32)>],
@@ -108,7 +112,7 @@ pub fn mr_mocd_select(
         .iter()
         .map(|p| obj_of(&g, measure(&g, p, &mut size, &mut live)))
         .collect();
-    (select_index(&g, &front, &objs), objs)
+    (select_index(&g, &front), objs)
 }
 
 #[cfg(test)]
@@ -116,10 +120,10 @@ mod tests {
     use rustc_hash::FxHashMap;
 
     use super::*;
-    use crate::core::algorithms::mr_mocd::config::defaults::*;
+    use crate::core::algorithms::rimpso::config::defaults::*;
 
-    fn small(nodes: &[i32], edges: &[(i32, i32)]) -> FxHashMap<i32, i32> {
-        mr_mocd(
+    fn seeded(nodes: &[i32], edges: &[(i32, i32)], seed: u64) -> FxHashMap<i32, i32> {
+        rimpso(
             nodes,
             edges,
             32,
@@ -130,6 +134,25 @@ mod tests {
             DEFAULT_LOCAL_RATE,
             32,
             DEFAULT_LS_PERIOD,
+            seed,
+        )
+        .into_iter()
+        .collect()
+    }
+
+    fn small(nodes: &[i32], edges: &[(i32, i32)]) -> FxHashMap<i32, i32> {
+        rimpso(
+            nodes,
+            edges,
+            32,
+            25,
+            DEFAULT_INERTIA,
+            DEFAULT_COGNITIVE,
+            DEFAULT_SOCIAL,
+            DEFAULT_LOCAL_RATE,
+            32,
+            DEFAULT_LS_PERIOD,
+            DEFAULT_SEED,
         )
         .into_iter()
         .collect()
@@ -197,9 +220,45 @@ mod tests {
     }
 
     #[test]
+    fn the_default_seed_reproduces_the_unseeded_search() {
+        let (nodes, edges) = ring_of_cliques(8, 5);
+        assert_eq!(
+            small(&nodes, &edges),
+            seeded(&nodes, &edges, DEFAULT_SEED),
+            "the default no longer walks the trajectory it walked before the \
+             seed was a parameter, so every published number is invalidated"
+        );
+    }
+
+    #[test]
+    fn every_seed_is_reproducible() {
+        let (nodes, edges) = ring_of_cliques(24, 5);
+        for s in [0u64, 1, 7, 19, u64::MAX] {
+            assert_eq!(
+                seeded(&nodes, &edges, s),
+                seeded(&nodes, &edges, s),
+                "seed {s} is not reproducible"
+            );
+        }
+    }
+
+    #[test]
+    fn a_planted_ring_is_recovered_from_every_seed() {
+        let (nodes, edges) = ring_of_cliques(24, 5);
+        let base = seeded(&nodes, &edges, 0);
+        for s in 1..8u64 {
+            assert_eq!(
+                seeded(&nodes, &edges, s),
+                base,
+                "seed {s} disagreed on a partition the objective determines"
+            );
+        }
+    }
+
+    #[test]
     fn an_empty_graph_returns_nothing() {
         assert!(
-            mr_mocd(
+            rimpso(
                 &[],
                 &[],
                 DEFAULT_POP_SIZE,
@@ -209,7 +268,8 @@ mod tests {
                 DEFAULT_SOCIAL,
                 DEFAULT_LOCAL_RATE,
                 DEFAULT_POP_SIZE,
-                DEFAULT_LS_PERIOD
+                DEFAULT_LS_PERIOD,
+                DEFAULT_SEED
             )
             .is_empty()
         );
@@ -218,7 +278,7 @@ mod tests {
     #[test]
     fn the_front_is_a_profile_and_the_selection_indexes_into_it() {
         let (nodes, edges) = ring_of_cliques(12, 5);
-        let (front, objs, pick) = mr_mocd_fronts(
+        let (front, objs, pick) = rimpso_fronts(
             &nodes,
             &edges,
             32,
@@ -229,6 +289,7 @@ mod tests {
             DEFAULT_LOCAL_RATE,
             32,
             DEFAULT_LS_PERIOD,
+            DEFAULT_SEED,
         );
         assert!(!front.is_empty());
         assert_eq!(front.len(), objs.len());

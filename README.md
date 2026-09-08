@@ -33,7 +33,7 @@ import networkx as nx
 import pymocd
 
 G = nx.karate_club_graph()          # any NetworkX / igraph graph, integer node ids
-communities = pymocd.mr_mocd(G)     # -> dict[node, community]
+communities = pymocd.rimpso(G)      # -> dict[node, community]
 ```
 
 > [!IMPORTANT]
@@ -49,7 +49,7 @@ detector entry points** (Shi-MOCD ships under two selection rules).
 
 | API | Source | Objectives | Engine | Decision Making | Code |
 |---|---|---|---|---|---|
-| `mr_mocd` | Santos, *in prep.* (2026) | Constant Potts split: cut fraction + pair coverage | memetic MOPSO over a resolution ladder | min code length | this library |
+| `rimpso` | Santos, *in prep.* (2026) | Constant Potts split: cut fraction + pair coverage | memetic MOPSO over a resolution ladder | best-fit assortative block model | this library |
 | `hpmocd` | [Santos et al., *SNAM* 2025](https://doi.org/10.1007/s13278-025-01519-7) | decomposed modularity (intra, inter) | NSGA-II | max *Q* | this library |
 | `cdrme` | [Dabaghi-Zarandi et al., *JNCA* 2025](https://doi.org/10.1016/j.jnca.2024.104070) | Eq. 12 linkage scalar (single) | random walks + agglomerative merge | max *Q* | [private, vendored here](res/original_algs/cdrme) |
 | `mmcomo` | [Zhang et al., *IEEE CIM* 2023](https://ieeexplore.ieee.org/document/10188453) | kernel *k*-means + ratio cut | macro/micro co-evolutionary NSGA-II | max *Q* | — |
@@ -62,7 +62,7 @@ detector entry points** (Shi-MOCD ships under two selection rules).
 
 Each detector has a module README with its full derivation, its parameter
 table and the list of every deliberate divergence from its paper:
-[`mr_mocd`](src/core/algorithms/mr_mocd/README.md) ·
+[`rimpso`](src/core/algorithms/rimpso/README.md) ·
 [`hpmocd`](src/core/algorithms/hpmocd/README.md) ·
 [`cdrme`](src/core/algorithms/cdrme/README.md) ·
 [`mmcomo`](src/core/algorithms/mmcomo/README.md) ·
@@ -79,7 +79,7 @@ table and the list of every deliberate divergence from its paper:
 import pymocd
 
 # This library's own detectors
-part = pymocd.mr_mocd(G)          # MR-MOCD        (recommended default)
+part = pymocd.rimpso(G)           # RIMPSO         (recommended default)
 part = pymocd.hpmocd(G)           # HP-MOCD
 
 # Re-implemented baselines
@@ -100,8 +100,8 @@ values below are the shipped defaults, which follow each paper wherever the
 paper states them:
 
 ```python
-pymocd.mr_mocd(G, pop_size=100, num_gens=100, inertia=0.4, cognitive=0.7, social=0.7,
-               local_rate=0.35, archive=100, ls_period=10)
+pymocd.rimpso(G, pop_size=100, num_gens=100, inertia=0.4, cognitive=0.7, social=0.7,
+              local_rate=0.35, archive=100, ls_period=10, seed=0)
 pymocd.mmcomo(G, pop_size=100, num_gens=50, cross_rate=0.1, mut_rate=0.1, gap=10, beta=0.05)
 pymocd.ccm(G,    pop_size=200, num_gens=100, cross_rate=0.8, mut_rate=1/68, r=1.0, alpha=1.0, divisions=12)
 pymocd.krm(G,    pop_size=100, num_gens=100, cross_rate=0.8, mut_rate=1/34, divisions=12)
@@ -129,25 +129,28 @@ Seven of the eleven entry points expose the candidate set their selection
 rule picks from:
 
 ```python
-fronts = pymocd.mr_mocd_fronts(G)    # list[dict[node, community]]
+fronts = pymocd.rimpso_fronts(G)    # list[dict[node, community]]
 fronts = pymocd.hpmocd_fronts(G)
 fronts = pymocd.mmcomo_fronts(G)
 fronts = pymocd.ccm_fronts(G)
 fronts = pymocd.krm_fronts(G)
 fronts = pymocd.moga_net_fronts(G)
 
-# MR-MOCD only: run its label-free selection chain over partitions produced
+# RIMPSO only: run its label-free selection rule over partitions produced
 # elsewhere, which separates the search's contribution from the selector's
-pick, points = pymocd.mr_mocd_select(G, candidates)
+pick, points = pymocd.rimpso_select(G, candidates)
 ```
 
 Those are *exactly* the detectors with a front accessor. `gdpso` and `cdrme`
 are single-objective, and `mocd_q` / `mocd_d` do not expose theirs, so there is
 no `gdpso_fronts`, `cdrme_fronts` or `mocd_fronts`.
 
-`pymocd.scale` and `pymocd.scale_fronts` are deprecated aliases kept from
-earlier names of this detector; they are the same functions as `mr_mocd` and
-`mr_mocd_fronts`.
+`pymocd.mr_mocd`, `pymocd.mr_mocd_fronts` and `pymocd.mr_mocd_select` are the
+names this detector carried before it was renamed to RIMPSO; `pymocd.scale` and
+`pymocd.scale_fronts` are older still. All five are deprecated aliases for the
+same function objects as `rimpso`, `rimpso_fronts` and `rimpso_select`, kept so
+pinned callers keep working. They emit no warning and do not appear in the type
+stubs. Use the new names.
 
 ### Helpers
 

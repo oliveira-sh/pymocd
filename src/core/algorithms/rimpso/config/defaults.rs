@@ -9,3 +9,6 @@ pub const DEFAULT_COGNITIVE: f64 = 0.7;
 pub const DEFAULT_SOCIAL: f64 = 0.7;
 pub const DEFAULT_LOCAL_RATE: f64 = 0.35;
 pub const DEFAULT_LS_PERIOD: usize = 10;
+/// Contributes nothing to the RNG stream, so the default run reproduces the
+/// single trajectory this searched before the seed was a parameter.
+pub const DEFAULT_SEED: u64 = 0;

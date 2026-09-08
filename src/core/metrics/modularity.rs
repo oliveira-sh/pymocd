@@ -12,7 +12,7 @@ use rustc_hash::FxHashMap;
 /// `node < neighbor` guard counts each internal edge once to match — using the
 /// adjacency list's `2m` entries here doubles Q's first term.
 ///
-/// The partition-map form, live for MR-MOCD; detectors with a dense label
+/// The partition-map form, live for RIMPSO; detectors with a dense label
 /// array carry their own variant.
 pub fn modularity(graph: &Graph, partition: &Partition) -> f64 {
     let m = graph.edges.len() as f64;

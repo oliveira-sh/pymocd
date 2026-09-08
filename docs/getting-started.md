@@ -18,14 +18,14 @@ make build
 
 ## First detection
 
-`pymocd.mr_mocd` is the recommended entry point:
+`pymocd.rimpso` is the recommended entry point:
 
 ```python
 import networkx as nx
 import pymocd
 
 G = nx.karate_club_graph()
-communities = pymocd.mr_mocd(G)
+communities = pymocd.rimpso(G)
 ```
 
 !!! important "Graph format"
@@ -33,10 +33,10 @@ communities = pymocd.mr_mocd(G)
 
 ## Tuning
 
-`mr_mocd` takes its budget as keyword arguments, shown here at its defaults:
+`rimpso` takes its budget as keyword arguments, shown here at its defaults:
 
 ```python
-communities = pymocd.mr_mocd(
+communities = pymocd.rimpso(
     G,
     pop_size=100,
     num_gens=100,
@@ -46,6 +46,7 @@ communities = pymocd.mr_mocd(
     local_rate=0.35,
     archive=100,
     ls_period=10,
+    seed=0,
 )
 ```
 
@@ -53,9 +54,10 @@ communities = pymocd.mr_mocd(
 `inertia`, `cognitive` and `social` are the swarm's three velocity terms;
 `local_rate` is the per-node rate of the resolution-directed local move;
 `archive` is the capacity of the external Pareto archive, one slot per
-particle so it holds the whole profile; and `ls_period` is how often the full
-local search runs. **Resolution is not a parameter** — a single run covers the
-whole ladder.
+particle so it holds the whole profile; `ls_period` is how often the full
+local search runs; and `seed` is the run seed, whose default of `0` reproduces
+the single trajectory the search flew before the seed was a parameter.
+**Resolution is not a parameter** — a single run covers the whole ladder.
 
 `mmcomo` takes a different four knobs plus `gap` and `beta`, at its own
 paper's defaults (`pop_size=100`, `num_gens=50`, `cross_rate=0.1`,
@@ -109,22 +111,22 @@ Each metric is also available on its own: `pymocd.nmi`, `pymocd.ami`, `pymocd.ar
 ## Inspecting Pareto fronts
 
 Six detectors pick one partition from a Pareto front of candidates:
-`mr_mocd`, `hpmocd`, `mmcomo`, `ccm`, `krm` and `moga_net`. To see the whole
-candidate set, use `mr_mocd_fronts`, `hpmocd_fronts`, `mmcomo_fronts`,
+`rimpso`, `hpmocd`, `mmcomo`, `ccm`, `krm` and `moga_net`. To see the whole
+candidate set, use `rimpso_fronts`, `hpmocd_fronts`, `mmcomo_fronts`,
 `ccm_fronts`, `krm_fronts` or `moga_net_fronts`, which accept the same kwargs
 as their detector and return a `list[dict[node, community]]`:
 
 ```python
-front, points, selected = pymocd.mr_mocd_fronts(G)
+front, points, selected = pymocd.rimpso_fronts(G)
 best = max(front, key=lambda p: pymocd.ari(p, gt))
 ```
 
 `gdpso` and `cdrme` optimize a single scalar, so they have no front;
 `mocd_q` and `mocd_d` do not expose theirs.
 
-`mr_mocd_fronts` returns `(partitions, points, selected)`: every member, its
+`rimpso_fronts` returns `(partitions, points, selected)`: every member, its
 `(cut, pair)` point, and the index the selector picked.
-[`mr_mocd_select`](api/fronts.md#pymocd.mr_mocd_select) runs that selection
-chain alone over partitions produced elsewhere.
+[`rimpso_select`](api/fronts.md#pymocd.rimpso_select) runs that selection
+rule alone over partitions produced elsewhere.
 
 See the [fronts API reference](api/fronts.md) for details.

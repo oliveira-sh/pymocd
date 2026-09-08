@@ -16,7 +16,7 @@ use crate::core::algorithms::krm;
 use crate::core::algorithms::mmcomo;
 use crate::core::algorithms::mocd;
 use crate::core::algorithms::moganet;
-use crate::core::algorithms::mr_mocd;
+use crate::core::algorithms::rimpso;
 use crate::core::graph::{Graph, Partition, get_edges, get_nodes};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
@@ -533,7 +533,7 @@ pub fn mmcomo_fronts_fn(
     Ok(out.into_any().unbind())
 }
 
-/// `mr_mocd` — multi-objective particle swarm optimisation over the Constant
+/// `rimpso` — multi-objective particle swarm optimisation over the Constant
 /// Potts Model. Returns the selected partition as ``dict[node, community]``;
 /// isolated nodes get ``-1``.
 ///
@@ -543,35 +543,45 @@ pub fn mmcomo_fronts_fn(
 /// builds is the graph's whole resolution profile and `gamma` stops being a
 /// parameter the caller has to guess.
 ///
-/// Deterministic: the same graph and parameters give the same partition on any
-/// number of threads.
+/// Selection is label-free and has no parameter: of the archive's members, the one
+/// a degree-corrected assortative block model fits best once its own free
+/// densities are paid for. Both degenerate partitions carry no evidence and pay
+/// the penalty anyway, so there is no degeneracy filter and no fallback stage.
+///
+/// Deterministic: the same graph and the same parameters, ``seed`` included, give
+/// the same partition on any number of threads.
 ///
 /// Args:
+///     pop_size: particles in the swarm, one per rung of the resolution ladder.
+///     num_gens: generations to fly; the search always runs all of them.
 ///     inertia: fraction of a node's instability carried to the next iteration.
 ///     cognitive: pull toward the particle's own best partition.
 ///     social: pull toward a leader drawn from the archive by binary
 ///         tournament on crowding distance.
-///     local_rate: per-node rate of the resolution-directed CPM local move. Read only
-///         when ``repair`` is false; the repair supersedes it.
-///     repair: after perturbing a particle toward its attractors, drive it back to a local
-///         optimum of CPM at its own resolution, and prune the archive by keeping the best
-///         member at each rung of the resolution ladder rather than the least crowded.
-///         This is what makes the flight a search: with it off, 100 generations of 100
-///         particles improve a particle's own objective between 0 and 9 times in total and
-///         the net effect on the LFR grid is negative. Set false to reproduce the original
-///         flight exactly.
+///     local_rate: per-node rate of the resolution-directed CPM local move, applied
+///         on the iterations the full local search does not run.
 ///     archive: capacity of the external Pareto archive.
+///     ls_period: run the full local search — drive the particle back to a local
+///         optimum of CPM at its own resolution, then sweep for community merges —
+///         every ``ls_period`` iterations; 0 turns it off. This is what makes the
+///         flight a search: without it, 100 generations of 100 particles improve a
+///         particle's own objective between 0 and 9 times in total and the net
+///         effect on the LFR grid is negative.
+///     seed: run seed. The default, 0, contributes nothing to the random stream, so
+///         it reproduces the single trajectory this searched before the seed was a
+///         parameter; any other value flies an independent one.
 ///
-/// There is no seeding local search and no ``seed_rounds``: every particle starts at a
-/// raw scatter and the flight does all of the optimisation. Driving each particle to a
-/// CPM local optimum first was measured to be worth only a handful of iterations, and
-/// asymptotically to cost quality, because a particle already at a local optimum must be
-/// dragged out of it before it can move.
+/// ``seed`` is the random seed, not a seeding budget: there is no seeding local
+/// search and no ``seed_rounds``. Every particle starts at a raw scatter and the
+/// flight does all of the optimisation. Driving each particle to a CPM local optimum
+/// first was measured to be worth only a handful of iterations, and asymptotically to
+/// cost quality, because a particle already at a local optimum must be dragged out of
+/// it before it can move.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(name = "mr_mocd", signature = (graph, pop_size = mr_mocd::DEFAULT_POP_SIZE, num_gens = mr_mocd::DEFAULT_NUM_GENS, inertia = mr_mocd::DEFAULT_INERTIA, cognitive = mr_mocd::DEFAULT_COGNITIVE, social = mr_mocd::DEFAULT_SOCIAL, local_rate = mr_mocd::DEFAULT_LOCAL_RATE, archive = mr_mocd::DEFAULT_POP_SIZE, ls_period = mr_mocd::DEFAULT_LS_PERIOD))]
+#[pyo3(name = "rimpso", signature = (graph, pop_size = rimpso::DEFAULT_POP_SIZE, num_gens = rimpso::DEFAULT_NUM_GENS, inertia = rimpso::DEFAULT_INERTIA, cognitive = rimpso::DEFAULT_COGNITIVE, social = rimpso::DEFAULT_SOCIAL, local_rate = rimpso::DEFAULT_LOCAL_RATE, archive = rimpso::DEFAULT_POP_SIZE, ls_period = rimpso::DEFAULT_LS_PERIOD, seed = rimpso::DEFAULT_SEED))]
 #[allow(clippy::too_many_arguments)]
-pub fn mr_mocd_fn(
+pub fn rimpso_fn(
     graph: &Bound<'_, PyAny>,
     pop_size: usize,
     num_gens: usize,
@@ -581,11 +591,12 @@ pub fn mr_mocd_fn(
     local_rate: f64,
     archive: usize,
     ls_period: usize,
+    seed: u64,
 ) -> PyResult<Py<PyAny>> {
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
-    let part = mr_mocd::mr_mocd(
+    let part = rimpso::rimpso(
         &nodes,
         &edges,
         pop_size,
@@ -596,6 +607,7 @@ pub fn mr_mocd_fn(
         local_rate,
         archive,
         ls_period,
+        seed,
     );
     let d = PyDict::new(py);
     for (node, comm) in part {
@@ -604,20 +616,22 @@ pub fn mr_mocd_fn(
     Ok(d.into_any().unbind())
 }
 
-/// `mr_mocd`'s archive: the graph's resolution profile.
+/// `rimpso`'s archive: the graph's resolution profile.
 ///
 /// Returns ``(fronts, objectives, selected)`` where ``fronts`` is a list of
 /// ``dict[node, community]``, ``objectives`` the matching ``(cut, pair)`` pairs,
-/// and ``selected`` the index the selector picks. ``cut`` is the fraction of
+/// and ``selected`` the index the selector picks — the member a degree-corrected
+/// assortative block model fits best. ``cut`` is the fraction of
 /// edges leaving their community — the partition's own mixing parameter — and
 /// ``pair`` the fraction of node pairs sharing one.
 ///
-/// Args:
+/// Takes the same keyword arguments as [`rimpso`][pymocd.rimpso], with the same
+/// defaults, and searches identically — only the return shape differs.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(name = "mr_mocd_fronts", signature = (graph, pop_size = mr_mocd::DEFAULT_POP_SIZE, num_gens = mr_mocd::DEFAULT_NUM_GENS, inertia = mr_mocd::DEFAULT_INERTIA, cognitive = mr_mocd::DEFAULT_COGNITIVE, social = mr_mocd::DEFAULT_SOCIAL, local_rate = mr_mocd::DEFAULT_LOCAL_RATE, archive = mr_mocd::DEFAULT_POP_SIZE, ls_period = mr_mocd::DEFAULT_LS_PERIOD))]
+#[pyo3(name = "rimpso_fronts", signature = (graph, pop_size = rimpso::DEFAULT_POP_SIZE, num_gens = rimpso::DEFAULT_NUM_GENS, inertia = rimpso::DEFAULT_INERTIA, cognitive = rimpso::DEFAULT_COGNITIVE, social = rimpso::DEFAULT_SOCIAL, local_rate = rimpso::DEFAULT_LOCAL_RATE, archive = rimpso::DEFAULT_POP_SIZE, ls_period = rimpso::DEFAULT_LS_PERIOD, seed = rimpso::DEFAULT_SEED))]
 #[allow(clippy::too_many_arguments)]
-pub fn mr_mocd_fronts_fn(
+pub fn rimpso_fronts_fn(
     graph: &Bound<'_, PyAny>,
     pop_size: usize,
     num_gens: usize,
@@ -627,11 +641,12 @@ pub fn mr_mocd_fronts_fn(
     local_rate: f64,
     archive: usize,
     ls_period: usize,
+    seed: u64,
 ) -> PyResult<Py<PyAny>> {
     let py = graph.py();
     let nodes = get_nodes(graph)?;
     let edges = get_edges(graph)?;
-    let (fronts, objs, selected) = mr_mocd::mr_mocd_fronts(
+    let (fronts, objs, selected) = rimpso::rimpso_fronts(
         &nodes,
         &edges,
         pop_size,
@@ -642,6 +657,7 @@ pub fn mr_mocd_fronts_fn(
         local_rate,
         archive,
         ls_period,
+        seed,
     );
     let parts = PyList::empty(py);
     for part in fronts {
@@ -661,7 +677,7 @@ pub fn mr_mocd_fronts_fn(
         .unbind())
 }
 
-/// Run `mr_mocd`'s label-free selection chain over partitions produced elsewhere.
+/// Run `rimpso`'s label-free selection rule over partitions produced elsewhere.
 ///
 /// `candidates` is a list of ``dict[node, community]``. Returns
 /// ``(selected_index, objectives)`` where ``objectives`` holds the ``(cut, pair)``
@@ -669,8 +685,8 @@ pub fn mr_mocd_fronts_fn(
 /// independently of the search that normally feeds it.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(name = "mr_mocd_select", signature = (graph, candidates))]
-pub fn mr_mocd_select_fn(
+#[pyo3(name = "rimpso_select", signature = (graph, candidates))]
+pub fn rimpso_select_fn(
     graph: &Bound<'_, PyAny>,
     candidates: Vec<std::collections::HashMap<i32, i32>>,
 ) -> PyResult<Py<PyAny>> {
@@ -681,7 +697,7 @@ pub fn mr_mocd_select_fn(
         .iter()
         .map(|m| m.iter().map(|(&k, &v)| (k, v)).collect())
         .collect();
-    let (pick, objs) = mr_mocd::mr_mocd_select(&nodes, &edges, &cands);
+    let (pick, objs) = rimpso::rimpso_select(&nodes, &edges, &cands);
     let points = PyList::empty(py);
     for o in objs {
         points.append(vec![o[0], o[1]])?;
